@@ -438,7 +438,7 @@ export function IndustryAnalysis() {
       <PageHeader
         className="shrink-0 [&>div:first-child]:w-full"
         afterSubtitle={
-          <div className="flex w-full min-w-0 flex-col gap-1">
+          <div className="flex w-full min-w-0 flex-col gap-2">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
               <IndustryLeaders leaders={pctLeaders} fallers={pctFallers} onSelect={setSelectedKey} />
               <span className="ml-auto whitespace-nowrap text-xs leading-[18px] text-muted">
@@ -470,12 +470,12 @@ export function IndustryAnalysis() {
                 <button
                   onClick={() => { rowsQuery.refetch(); marketQuery.refetch() }}
                   disabled={rowsQuery.isFetching || marketQuery.isFetching}
-                  className="p-1.5 text-secondary hover:bg-surface disabled:opacity-50"
+                  className="p-1 text-secondary hover:bg-surface disabled:opacity-50"
                   title="刷新"
                 >
                   <RefreshCw className={cn('h-4 w-4', (rowsQuery.isFetching || marketQuery.isFetching) && 'animate-spin')} />
                 </button>
-                <button onClick={() => setShowConfig(true)} className="p-1.5 text-secondary hover:bg-surface hover:text-accent" title="配置数据源">
+                <button onClick={() => setShowConfig(true)} className="p-1 text-secondary hover:bg-surface hover:text-accent" title="配置数据源">
                   <Settings2 className="h-4 w-4" />
                 </button>
               </div>
