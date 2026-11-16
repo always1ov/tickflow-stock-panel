@@ -343,8 +343,31 @@ export function IndustryAnalysis() {
     [rowsQuery.data, activeConfig, fieldConfig.dimensionField],
   )
 
-  const industryLevel = fieldConfig.hierarchyLevel ?? 2
-  const groups = useMemo(() => groupByIndustryLevel(resolved.groups, industryLevel), [resolved.groups, industryLevel])
+  // [R778] 层级跟着页头工具栏走: 页头改动后写回配置(刷新不丢)
+  // [R779] 默认落到最细一级(= 数据实际的最深一段), 用 3 表示「我要最细的」,
+  // 下面再按 maxIndustryLevel 夹一次 —— 数据只有两段时就是 2 级。
+  // 原来从配置里的 2 级起步: 2 级只是历史默认值, 不代表用户的选择, 而层级越细
+  // 区分度越高(90 组时除第一名外几乎拉不开), 默认就该给信息量最大的那层。
+  const [grain, setGrain] = useState<IndustryLevel>(3)
+  const changeGrain = (lv: IndustryLevel) => {
+    setGrain(lv)
+    setSelectedKey(null)
+    const next = { ...fieldConfig, hierarchyLevel: lv }
+    setFieldConfig(next)
+    saveConfig(next)
+  }
+  // [R778] 数据源实际有几段行业串（"种植业与林业-种子生产" = 2）。层数不足时，
+  // 后端的「3 级」会回退到最后一段，结果与 2 级完全相同 —— 用户点了看不到任何变化，
+  // 所以这里按数据实际段数限制可选档位，同时把上次存的越界档位夹回来。
+  const maxIndustryLevel = useMemo(() => {
+    let max = 1
+    for (const g of resolved.groups) {
+      max = Math.max(max, g.key.split('-').filter(s => s.trim()).length)
+    }
+    return Math.min(3, max) as IndustryLevel
+  }, [resolved.groups])
+  const effectiveLevel = Math.min(grain, maxIndustryLevel) as IndustryLevel
+  const groups = useMemo(() => groupByIndustryLevel(resolved.groups, effectiveLevel), [resolved.groups, effectiveLevel])
 
   const stats = useMemo(() => {
     return groups
@@ -387,6 +410,7 @@ export function IndustryAnalysis() {
   const handleSaveConfig = (c: AnalysisFieldConfig) => {
     setFieldConfig(c)
     saveConfig(c)
+    setGrain((c.hierarchyLevel ?? 3) as IndustryLevel)
     setSelectedKey(null)
   }
 
@@ -422,7 +446,7 @@ export function IndustryAnalysis() {
     )
   }
 
-  const industryLevelLabel = `${industryLevel}级行业`
+  const industryLevelLabel = `${effectiveLevel}级行业`
 
   return (
     // [R768] 整页是一个等高列: 页头固定, 下面内容吃掉剩余高度, 页面本身不滚动
@@ -461,6 +485,9 @@ export function IndustryAnalysis() {
                 <SectorHeatmapToolbar
                   days={heatDays}
                   onDaysChange={setHeatDays}
+                  level={effectiveLevel}
+                  maxLevel={maxIndustryLevel}
+                  onLevelChange={changeGrain}
                   topN={HEATMAP_TOP_N}
                   showAll={heatAll}
                   onShowAllChange={setHeatAll}
@@ -502,7 +529,7 @@ export function IndustryAnalysis() {
           {groups.length > 0 && (
             <SectorRankHeatmap
               kind="industry"
-              level={industryLevel}
+              level={effectiveLevel}
               days={heatDays}
               topN={HEATMAP_TOP_N}
               showAll={heatAll}
@@ -583,7 +610,7 @@ export function IndustryAnalysis() {
           aiOnly
           kind="industry"
           initialDays={aiDays}
-          initialLevel={industryLevel}
+          initialLevel={effectiveLevel}
           onClose={() => setShowAi(false)}
         />
       )}

@@ -29,6 +29,7 @@ const DEFAULT_DAYS = 30
 const DEFAULT_TOP_N = 50
 /** [R769] 天数档位与「涨幅RPS轮动分析」弹窗同一套，两处看到的口径必须能对上 */
 const DAY_PRESETS = [7, 12, 20, 30]
+const LEVEL_OPTIONS = [1, 2, 3] as const
 
 /**
  * [R773] 矩阵工具栏：天数 / 范围 / AI 三个入口。
@@ -42,14 +43,23 @@ const DAY_PRESETS = [7, 12, 20, 30]
  */
 export function SectorHeatmapToolbar({
   days,
+  level,
   topN,
   showAll,
   totalCount = 0,
+  maxLevel,
   onDaysChange,
+  onLevelChange,
   onShowAllChange,
   onOpenAi,
 }: {
   days: number
+  /**
+   * [R778] 行业层级（1/2/3）与天数一样上移到页头 —— 用户：「按钮都放在外面，里面点进去
+   * 直接跟随外面的选择运行分析」。层级切换留在 AI 弹窗里只能改 AI 那份数据，热力图还是
+   * 原来的分组，同一屏两套口径。
+   */
+  level?: number
   topN: number
   /** 受控：前 N 名 / 全部名次，状态在页面里 */
   showAll: boolean
@@ -60,6 +70,14 @@ export function SectorHeatmapToolbar({
    */
   totalCount?: number
   onDaysChange?: (days: number) => void
+  /** 不给就不渲染层级切换（概念页没有层级） */
+  onLevelChange?: (level: 1 | 2 | 3) => void
+  /**
+   * [R778] 数据源实际有几段行业串。同花顺这套只有两段（"种植业与林业-种子生产"），
+   * 传 3 会让用户点「3级」却看不到任何变化（后端段数不足时回退最后一段，结果与 2 级
+   * 完全相同）。所以按钮只渲染真实存在的档位。
+   */
+  maxLevel?: number
   onShowAllChange?: (showAll: boolean) => void
   /** 打开 AI 轮动分析，带上当前看的天数 */
   onOpenAi?: (days: number) => void
@@ -80,6 +98,23 @@ export function SectorHeatmapToolbar({
           </button>
         ))}
       </div>
+      {onLevelChange && (
+        <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
+          {LEVEL_OPTIONS.filter(lv => lv <= (maxLevel ?? 3)).map(lv => (
+            <button
+              key={lv}
+              onClick={() => onLevelChange(lv)}
+              title={lv === (maxLevel ?? 3) ? '当前数据源的最细一层' : undefined}
+              className={cn(
+                'h-5 rounded-[5px] px-2 text-micro tabular-nums transition-colors',
+                level === lv ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground',
+              )}
+            >
+              {lv}级
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex items-center rounded-btn border border-border bg-base/60 p-0.5">
         <button
           onClick={() => onShowAllChange?.(false)}
@@ -96,8 +131,11 @@ export function SectorHeatmapToolbar({
             'h-5 rounded-[5px] px-2 text-micro tabular-nums transition-colors',
             showAll ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground',
           )}
+          title="显示全部名次"
         >
-          全部 {totalCount || '—'}
+          {/* [R778] 数字给固定宽度: 切层级时 90 / 257 的位数一变, 这排按钮就整体左右挪,
+              页头看起来在抖 */}
+          全部<span className="inline-block w-7 text-right tabular-nums">{totalCount || '—'}</span>
         </button>
       </div>
       {onOpenAi && (

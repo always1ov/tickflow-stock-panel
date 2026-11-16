@@ -216,6 +216,10 @@ def build_rps_rotation(repo, days: int = 12, kind: str = "concept", level: int |
         parts = pl.col(kind).str.split("-")
         idx = pl.min_horizontal(pl.lit(level - 1), pl.col(kind).str.count_matches("-"))
         joined = joined.with_columns(parts.list.get(idx).alias(kind))
+        # [R778] 成员数要按**当前层级**重算。原来直接返回 _load_concept_map_df 的
+        # 未分层成员数(257), 切到 1 级后热力图只剩 90 行, 弹窗标题却仍写 257 ——
+        # 同一块界面两个总数, 用户切层级看不出计数变化。
+        member_count = joined.get_column(kind).n_unique()
 
     # 4. 按 (date, <kind>) 聚合 avg change_pct —— 与 _dimension_rank 的简单平均口径一致
     agg = joined.group_by(["date", kind]).agg(

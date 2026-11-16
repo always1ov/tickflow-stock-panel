@@ -30,6 +30,15 @@ const ROW_HEIGHT = 34
 const OVERSCAN = 8           // 上下额外渲染行数, 减少滚动时的白屏闪烁
 // [R764] 天数从 7~30 滑杆改成 4 档 chip, 塞进标题行
 const DAY_PRESETS = [7, 12, 20, 30]
+/** [R779] aiOnly 空态的四张卡 = 报告固定会覆盖的四件事 */
+const AI_ANGLES = [
+  { title: '主线研判', desc: '当前最强的一条线, 以及它还能不能延续' },
+  { title: '新晋强势', desc: '名次快速上移、刚挤进前列的方向' },
+  { title: '退潮预警', desc: '由强转弱、还在榜上但已经在掉队' },
+  { title: '资金结构', desc: '机构 vs 游资, 这些名次是谁在承接' },
+]
+/** [R779] 标题栏上的只读口径 chip */
+const CALIBER_CHIP = 'rounded-btn border border-border bg-base/60 px-1.5 py-0.5 text-micro text-secondary tabular-nums'
 
 // 涨幅 → 背景色梯度(A 股语义: 红涨绿跌)。强度越大色越深, 一眼看出强势/弱势概念
 function pctBgClass(pct: number): string {
@@ -223,27 +232,132 @@ export function RpsRotationDialog({
     return rows
   }, [visibleRange, getRowIndex, dates, columns, selected])
 
+  // [R779] aiOnly 重排: 这个弹窗只装一份报告 —— 口径钉在标题栏、操作收在底部、
+  // 正文整块给结论。原来「标题 / 口径 / 输入 / 空态 / 报告」五段全挤在上方,
+  // 76vh 的窗口里真正能读报告的高度被切得只剩一半。
+  if (aiOnly) {
+    return (
+      <Modal
+        onClose={onClose}
+        labelledBy="rps-rotation-title"
+        overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        panelClassName="bg-surface border border-border rounded-card shadow-xl flex flex-col w-[800px] max-w-[92vw] h-[76vh]"
+      >
+        {/* 标题栏: 标题 + 只读口径。口径跟随页头工具栏, 这里没有第二个切换入口 */}
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-3">
+          <Sparkles className="h-4 w-4 text-accent" />
+          <span id="rps-rotation-title" className={TYPE.section}>{dimLabel} AI 轮动分析</span>
+          <span className="ml-1 flex items-center gap-1">
+            <span className={CALIBER_CHIP}>{dates.length || days} 日</span>
+            {kind === 'industry' && <span className={CALIBER_CHIP}>{level} 级</span>}
+            {conceptCount > 0 && <span className={CALIBER_CHIP}>{conceptCount} 个{dimLabel}</span>}
+          </span>
+          <button aria-label="关闭" onClick={onClose} className="ml-auto p-1 rounded-btn hover:bg-elevated transition-colors cursor-pointer">
+            <X className="h-4 w-4 text-muted" />
+          </button>
+        </div>
+
+        {/* 正文: 报告 / 空态 / 错误三选一, 整块可滚 */}
+        <div ref={analysisRef} className="flex-1 min-h-0 overflow-auto">
+          {analysisError ? (
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+              <AlertCircle className="h-5 w-5 text-danger" />
+              <div className="text-xs text-danger">{analysisError}</div>
+              <button
+                onClick={() => runAnalysis(days, focus)}
+                className="rounded-btn border border-border px-3 py-1 text-xs text-accent transition-colors hover:bg-elevated cursor-pointer"
+              >重新生成</button>
+            </div>
+          ) : analysis || analyzing ? (
+            <div className="px-5 py-4 leading-relaxed">
+              {analysisMeta?.summary && (
+                <div className="mb-3 border-l-2 border-accent/60 bg-accent/5 px-3 py-2 text-xs text-accent/90">
+                  {analysisMeta.summary}
+                </div>
+              )}
+              {analyzing && (
+                <div className="mb-2 flex items-center gap-1.5 text-micro text-muted">
+                  <RefreshCw className="h-3 w-3 animate-spin" />AI 正在读矩阵…
+                </div>
+              )}
+              <div className="text-body">
+                <MarkdownRenderer content={analysis} />
+                {analyzing && <span className="ml-0.5 inline-block h-3.5 w-1.5 bg-accent animate-pulse align-middle" />}
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-5 px-8 text-center">
+              <div className="flex flex-col items-center gap-1">
+                <Sparkles className="h-6 w-6 text-accent/40" />
+                <div className="text-body text-foreground">让 AI 读一遍这张轮动矩阵</div>
+                <div className="text-micro text-muted">
+                  按 {dates.length || days} 日{kind === 'industry' ? ` · ${level} 级` : ''}{conceptCount > 0 ? ` · ${conceptCount} 个${dimLabel}` : ''} 的口径
+                </div>
+              </div>
+              {/* [R779] 固定两列 + 整体居中: flex-wrap 会因为容器 734px 装得下三张 224px 卡
+                  而排成 3+1, 四件事读起来就不是一组。`w-fit` 让网格宽度贴着两列, 再 mx-auto 居中 */}
+              <div className="mx-auto grid w-fit grid-cols-2 gap-2">
+                {AI_ANGLES.map(a => (
+                  <div key={a.title} className="w-56 rounded-btn border border-border/60 bg-elevated/20 px-3 py-2 text-left">
+                    <div className="text-xs text-foreground">{a.title}</div>
+                    <div className="text-micro text-muted">{a.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 底部操作条: 输入在左、主按钮在右, 报告往上长而不把操作顶走 */}
+        <div className="shrink-0 border-t border-border px-5 py-3">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={focus}
+              onChange={e => setFocus(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !analyzing) runAnalysis(days, focus) }}
+              placeholder="关注点(可选)，例如: 只看新能源链 / 谁在退潮"
+              disabled={analyzing}
+              className="h-8 min-w-0 flex-1 rounded-btn border border-border bg-base/60 px-2.5 text-xs text-foreground placeholder:text-muted/50 focus:border-accent/40 focus:outline-none disabled:opacity-50"
+            />
+            <button
+              onClick={() => runAnalysis(days, focus)}
+              disabled={analyzing}
+              className={cn(
+                'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-btn px-3 text-xs transition-colors',
+                analyzing
+                  ? 'cursor-not-allowed border border-border text-secondary opacity-60'
+                  : 'cursor-pointer bg-foreground font-medium text-surface hover:bg-foreground/90',
+              )}
+            >
+              {analyzing
+                ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" />分析中</>
+                : analysis
+                  ? <><RefreshCw className="h-3.5 w-3.5" />重新分析</>
+                  : <><Sparkles className="h-3.5 w-3.5" />生成分析</>}
+            </button>
+          </div>
+          <div className="mt-2 text-micro text-muted">报告由 AI 生成，结论以热力图为准</div>
+        </div>
+      </Modal>
+    )
+  }
+
   return (
     <Modal
       onClose={onClose}
       labelledBy="rps-rotation-title"
       overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      panelClassName={cn(
-        'w-[92vw] bg-surface border border-border rounded-card shadow-xl flex flex-col',
-        aiOnly ? 'h-[70vh] max-w-read' : 'h-[88vh] max-w-wide',
-      )}
+      panelClassName="bg-surface border border-border rounded-card shadow-xl flex flex-col w-[92vw] h-[88vh] max-w-wide"
     >
           {/* 标题栏 */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
             <div className="flex items-center gap-2">
               <Repeat className="h-4 w-4 text-accent" />
-              <span id="rps-rotation-title" className={TYPE.section}>
-                {aiOnly ? `${dimLabel} AI 轮动分析` : `${dimLabel}涨幅轮动`}
-              </span>
+              <span id="rps-rotation-title" className={TYPE.section}>{dimLabel}涨幅轮动</span>
               <span className="text-xs text-muted">
                 {conceptCount > 0 ? `${dates.length} 日 · ${conceptCount} 个${dimLabel}` : '暂无数据'}
               </span>
-              {/* 行业层级选择器: 1/2/3 级, 默认 2 级。仅 kind=industry 显示 */}
               {kind === 'industry' && (
                 <div className="ml-1 flex items-center rounded-btn border border-border bg-base/60 p-0.5">
                   {[1, 2, 3].map(lv => (
@@ -275,23 +389,20 @@ export function RpsRotationDialog({
                   </button>
                 ))}
               </div>
-              {/* [R769] aiOnly 模式没有矩阵可翻, 排序开关一并收起 */}
-              {!aiOnly && (
-                <button
-                  onClick={() => setReversed(r => !r)}
-                  className={cn(
-                    'inline-flex h-6 items-center gap-1 rounded-btn px-2 text-micro transition-colors cursor-pointer border',
-                    reversed
-                      ? 'border-foreground bg-foreground font-medium text-surface'
-                      : 'border-border text-secondary hover:bg-elevated',
-                  )}
-                  title="翻转排序(高↔低)"
-                >
-                  <ArrowDownUp className="h-3 w-3" />
-                  {reversed ? '低→高' : '高→低'}
-                </button>
-              )}
-              {!aiOnly && selected && (
+              <button
+                onClick={() => setReversed(r => !r)}
+                className={cn(
+                  'inline-flex h-6 items-center gap-1 rounded-btn px-2 text-micro transition-colors cursor-pointer border',
+                  reversed
+                    ? 'border-foreground bg-foreground font-medium text-surface'
+                    : 'border-border text-secondary hover:bg-elevated',
+                )}
+                title="翻转排序(高↔低)"
+              >
+                <ArrowDownUp className="h-3 w-3" />
+                {reversed ? '低→高' : '高→低'}
+              </button>
+              {selected && (
                 <button onClick={() => setSelected(null)} className="text-micro text-accent hover:underline cursor-pointer">
                   取消追踪
                 </button>
@@ -302,8 +413,8 @@ export function RpsRotationDialog({
             </button>
           </div>
 
-          {/* 上半区: AI 轮动分析。aiOnly 时它就是全部内容, 不再压 42% 的高度上限 */}
-          <div className={cn('shrink-0 border-b border-border flex flex-col', aiOnly ? 'min-h-0 flex-1' : 'max-h-[42%]')}>
+          {/* 上半区: AI 轮动分析 */}
+          <div className="shrink-0 border-b border-border flex flex-col max-h-[42%]">
             {/* 标题栏: 标题 + meta 摘要 + focus 输入 + 触发按钮 */}
             <div className="flex items-center gap-2 px-4 py-1.5 bg-elevated/30 shrink-0">
               <Sparkles className={cn('h-3.5 w-3.5 text-accent/60', analyzing && 'animate-pulse')} />
@@ -324,7 +435,7 @@ export function RpsRotationDialog({
                   onChange={e => setFocus(e.target.value)}
                   placeholder="关注点(可选)"
                   disabled={analyzing}
-                  className="w-28 px-2 py-0.5 text-xs bg-elevated/50 border border-border rounded-btn text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent/40 disabled:opacity-50"
+                  className="px-2 py-0.5 w-28 text-xs bg-elevated/50 border border-border rounded-btn text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent/40 disabled:opacity-50"
                 />
                 <button
                   onClick={() => runAnalysis(days, focus)}
@@ -358,7 +469,7 @@ export function RpsRotationDialog({
                   >重试</button>
                 </div>
               ) : analysis || analyzing ? (
-                <div className="px-4 py-2.5 text-xs leading-relaxed">
+                <div className="px-4 py-2.5 leading-relaxed text-xs">
                   <MarkdownRenderer content={analysis} />
                   {analyzing && (
                     <span className="inline-block w-1.5 h-3.5 bg-accent animate-pulse align-middle ml-0.5" />
@@ -369,9 +480,7 @@ export function RpsRotationDialog({
             )}
           </div>
 
-          {/* 下半区: 涨幅轮动矩阵(虚拟滚动) — [R769] aiOnly 时整块不渲染 */}
-          {!aiOnly && (
-          <>
+          {/* 下半区: 涨幅轮动矩阵(虚拟滚动) */}
           <div className="flex-1 min-h-0 flex flex-col">
             {isLoading ? (
               <div className="flex items-center justify-center py-16">
@@ -475,17 +584,6 @@ export function RpsRotationDialog({
               每列各自按当日涨幅排序 · 点击单元格追踪概念在各日的排名变化
             </span>
           </div>
-          </>
-          )}
-
-          {/* [R769] aiOnly: 矩阵已并进热力图, 这里只交代口径与边界 */}
-          {aiOnly && (
-            <div className="px-4 py-1.5 border-t border-border shrink-0">
-              <span className="text-micro text-muted">
-                最近 {days} 日 · 报告由 AI 生成，名次与涨幅以矩阵为准
-              </span>
-            </div>
-          )}
     </Modal>
   )
 }
