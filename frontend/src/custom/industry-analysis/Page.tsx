@@ -560,7 +560,8 @@ export function IndustryAnalysis() {
         </div>
       </div>
 
-      {/* [R763] 行业详情抽屉: 点热力图格子/chip 后从右侧滑出(复用 IndustryFocus) */}
+      {/* [R763] 行业详情抽屉: 点左列行业名/chip 后从右侧滑出(复用 IndustryFocus)
+          [R780] 只有行业名可点 —— 热力图格子是历史名次, 抽屉是今日口径, 两者不能连起来 */}
       <AnimatePresence>
         {selected && (
           <>
@@ -579,7 +580,12 @@ export function IndustryAnalysis() {
               className="fixed right-0 top-0 z-40 flex h-screen w-[800px] max-w-[92vw] flex-col border-l border-border bg-base shadow-2xl"
             >
               <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
-                <span className="text-xs text-muted">行业详情</span>
+                {/* [R780] 抽屉口径必须写明: 热力图格子里是历史某天的名次, 这里全是今日快照,
+                    不写清楚就会被当成「那一天的行业详情」 */}
+                <span className="flex items-center gap-2 text-xs text-muted">
+                  行业详情
+                  <span className="rounded-btn border border-border bg-base/60 px-1.5 py-0.5 text-micro">今日口径</span>
+                </span>
                 <button onClick={() => setSelectedKey(null)} className="p-1 text-secondary hover:text-foreground" aria-label="关闭">
                   <X className="h-4 w-4" />
                 </button>

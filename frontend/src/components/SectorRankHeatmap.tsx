@@ -300,9 +300,10 @@ export function SectorRankHeatmap({
                     {row.cells.map((cell, i) => (
                       <td key={dates[i]} className="border-r border-border/25 p-0">
                         {cell ? (
+                          // [R780] 格子不可点: 名次是历史那一天的, 但抽屉里的行业详情只有今日口径,
+                          // 点历史格子打开今日详情会让人以为看到的是那天的行业。选行业统一走左列名称。
                           <div
-                            onClick={() => onSelect?.(row.name)}
-                            className="flex w-full cursor-pointer items-center justify-center text-micro font-medium leading-none tabular-nums hover:brightness-110"
+                            className="flex w-full items-center justify-center text-micro font-medium leading-none tabular-nums"
                             style={{
                               height: rowH - 1,
                               backgroundColor: rankColor(cell.rank, showAll ? totalRows : 50),
