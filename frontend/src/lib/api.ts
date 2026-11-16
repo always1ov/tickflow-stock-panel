@@ -5079,6 +5079,8 @@ export const api = {
     request<{ status: string; symbol: string; rows: number }>('/api/kline/sync_minute_single', {
       method: 'POST',
       body: JSON.stringify({ symbol, ...(days != null ? { days } : {}) }),
+      // 回退到分时备用接口时是逐日串行请求 (10 日实测约 21s), 默认 30s 会误超时
+      timeoutMs: 180_000,
     }),
   repairMinuteGaps: (targets: Pick<MinuteGapRow, 'symbol' | 'date'>[] | string[]) =>
     request<{ status: string; job_id: string }>('/api/kline/repair_minute_gaps', {

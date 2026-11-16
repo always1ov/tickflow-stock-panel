@@ -1678,12 +1678,51 @@ async def trigger_minute_sync(
     return {"status": "started", "job_id": job_id}
 
 
+def _recent_trade_dates(repo, symbol: str, days: int) -> list[date]:
+    """最近 N 个交易日: 优先取日K实际日期, 取不到再按工作日回退。"""
+    end = cn_today()
+    start = end - timedelta(days=days * 3 + 20)
+    try:
+        daily = repo.get_daily(symbol, start, end, columns=["date"])
+        if not daily.is_empty() and "date" in daily.columns:
+            dates = sorted({d for d in daily["date"].to_list() if isinstance(d, date)})
+            if dates:
+                return dates[-days:]
+    except Exception as e:  # noqa: BLE001 — 日K不可用时用工作日兜底
+        logger.warning("分时补齐取日K交易日失败, 回退工作日: %s", e)
+    out: list[date] = []
+    cursor = trading_day.expected_latest_bar_date()
+    while len(out) < days and (end - cursor).days <= days * 3 + 20:
+        if cursor.weekday() < 5:
+            out.append(cursor)
+        cursor -= timedelta(days=1)
+    return sorted(out)
+
+
+def _backfill_from_backup(repo, symbol: str, asset_type: str, days: int) -> int:
+    """用分时备用接口补齐单只标的 (只由个股弹窗触发, 不扫全市场)。
+
+    只请求本地还缺的日子, 然后并发拉取 (上游一次一日, 并发 ≈ 一次性补齐)。
+    """
+    dates = _recent_trade_dates(repo, symbol, days)
+    missing = [
+        d for d in dates
+        if not hist_minute_backup.is_session_complete(symbol, d, asset_type)
+    ]
+    if not missing:
+        return 0
+    return hist_minute_backup.fetch_days(
+        symbol, missing, asset_type, write_lock=getattr(repo, "_write_lock", None),
+    )
+
+
 @router.post("/sync_minute_single")
 async def sync_minute_single(request: Request, body: dict):
     """手动拉取单只股票的分钟K并落库 (口径随基准标记: 未迁移=前复权, 已迁移=原始)。
 
-    body: { "symbol": "000001.SZ" }
-    用于个股分时图"获取数据"按钮: 本地无数据时单独拉取并持久化。
+    body: { "symbol": "000001.SZ", "days": 10 }
+    用于个股分时图"获取数据/重试补齐"按钮: 主源不可用或拉空时, 回退到
+    设置页配置的分时备用接口逐日补齐 (仍然只拉这一只)。
     """
     from app.services.preferences import get_minute_sync_days
 
@@ -1707,16 +1746,39 @@ async def sync_minute_single(request: Request, body: dict):
     if asset_type == "index":
         raise HTTPException(status_code=400, detail="指数分钟K不支持落库同步 (指数分钟数据走 /api/index/minute 实时读取)")
 
-    if not _minute_allowed(capset):
-        raise HTTPException(status_code=403, detail="需要 Pro+ 权限")
-
     days = requested_days if requested_days is not None else get_minute_sync_days()
-    from app.services.minute_shared_pull import sync_history
+    allowed = _minute_allowed(capset)
+    written = 0
+    primary_error: Exception | None = None
 
-    qs = getattr(request.app.state, "quote_service", None)
-    written = await anyio.to_thread.run_sync(lambda: sync_history(
-        repo, capset, symbol, asset_type, days, on_updated=qs.notify_data_updated if qs else None,
-    ))
+    if allowed:
+        from app.services.minute_shared_pull import sync_history
+
+        qs = getattr(request.app.state, "quote_service", None)
+        try:
+            written = await anyio.to_thread.run_sync(lambda: sync_history(
+                repo, capset, symbol, asset_type, days,
+                on_updated=qs.notify_data_updated if qs else None,
+            ))
+        except Exception as e:  # noqa: BLE001 — 主源异常时给备用接口一次机会
+            primary_error = e
+            logger.warning("分钟主源补齐失败, 尝试分时备用接口: %s", e)
+
+    # 主源无权限/拉空/异常 → 用设置页的分时备用接口逐日补齐这一只
+    if written == 0 and hist_minute_backup.is_configured():
+        written = await anyio.to_thread.run_sync(
+            lambda: _backfill_from_backup(repo, symbol, asset_type, days),
+        )
+
+    if written == 0:
+        # 主源自己有异常时原样抛出, 保留「部分分段已写、异常照样上报」的既有契约
+        if primary_error is not None:
+            raise primary_error
+        if not allowed and not hist_minute_backup.is_configured():
+            raise HTTPException(
+                status_code=403,
+                detail="需要 Pro+ 权限; 也可在 设置 → 数据源 底部配置「分时备用接口」后重试",
+            )
 
     # 刷新视图
     from app.jobs.daily_pipeline import _refresh_single_view

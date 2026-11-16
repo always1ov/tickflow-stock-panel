@@ -223,18 +223,21 @@ export function StockPanel({
         const date = res?.rows?.at(-1)?.date
         lastDate = date ? String(date).slice(0, 10) : undefined
       })
-      // 独立排队, 切股/关闭后的日K响应不会继续级联分钟请求。
-      tasks.push(async () => {
-        if (lastDate) await qc.prefetchQuery({ ...klineMinuteQueryOptions(s, lastDate, true), staleTime: 30_000 })
-      })
+      // [R783] 不显示分时就不预取分钟, 省掉日K视图下没有去处的分钟请求
+      if (showIntraday) {
+        // 独立排队, 切股/关闭后的日K响应不会继续级联分钟请求。
+        tasks.push(async () => {
+          if (lastDate) await qc.prefetchQuery({ ...klineMinuteQueryOptions(s, lastDate, true), staleTime: 30_000 })
+        })
+        tasks.push(() => qc.prefetchQuery({ ...klineMinuteRangeQueryOptions(s, intradayDays), staleTime: 30_000 }))
+        tasks.push(() => qc.prefetchQuery({ ...klineMinuteQueryOptions(s, undefined, true), staleTime: 30_000 }))
+      }
       if (hasFinanceField && hasFinancialCap) {
         tasks.push(() => qc.prefetchQuery(financialMetricsQueryOptions(s)))
       }
-      tasks.push(() => qc.prefetchQuery({ ...klineMinuteRangeQueryOptions(s, intradayDays), staleTime: 30_000 }))
-      tasks.push(() => qc.prefetchQuery({ ...klineMinuteQueryOptions(s, undefined, true), staleTime: 30_000 }))
     }
     return scheduleNeighborPrefetch(qc, symbol, tasks)
-  }, [prefetchKey, symbol, dateRange, extColumns, hasFinanceField, hasFinancialCap, intradayDays, qc, kline.isSuccess, kline.isPlaceholderData])
+  }, [prefetchKey, symbol, dateRange, extColumns, hasFinanceField, hasFinancialCap, intradayDays, showIntraday, qc, kline.isSuccess, kline.isPlaceholderData])
 
   // symbol 变化时重置分时相关状态，避免切股后残留旧日期。
   // 日K信息直接读 query data (切股到已预取邻股首帧即有), 无需清空或门控。

@@ -498,20 +498,17 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                           // [R650] 右栏可视高度: 日K 用它算两张分析副图还剩多少空间;
                           // [R651] 主图不动, 放不下就让整图溢出、右栏滚动
                           fillHeight={chartAreaH > 0 ? chartAreaH : undefined}
-                          showIntraday
+                          // [R783] 日K 就是日K: 不再右侧挂分时小图。分时是头部独立视图,
+                          // 由「分时」按钮进入(用户: 「日K里面不需要显示分时, 除非我点了分时」)
+                          showIntraday={false}
                           dateRange={heroRange}
-                          // 区间取到了还不够: 带分时小图时它默认只露最后 40 根
+                          // 区间取到了还不够: 默认只露最后 N 根
                           visibleBars={reviewDays}
                           priceLines={monitorPriceLines}
                           onPriceDoubleClick={openPriceAlert}
                           refetchIntervalMs={intradayRefetchMs}
                           prefetchSymbols={prefetchSymbols}
-                          intradayDays={effectiveIntradayDays}
-                          dailyKlineFlex="flex-[1.4]"
                           addedDate={addedDate}
-                          // [R625] 数据源确认没有该日分钟数据时收起右边空列(原来常驻一块
-                          // 空分时 + 一个拉了也没用的按钮, 日K被挤在 57% 宽里)
-                          hideEmptyIntraday
                           // [R660] 与「关键价位」共用同一份开关/悬停, 盘中同样现拉最新一根
                           levelControls={levelCtl}
                           levelHoveredKey={levelHover}

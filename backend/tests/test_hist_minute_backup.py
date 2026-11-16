@@ -272,3 +272,85 @@ def test_batch_paths_never_reference_hist_minute():
     root = Path(__file__).resolve().parents[1] / "app"
     for rel in ("services/minute_refresh.py", "jobs/daily_pipeline.py"):
         assert "hist_minute" not in (root / rel).read_text(encoding="utf-8"), rel
+
+
+def test_recent_trade_dates_prefers_daily_klines():
+    repo = MagicMock()
+    repo.get_daily.return_value = pl.DataFrame({
+        "date": [date(2026, 11, 5), date(2026, 11, 10), date(2026, 11, 12)],
+    })
+    got = kline_api._recent_trade_dates(repo, "600519.SH", 2)
+    assert got == [date(2026, 11, 10), date(2026, 11, 12)]
+
+
+def test_recent_trade_dates_falls_back_to_weekdays():
+    repo = MagicMock()
+    repo.get_daily.side_effect = RuntimeError("no daily")
+    got = kline_api._recent_trade_dates(repo, "600519.SH", 3)
+    assert len(got) == 3
+    assert all(d.weekday() < 5 for d in got)
+    assert got == sorted(got)
+
+
+def test_backfill_from_backup_only_requests_missing_days(monkeypatch):
+    """本地已完整的交易日不再向上游请求, 剩余日期一次性交给 fetch_days 并发拉。"""
+    repo = MagicMock()
+    dates = [date(2026, 11, 10), date(2026, 11, 11), date(2026, 11, 12)]
+    monkeypatch.setattr(kline_api, "_recent_trade_dates", lambda *a: dates)
+    monkeypatch.setattr(
+        kline_api.hist_minute_backup, "is_session_complete",
+        lambda symbol, d, asset_type="stock": d != dates[2],
+    )
+
+    calls: list[list[date]] = []
+
+    def fake_fetch_days(symbol, missing, asset_type="stock", *, write_lock=None, max_workers=5):
+        calls.append(list(missing))
+        return 240
+
+    monkeypatch.setattr(kline_api.hist_minute_backup, "fetch_days", fake_fetch_days)
+
+    assert kline_api._backfill_from_backup(repo, SYMBOL, "stock", 3) == 240
+    assert calls == [[dates[2]]]
+
+
+def test_backfill_from_backup_skips_upstream_when_all_days_complete(monkeypatch):
+    repo = MagicMock()
+    dates = [date(2026, 11, 10), date(2026, 11, 11)]
+    monkeypatch.setattr(kline_api, "_recent_trade_dates", lambda *a: dates)
+    monkeypatch.setattr(
+        kline_api.hist_minute_backup, "is_session_complete",
+        lambda symbol, d, asset_type="stock": True,
+    )
+
+    def fail_fetch_days(*a, **k):
+        raise AssertionError("本地已完整时不应请求上游")
+
+    monkeypatch.setattr(kline_api.hist_minute_backup, "fetch_days", fail_fetch_days)
+    assert kline_api._backfill_from_backup(repo, SYMBOL, "stock", 2) == 0
+
+
+def test_fetch_days_aggregates_concurrent_results(monkeypatch):
+    """多日并发: 汇总成功日行数, 单日失败不影响其它日。"""
+    dates = [date(2026, 11, 10), date(2026, 11, 11), date(2026, 11, 12)]
+
+    def fake_fetch(symbol, trade_date, asset_type="stock", *, write_lock=None):
+        if trade_date == dates[1]:
+            raise RuntimeError("boom")
+        return _bars(day=trade_date), backup.DISPLAY_NAME
+
+    monkeypatch.setattr(backup, "fetch", fake_fetch)
+    assert backup.fetch_days(SYMBOL, dates, "stock") == 480
+    assert backup.fetch_days(SYMBOL, [], "stock") == 0
+
+
+def test_is_session_complete_uses_local_rows():
+    backup._persist(_bars(60, day=date(2026, 11, 12)), "stock")
+    backup._persist(_bars(120, day=date(2026, 11, 13)), "stock")
+
+    assert backup.local_session_rows(SYMBOL, date(2026, 11, 12)) == 60
+    assert backup.is_session_complete(SYMBOL, date(2026, 11, 12)) is False
+    assert backup.is_session_complete(SYMBOL, date(2026, 11, 13)) is True
+    # 没有分区的日期按 0 行处理
+    assert backup.is_session_complete(SYMBOL, date(2026, 11, 9)) is False
+

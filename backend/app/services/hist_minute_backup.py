@@ -22,6 +22,7 @@ import contextlib
 import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, time as dtime
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -61,8 +62,12 @@ _FRAME_COLUMNS = ["symbol", "datetime", "open", "high", "low", "close", "volume"
 _cache_lock = threading.Lock()
 _cache: dict[tuple, tuple[float, pl.DataFrame, str | None]] = {}
 _ledger_cache: dict[tuple, tuple[float, str | None]] = {}
+_ledger_lock = threading.Lock()
 _config_lock = threading.Lock()
 _config_state: tuple[tuple, dict | None] | None = None
+
+# 逐日补齐的并发度: 上游限速 30 次/分, 20 个交易日按 5 并发约 4 轮, 约 3~5s
+_FETCH_WORKERS = 5
 
 
 def config_path() -> Path:
@@ -76,6 +81,28 @@ def _ledger_path() -> Path:
 def _minute_dir(asset_type: str) -> Path:
     folder = "kline_etf_minute" if asset_type == "etf" else "kline_minute"
     return settings.data_dir / folder
+
+
+def min_bars_for(trade_date: date) -> int:
+    """该日期算「有完整分钟数据」的最少根数 (当日盘中按已出分钟放宽)。"""
+    return _MIN_BARS_TODAY if trade_date >= cn_today() else _MIN_BARS_HISTORY
+
+
+def local_session_rows(symbol: str, trade_date: date, asset_type: str = "stock") -> int:
+    """本地该标的当日的分钟行数 (无分区则为 0)。"""
+    path = _minute_dir(asset_type) / f"date={trade_date}" / "part.parquet"
+    if not path.exists():
+        return 0
+    try:
+        return pl.read_parquet(path, columns=["symbol"]).filter(
+            pl.col("symbol") == symbol
+        ).height
+    except Exception:  # noqa: BLE001 — 分区损坏按无数据处理
+        return 0
+
+
+def is_session_complete(symbol: str, trade_date: date, asset_type: str = "stock") -> bool:
+    return local_session_rows(symbol, trade_date, asset_type) >= min_bars_for(trade_date)
 
 
 def _empty() -> pl.DataFrame:
@@ -167,6 +194,12 @@ def delete_source_config() -> None:
     config_path().unlink(missing_ok=True)
     clear_caches()
     _reset_config()
+
+
+def is_configured() -> bool:
+    """设置页是否已填写可用地址。"""
+    cfg = _config()
+    return bool(cfg and cfg["url"])
 
 
 def _reset_config() -> None:
@@ -360,7 +393,7 @@ def _normalize_frame(
     df = df.select(keep)
     df = df.unique(subset=["symbol", "datetime"], keep="last").sort("datetime")
 
-    min_bars = _MIN_BARS_TODAY if trade_date >= cn_today() else _MIN_BARS_HISTORY
+    min_bars = min_bars_for(trade_date)
     if df.height < min_bars:
         logger.warning(
             "分时备用接口有效行数不足 (%d < %d, %s %s), 丢弃不落盘",
@@ -371,6 +404,12 @@ def _normalize_frame(
 
 
 def _record_ledger(df: pl.DataFrame, asset_type: str) -> None:
+    # 并发补齐时多日同时写台账, 读-改-写必须串行, 否则会丢条目
+    with _ledger_lock:
+        _record_ledger_locked(df, asset_type)
+
+
+def _record_ledger_locked(df: pl.DataFrame, asset_type: str) -> None:
     path = _ledger_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     incoming = df.select("symbol", "datetime").with_columns(
@@ -440,6 +479,39 @@ def fetch(
         logger.warning("分时备用接口落盘失败 (不影响本次展示): %s", e)
     _cache[key] = (now + _ttl(trade_date), df, DISPLAY_NAME)
     return df, DISPLAY_NAME
+
+
+def fetch_days(
+    symbol: str,
+    dates: list[date],
+    asset_type: str = "stock",
+    *,
+    write_lock=None,
+    max_workers: int = _FETCH_WORKERS,
+) -> int:
+    """并发补齐单只多日 (仍然只拉这一只), 返回成功落库行数。
+
+    上游一次只能拉一日, 所以「一次性 20 日」= 20 个请求并发跑, 不串行等待;
+    落盘仍由 write_lock 串行保护。
+    """
+    if not dates:
+        return 0
+    total = 0
+    workers = max(1, min(max_workers, len(dates)))
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="hist-minute") as pool:
+        futures = [
+            pool.submit(fetch, symbol, d, asset_type, write_lock=write_lock)
+            for d in dates
+        ]
+        for trade_date, future in zip(dates, futures):
+            try:
+                df, source = future.result()
+            except Exception as e:  # noqa: BLE001 — 单日失败不影响其它日
+                logger.warning("分时备用接口并发补齐失败 %s %s: %s", symbol, trade_date, e)
+                continue
+            if source:
+                total += df.height
+    return total
 
 
 def _ttl(trade_date: date) -> float:
