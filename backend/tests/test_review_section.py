@@ -2,10 +2,12 @@
 
 用户两条答复: 动作三列**两套都显示**; 状态那张表**只摆数, 不下结论**。
 
-[R730→R748] 排版改过四轮: 8 列横向滚动表 → 上下一条线的卡片 → 日历/热力矩阵/分布三视图。
-[R749] 用户: 「我感觉越搞越复杂了, 推翻整个复盘, 重做一个复盘方案实现」——
-定案三块: **结论 / 权益曲线 / 逐日**。这里守的是内容口径与三条不变式,
-不再守某一种排版的具体写法:
+[R730→R749] 排版改过四轮: 8 列横向滚动表 → 上下一条线的卡片 → 日历/热力矩阵/分布三视图。
+[R759] 用户: 「保持现在四列排版不变了, 里面内容布局先恢复最开始的样子, 复盘内部的排版
+要排好显示出所有信息, 我还没想好怎么重做」—— 弹窗四栏不动, 复盘内部回到 R431 最初那版
+三块(逐日 / 两套对比 / 六态历史); 窄列摊不开八列, 每天拆两行摊开八样信息。
+
+这里守的是内容口径与三条不变式, 不再守某一种排版的具体写法:
 
   1. 页头仍是旧「趋势状态」页那一句;
   2. 口径说明只有 `StockReviewDialog` 里那一份原文;
@@ -52,101 +54,62 @@ def test_R431_口径与四个数的说明只有一个产地():
     old, sec, ft = code_of(OLD), code_of(SEC), code_of(FT)
     for const, text in (("FLIP_BASIS", "转折次日开盘进出"), ("VERDICT_BASIS", "换档次日开盘进出")):
         assert old.count(text) == 1 and text not in sec, f"{const} 的原文又写了第二份"
-        assert f"basis={{{const}}}" in old
-    # 结论条只引用那一份原文, 不自己再写一遍
-    assert "title={FLIP_BASIS}" in sec
+        assert f"basis: {const}" in sec, f"{const} 没引用那一份原文"
     assert ft.count("按信号进出的复利") == 1 and "按信号进出的复利" not in sec
     assert "tip={TRADE_STAT_TIPS.follow}" in sec
 
 
-def test_R749_结论句与别当真的提醒同进同出():
-    """数字与提醒必须同时出现: 摆出 +143% 而把「样本太少」藏起来, 那是骗人。"""
-    sec = code_of(SEC)
-    block = _between(sec, "function Conclusion", "function Inline(")
-    assert "tradeNotes(ft)" in block
-    assert "REASON_CN[ft.reason]" in block, "算不出来时要说为什么, 不能空着"
-    assert "ci95(" in block, "结论句里的统计判断没接上区间"
-
-
-def test_R441_对比表没有按档位买卖那一行():
-    """[R441] 用户指着「按档位买卖 · 通道 +1.2% +11.8% -10.6% 1 次 ...」那一行: 「删除」。
-    只删对比表那一行。(逐日表里通道的一笔笔动作 R444 随「通道档位」那一页一起撤了。)"""
-    sec = code_of(SEC)
-    assert "verdict_trades" not in sec and "按档位买卖" not in sec and "VERDICT_BASIS" not in sec
-    assert "d.flip_trades" in sec
-
-
-def test_R444_逐日复盘的字段与旧趋势状态页一致():
+def test_R444_页头那句与旧趋势状态页一致():
     """页头仍是旧「趋势状态」页那一句, 转折配对仍用同一份 `legsByFlipDate`。"""
     old, new = code_of(OLD), code_of(SEC)
     for t in ("{d.start} ~ {d.end} · {d.days} 个交易日",
               "` · 六态阈值 ${(d.threshold * 100).toFixed(0)}%${d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}`"):
         assert t in old and t in new, f"页头那一句与旧页对不上: {t}"
     assert "legsByFlipDate(d.flip_trades)" in new
-    # 通道档位那一页、页签、并表时代的东西都不许回来
-    for gone in ("VerdictTable", "只看换档的日子", "legsByFlipDate(d.verdict_trades)", "setTab(",
-                 "TradeCells six=", "emptyText(", "ACT_TIP", "setShifted"):
-        assert gone not in new, f"「{gone}」—— 用户只要趋势状态那套字段"
 
 
-def _between(src: str, start: str, end: str, after: str = "") -> str:
-    base = src.index(after) if after else 0
-    i = src.index(start, base)
-    return src[i:src.index(end, i) + len(end)]
+def test_R759_复盘回到最初三块_页签与三视图都撤了():
+    """用户: 「里面内容布局先恢复最开始的样子」—— 逐日 / 两套对比 / 六态历史。
+    R749 的结论条、六态规律、权益曲线都不回来了。"""
+    sec = code_of(SEC)
+    for fn in ("function DailyCard", "function DayRow", "function SummaryCard", "function StateHistory"):
+        assert fn in sec, f"三块里少了 {fn}"
+    for gone in ("setView(", "ReviewCalendar", "DistPanel", "TradeBars",
+                 "NowCondition", "FlipStats", "HeatCell", "MiniBox", "VerdictStrip",
+                 "function Conclusion", "function EquityChart", "function DailyTable"):
+        assert gone not in sec, f"「{gone}」—— 页签/三视图/后来那两版又回来了"
+
+
+def test_R759_每天两行摆齐八样信息():
+    """窄列 420~460px: 第一行日期·收盘·涨跌·六态状态; 第二行通道档位·动作·成交→了结·结果。
+    八样信息都必须直接可见, 不再收进悬停。"""
+    sec = code_of(SEC)
+    for piece in ("{r.date.slice(5)}", "{r.close.toFixed(2)}", "chgCls(r.change_pct)",
+                  "trendBadgeCls(r.trend.state)", "VERDICT_CLS[r.verdict.tone]",
+                  "<LegAct leg={l} />", "<LegFill leg={l} />", "<LegResult leg={l} />"):
+        assert piece in sec, f"逐日少了一样: {piece}"
+
+
+def test_R759_两套口径都在_六态与通道():
+    """[R441] 曾按用户要求删掉「按档位买卖 · 通道」那一行; [R759] 用户要最初版
+    「显示出所有信息」, 那一行与逐日里通道那笔动作一起回来。"""
+    sec = code_of(SEC)
+    assert "按转折买卖 · 六态" in sec and "basis: FLIP_BASIS" in sec
+    assert "按档位买卖 · 通道" in sec and "basis: VERDICT_BASIS" in sec
+    assert "legsByFlipDate(d.verdict_trades)" in sec, "逐日里通道那笔动作没接上"
+    for word in ("只看有事的日子", "只看换档的日子"):
+        assert word in sec, f"筛选少了「{word}」"
+
+
+def test_R759_结果按每一段取():
+    """最初版的结果列是**每一段自己**的盈亏(多头真赚、空头是空仓期涨跌),
+    不是卖出那天统一落账 —— R749 的落账口径随五列表一起退了。"""
+    sec = code_of(SEC)
+    assert "<LegResult leg={l} />" in sec and "legResultCls(l)" in sec
+    assert "closed.get(leg.enter_date)" not in sec and "openBuy" not in sec
 
 
 def test_R442_换票复位():
     dlg = code_of(DLG)
     call = dlg[dlg.index("<ReviewSection"):dlg.index("/>", dlg.index("<ReviewSection"))]
     assert "key={symbol}" in call
-
-
-def test_R749_只剩三块_页签与三视图都撤了():
-    """用户: 「越搞越复杂了, 推翻整个复盘」—— 打开复盘不用再先选页签。"""
-    sec = code_of(SEC)
-    for fn in ("function Conclusion", "function EquityChart", "function DailyTable"):
-        assert fn in sec, f"三块里少了 {fn}"
-    for gone in ("setView(", "PILL", "ReviewCalendar", "DistPanel", "StateHistory", "TradeBars",
-                 "NowCondition", "FlipStats", "HeatCell", "MiniBox", "VerdictStrip"):
-        assert gone not in sec, f"「{gone}」—— 页签/三视图那一套又回来了"
-
-
-def test_R749_逐日就是五列():
-    sec = code_of(SEC)
-    assert "grid grid-cols-[64px_minmax(0,1fr)_64px_56px_76px]" in sec, "逐日不是五列"
-    for head in (">日期<", ">状态<", ">涨跌<", ">动作<", ">结果<"):
-        assert head in sec, f"逐日表少了「{head[1:-1]}」这一列"
-
-
-def test_R749_结果只在卖出那天落账():
-    """用户: 「我表示看不懂」——
-    以前买入那天就摆出这一笔的最后收益, 中间每天都跟着重复同一个数,
-    卖出那天摆的反而是空头段的涨跌(跌了反而是好事)。现在只在卖出那天落账,
-    与上面「每笔平均」同一口径。"""
-    sec = code_of(SEC)
-    assert "closed.get(leg.enter_date)" in sec
-    assert "openBuy.has(leg.enter_date)" in sec
-    assert "legResultCls" not in sec and "LegResult" not in sec, "又用回了按段取的那套结果"
-
-
-def test_R749_权益曲线同起点同终点_灰底是空仓_圆点是买卖():
-    sec = code_of(SEC)
-    assert "curveOf(" in sec
-    assert "hold *= r.close / base" in sec and "strat *=" in sec, "两条线不是同一段逐日净值"
-    assert "r.close / origin" in sec, "曲线没从第一笔成交那天起算, 末端读数会跟结论条对不上"
-    # [R750] 六态底色换成空仓灰底 —— 统计上差额来自空仓躲跌, 不是买卖点。
-    assert "STATE_SHADE" not in sec, "六态底色又铺回来了"
-    assert "flat: started && !inMarket" in sec and "fillOpacity={0.1}" in sec, "空仓灰底没铺上"
-    assert "p.act === '买入' ? 'text-bull' : 'text-bear'" in sec, "买卖圆点没了"
-
-
-def test_R750_规律与厚尾提醒都在结论之后():
-    """统计量出来的三件事必须出现在页面上: 状态指不了方向、差额靠空仓、收益靠少数大赢家。"""
-    sec = code_of(SEC)
-    assert "forwardByState(d.rows ?? [], 5)" in sec, "六态之后的分布没接上"
-    assert "function StateForward" in sec
-    assert "其中 " in sec and "天空仓" in sec, "结论条没把空仓那段归因写出来"
-    assert "去掉最好的" in sec and "trimmed" in sec, "厚尾提醒没跟数字一起摆出来"
-    assert "中位" in sec, "右偏的收益还在用均值当主读数"
-    # 规律模块要在结论之后、逐日之前
-    assert sec.index("<Conclusion") < sec.index("<StateForward") < sec.index("<EquityChart")
