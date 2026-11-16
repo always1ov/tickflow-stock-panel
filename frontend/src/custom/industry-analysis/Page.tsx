@@ -1,21 +1,17 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Activity,
   Crown,
   Layers3,
   RefreshCw,
-  Repeat,
-  Search,
   Settings2,
-  TrendingDown,
-  TrendingUp,
+  X,
 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { AnalysisConfigDialog, PresetFetchState, type AnalysisFieldConfig } from '@/components/analysis-shared'
-import { SectorRankHeatmap } from '@/components/SectorRankHeatmap'
+import { SectorHeatmapToolbar, SectorRankHeatmap } from '@/components/SectorRankHeatmap'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { toNavItems, type NavItem } from '@/lib/listNav'
 import { api, type MarketSnapshotRow } from '@/lib/api'
@@ -26,16 +22,22 @@ import { cn } from '@/lib/cn'
 import { resolveDimension, type DimensionGroup, type StockRow } from '@/lib/analysis-adapter'
 import { SectorRotationCard } from '@/components/SectorRotationCard'
 import { RpsRotationDialog } from '@/components/RpsRotationDialog'
-import { buttonClass } from '@/components/ui'
 
 const KEYWORDS = ['industry', '行业', 'sector', '申万', '中信']
 const CANDIDATE_FIELDS = ['industry', '行业', 'sector', '申万', '中信', '行业名称', 'industry_name', 'sector_name']
 const PAGE_LIMIT = 12000
-const MAX_RENDERED_INDUSTRIES = 120
 const MAX_RENDERED_STOCKS = 160
 
 /** 内置行业预设 id — 本页的数据来源与「未获取」引导按钮都锚定它 */
 const PRESET_INDUSTRY_ID = 'ext_hy_ths'
+
+// [R766] 热力图默认口径(30 日 / 前 48 名)。[R769] 改成可变档位后, 当前档位只在矩阵工具栏里显示,
+// 页头副标题不再重复 —— 副标题字数一变就可能折行, 把页头从 60 挤到 89, 反过来改掉矩阵高度和行高。
+// [R771] 45 → 48: 1700×913 下容器 799、表头 20, 45 行(行高 17)只占 785, 底下白留 14px;
+// 补到 48 行后自适应算出 16px 行高, 48×16+20 = 788, 正好贴到容器底(余 11)。
+// 47 行会剩 27px, 还是有可见空白; 49 行需要 804, 一屏放不下。
+const HEATMAP_DAYS = 30
+const HEATMAP_TOP_N = 48
 
 type SortMode = 'heat' | 'avgPct' | 'leader' | 'amount' | 'down'
 type IndustryLevel = 1 | 2 | 3
@@ -282,10 +284,14 @@ function groupByIndustryLevel(groups: DimensionGroup[], level: IndustryLevel): D
 export function IndustryAnalysis() {
   const [fieldConfig, setFieldConfig] = useState<AnalysisFieldConfig>(loadConfig)
   const [showConfig, setShowConfig] = useState(false)
-  const [showRps, setShowRps] = useState(false)
-  const [search, setSearch] = useState('')
+  // [R769] 矩阵口径上移到页面: 页头副标题、热力图工具栏、AI 弹窗读同一份状态
+  const [heatDays, setHeatDays] = useState(HEATMAP_DAYS)
+  const [heatAll, setHeatAll] = useState(false)
+  // [R773] 「全部 N」的 N 由矩阵从轮动接口数据回报(页头的 stats.length 是另一套口径)
+  const [heatTotal, setHeatTotal] = useState(0)
+  const [showAi, setShowAi] = useState(false)
+  const [aiDays, setAiDays] = useState(HEATMAP_DAYS)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
-  const [sortMode, setSortMode] = useState<SortMode>('heat')
   const [previewSymbol, setPreviewSymbol] = useState<string | null>(null)
   const [previewName, setPreviewName] = useState<string>('')
   const [previewNavList, setPreviewNavList] = useState<NavItem[]>([])
@@ -346,15 +352,22 @@ export function IndustryAnalysis() {
       .filter(s => s.count > 0)
   }, [groups, marketMap])
 
-  const filteredStats = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const base = q ? stats.filter(s => s.key.toLowerCase().includes(q)) : stats
-    return [...base].sort(statSort(sortMode))
-  }, [stats, search, sortMode])
-
-  const selected = filteredStats.find(s => s.key === selectedKey) ?? filteredStats[0] ?? null
+  // [R763] rail 删除后没有默认选中项: 只有点热力图/chip 才出详情抽屉
+  const selected = selectedKey ? stats.find(s => s.key === selectedKey) ?? null : null
   const leading = useMemo(() => [...stats].sort(statSort('heat')).slice(0, 10), [stats])
   const falling = useMemo(() => [...stats].sort(statSort('down')).slice(0, 10), [stats])
+  // [R774] 页头那串「领涨/领跌」按涨幅排, 不能用强度榜(heat)的顺序 —— 否则
+  // 「领涨 生猪养殖 +3.10%」后面跟着 +4.37% 的行业, 名字与数值自相矛盾。
+  // 同时剔掉摘要里已经写过的第 1 名(最强行业 / 最大风险), 各补到 4 条 —— 同一行里
+  // 同一个行业出现两遍, 读的人会以为其中一处是错的。
+  const pctLeaders = useMemo(
+    () => [...stats].sort(statSort('avgPct')).filter(s => s.key !== leading[0]?.key).slice(0, 4),
+    [stats, leading],
+  )
+  const pctFallers = useMemo(
+    () => [...stats].sort(statSort('down')).filter(s => s.key !== falling[0]?.key).slice(0, 4),
+    [stats, falling],
+  )
   const activeIndustry = useMemo(() => [...stats].sort(statSort('amount'))[0] ?? null, [stats])
   const industryBreadth = useMemo(() => {
     const priced = stats.filter(s => s.avgPct != null)
@@ -412,50 +425,77 @@ export function IndustryAnalysis() {
   const industryLevelLabel = `${industryLevel}级行业`
 
   return (
-    <>
+    // [R768] 整页是一个等高列: 页头固定, 下面内容吃掉剩余高度, 页面本身不滚动
+    <div className="flex h-full min-h-0 flex-col">
+      {/* [R765] 原来独占一整条的 5 项指标(25px + 间距 12px), 现在压成一句摘要。
+          [R776] 顶部整体改成「两行」, 两行都靠两端对齐: 左边读数、右边控件/口径,
+          每一行的右缘都落在同一条竖线上; 按钮紧贴右缘而不是悬在中间。
+          行内顺序按用户口径对调过两次: 先是「按钮那部分和它底下的文字互换位置」,
+          再是「左边的那两行也是要互换」—— 定稿为
+          第一行 = 领涨领跌 + 口径(层级·日期·行业数·标的数), 第二行 = 5 项摘要 + 控件簇。
+          不用 PageHeader 的 `right` 槽: 它把左侧内容与右侧内容分成两个 flex item, 行高
+          由各自内容决定, 上下两行天然对不齐。 */}
       <PageHeader
-        title="行业板块"
-        subtitle={`${industryLevelLabel} · ${marketQuery.data?.as_of ?? rowsQuery.data?.date ?? '最新'} · ${stats.length} 个行业 · ${totalSymbols} 只标的`}
-        right={
-          <div className="flex flex-wrap items-center gap-1">
-            {/* RPS 轮动: 打开行业涨幅轮动矩阵对话框。
-                [R504] R105 曾把它收编到复盘页做统一入口; 复盘页回到作者的样子后, 放回作者原来这里。
-                配色走全站按钮(作者原来是琥珀色高亮, 全站迁移后不写死调色板色) */}
-            <button
-              onClick={() => setShowRps(true)}
-              className={buttonClass({}, 'gap-1')}
-              title="行业涨幅轮动矩阵"
-            >
-              <Repeat className="h-3.5 w-3.5" />涨幅RPS轮动分析
-            </button>
-            <button
-              onClick={() => { rowsQuery.refetch(); marketQuery.refetch() }}
-              disabled={rowsQuery.isFetching || marketQuery.isFetching}
-              className="p-1.5 text-secondary hover:bg-surface disabled:opacity-50"
-              title="刷新"
-            >
-              <RefreshCw className={cn('h-4 w-4', (rowsQuery.isFetching || marketQuery.isFetching) && 'animate-spin')} />
-            </button>
-            <button onClick={() => setShowConfig(true)} className="p-1.5 text-secondary hover:bg-surface hover:text-accent" title="配置数据源">
-              <Settings2 className="h-4 w-4" />
-            </button>
+        className="shrink-0 [&>div:first-child]:w-full"
+        afterSubtitle={
+          <div className="flex w-full min-w-0 flex-col gap-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+              <IndustryLeaders leaders={pctLeaders} fallers={pctFallers} onSelect={setSelectedKey} />
+              <span className="ml-auto whitespace-nowrap text-xs leading-[18px] text-muted">
+                {industryLevelLabel} · {marketQuery.data?.as_of ?? rowsQuery.data?.date ?? '最新'} · {stats.length} 个行业 · {totalSymbols} 只标的
+              </span>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+              <IndustryBrief
+                leading={leading[0]}
+                falling={falling[0]}
+                activeIndustry={activeIndustry}
+                industryBreadth={industryBreadth}
+              />
+              {/* [R769] 「涨幅RPS轮动分析」按钮删除: 那个弹窗和这张热力图吃的是同一个接口、
+                  同一份缓存, 弹窗只是同一份数据的另一种行语义(按名次而非按行业)。
+                  [R773] 工具栏整条搬到这里, 排在刷新按钮之前 —— 用户: 「按钮们放到刷新
+                  按钮前面」。它们和刷新/配置是同一类动作(改口径 / 重取数)。
+                  `ml-auto` 把整簇推到右缘, 与第一行的口径行同一条右对齐线。 */}
+              <div className="ml-auto flex flex-wrap items-center gap-1">
+                <SectorHeatmapToolbar
+                  days={heatDays}
+                  onDaysChange={setHeatDays}
+                  topN={HEATMAP_TOP_N}
+                  showAll={heatAll}
+                  onShowAllChange={setHeatAll}
+                  totalCount={heatTotal}
+                  onOpenAi={d => { setAiDays(d); setShowAi(true) }}
+                />
+                <button
+                  onClick={() => { rowsQuery.refetch(); marketQuery.refetch() }}
+                  disabled={rowsQuery.isFetching || marketQuery.isFetching}
+                  className="p-1.5 text-secondary hover:bg-surface disabled:opacity-50"
+                  title="刷新"
+                >
+                  <RefreshCw className={cn('h-4 w-4', (rowsQuery.isFetching || marketQuery.isFetching) && 'animate-spin')} />
+                </button>
+                <button onClick={() => setShowConfig(true)} className="p-1.5 text-secondary hover:bg-surface hover:text-accent" title="配置数据源">
+                  <Settings2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           </div>
         }
       />
 
-      {/* [R60] 统一版式: 留白 px-3/lg:px-4、区块间距 12px, 与全站一致 */}
-      <div className="min-h-full px-3 pb-4 pt-3 lg:px-4">
+      {/* [R60] 统一版式: 留白 px-3/lg:px-4、区块间距 12px, 与全站一致
+          [R768] 改成 flex 列并吃掉剩余高度: 热力图按剩余空间铺满, 页面不再需要滚动 */}
+      <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-3 lg:px-4">
         {/* [R547] 撤掉 1440px 居中上限, 与其它页一样贴左铺满(用户: 页面要铺满内容区) */}
-        <div className="w-full space-y-3">
+        <div className="flex min-h-0 w-full flex-1 flex-col gap-3">
           {/* [R326 同步上游] v0.2.4 新增的盘中板块轮动卡。上游随它一起把
               这一页的留白改成了 px-6 py-5 / space-y-5 —— **版式那半不取**:
               R60 把全站统一到了 px-3/lg:px-4 + space-y-3, 只改这两页会让它们
               比别处宽出一圈。取卡片, 不取版式。 */}
           <SectorRotationCard kind="industry" />
 
-          <HeroPanel leading={leading[0]} falling={falling[0]} activeIndustry={activeIndustry} industryBreadth={industryBreadth} />
-
-          {/* [R762] 布局重排: 热力图提到第 2 位(紧跟指标卡), Top10 挪到页面末尾。
+          {/* [R762] 布局重排: 热力图提到第 2 位(紧跟指标条), Top10 挪到页面末尾。
               理由(1700×913 实机量): 原来 Top10 占 500px 却与热力图最新一列讲同一件事,
               热力图被压到第 3 位、第一屏只露表头和 6 行; 且点格子后详情在 1.5 屏之外。
               现在顺序 = 指标卡 → 热力图 → 行业矩阵+详情 → Top10, 联动可当场看到。 */}
@@ -463,25 +503,18 @@ export function IndustryAnalysis() {
             <SectorRankHeatmap
               kind="industry"
               level={industryLevel}
+              days={heatDays}
+              topN={HEATMAP_TOP_N}
+              showAll={heatAll}
+              onTotalChange={setHeatTotal}
               selectedKey={selectedKey}
               onSelect={setSelectedKey}
             />
           )}
 
-          {stats.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[18rem_1fr]">
-              <IndustryRail
-                stats={filteredStats.slice(0, MAX_RENDERED_INDUSTRIES)}
-                selectedKey={selected?.key ?? null}
-                search={search}
-                sortMode={sortMode}
-                onSearch={v => { setSearch(v); setSelectedKey(null) }}
-                onSort={setSortMode}
-                onSelect={setSelectedKey}
-              />
-              <IndustryFocus stat={selected} activeSymbol={previewSymbol} onStockClick={handleStockClick} />
-            </div>
-          ) : rowsQuery.isLoading ? (
+          {/* [R763] 左侧 rail(288×752) 与热力图左列同信息, 删除; 详情改为右侧抽屉,
+              整页只剩「指标条 + 热力图」一屏, 空态/加载态仍原位显示 */}
+          {stats.length === 0 && (rowsQuery.isLoading ? (
             <div className="rounded-dialog border border-border bg-surface px-6 py-16 text-center text-sm text-muted">正在计算行业强度...</div>
           ) : needsIndustryFetch ? (
             <PresetFetchState
@@ -493,20 +526,44 @@ export function IndustryAnalysis() {
             />
           ) : (
             <EmptyState icon={Layers3} title="未匹配到行业数据" hint={resolved.hint || '请检查扩展数据是否包含行业/板块相关字段'} />
-          )}
+          ))}
 
-          {/* [R762] Top10 挪到页尾(内容一条不少): 它是"行业 → 龙头股"的下钻入口,
-              在热力图与行业矩阵之后看更顺; 原来排第 2 位, 500px 高却与热力图首列重复。 */}
-          <MarketPulse
-            leading={leading}
-            falling={falling}
-            selectedKey={selected?.key ?? null}
-            onSelect={setSelectedKey}
-            activeSymbol={previewSymbol}
-            onStockClick={handleStockClick}
-          />
+          {/* [R767] 页尾「领涨/领跌」chips 行删除; [R774] 用户要它回来, 已接到页头摘要末尾
+              (见 `IndustryBrief`), 页面里不再有第三行读数。 */}
         </div>
       </div>
+
+      {/* [R763] 行业详情抽屉: 点热力图格子/chip 后从右侧滑出(复用 IndustryFocus) */}
+      <AnimatePresence>
+        {selected && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedKey(null)}
+              className="fixed inset-0 z-30 bg-black/40"
+            />
+            <motion.aside
+              initial={{ x: 560 }}
+              animate={{ x: 0 }}
+              exit={{ x: 560 }}
+              transition={{ type: 'tween', duration: 0.2 }}
+              className="fixed right-0 top-0 z-40 flex h-screen w-[800px] max-w-[92vw] flex-col border-l border-border bg-base shadow-2xl"
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
+                <span className="text-xs text-muted">行业详情</span>
+                <button onClick={() => setSelectedKey(null)} className="p-1 text-secondary hover:text-foreground" aria-label="关闭">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-auto">
+                <IndustryFocus stat={selected} activeSymbol={previewSymbol} onStockClick={handleStockClick} />
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showConfig && <AnalysisConfigDialog currentConfig={fieldConfig} onSave={handleSaveConfig} onClose={() => setShowConfig(false)} showHierarchyLevel />}
@@ -520,14 +577,36 @@ export function IndustryAnalysis() {
         navList={previewNavList}
         onNavigate={(sym, n) => { setPreviewSymbol(sym); setPreviewName(n ?? '') }}
       />
-      {showRps && <RpsRotationDialog onClose={() => setShowRps(false)} kind="industry" />}
-    </>
+      {/* [R769] AI 只留报告: 矩阵已经并进热力图, 弹窗不再画第二遍同一份矩阵 */}
+      {showAi && (
+        <RpsRotationDialog
+          aiOnly
+          kind="industry"
+          initialDays={aiDays}
+          initialLevel={industryLevel}
+          onClose={() => setShowAi(false)}
+        />
+      )}
+    </div>
   )
 }
 
-// ===== HeroPanel =====
+// ===== 页头摘要 =====
 
-function HeroPanel({
+/**
+ * [R765] 5 项指标从「一整条并排卡」压成副标题后的一句摘要。
+ *
+ * 原来那 5 张单行卡占 25px + 上下间距 12px = 37px, 全在页面最顶部, 挤的是热力图。
+ * 现在同一批读数、同一套涨幅配色, 只是排成一行文本, 整条删除, 37px 还给热力图。
+ *
+ * 为什么是纯文本而不是 5 个 chip: 1700 视口下页头留给这块只剩 768px, 5 个 chip 的
+ * 自然宽是 800px(「龙头算法 6 因子 强势+承接+容量」一项就占 179px), 塞不进去;
+ * 同内容纯文本约 660px。更窄时由 `PageHeader` 的 flex-wrap 把整组折到第二行,
+ * 不截断也不丢字(见 `PageHeader.afterSubtitle` 的注释)。
+ *
+ * 「龙头算法」不是行情读数(value 与说明都是常量), 所以正文只留「6 因子」, 全句进 title。
+ */
+function IndustryBrief({
   leading,
   falling,
   activeIndustry,
@@ -539,268 +618,145 @@ function HeroPanel({
   industryBreadth: { up: number; down: number; flat: number }
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-      <HeroMetric icon={TrendingUp} label="最强行业" value={leading?.key ?? '—'} hint={leading?.avgPct != null ? <span className={priceColorClass(leading.avgPct)}>{fmtPct(leading.avgPct)}</span> : '等待行情'} tone="up" />
-      <HeroMetric icon={TrendingDown} label="最大风险" value={falling?.key ?? '—'} hint={falling?.avgPct != null ? <span className={priceColorClass(falling.avgPct)}>{fmtPct(falling.avgPct)}</span> : '等待行情'} tone="down" />
-      <HeroMetric
-        icon={Activity}
-        label="涨跌行业"
-        value={<><span className="text-bull">{industryBreadth.up}</span><span className="mx-1 text-muted">/</span><span className="text-bear">{industryBreadth.down}</span></>}
-        hint={<><span className="text-bull">上涨</span><span className="mx-1 text-muted">/</span><span className="text-bear">下跌</span>{industryBreadth.flat ? <span className="text-muted"> · 平 {industryBreadth.flat}</span> : null}</>}
-        tone="blue"
-      />
-      <HeroMetric icon={Activity} label="资金活跃" value={activeIndustry?.key ?? '—'} hint={activeIndustry ? fmtBigNum(activeIndustry.totalAmount) : '等待行情'} tone="blue" />
-      <HeroMetric icon={Crown} label="龙头算法" value="6 因子" hint="强势 + 承接 + 容量" tone="gold" />
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-micro text-muted">
+      <BriefItem label="最强行业">
+        <span className="text-foreground">{leading?.key ?? '—'}</span>
+        {leading?.avgPct != null
+          ? <span className={priceColorClass(leading.avgPct)}>{fmtPct(leading.avgPct)}</span>
+          : <span>等待行情</span>}
+      </BriefItem>
+      <BriefSep />
+      <BriefItem label="最大风险">
+        <span className="text-foreground">{falling?.key ?? '—'}</span>
+        {falling?.avgPct != null
+          ? <span className={priceColorClass(falling.avgPct)}>{fmtPct(falling.avgPct)}</span>
+          : <span>等待行情</span>}
+      </BriefItem>
+      <BriefSep />
+      <BriefItem label="涨跌行业">
+        <span className="text-bull">{industryBreadth.up}</span>
+        <span className="text-muted">/</span>
+        <span className="text-bear">{industryBreadth.down}</span>
+        {industryBreadth.flat > 0 && <span className="font-normal text-muted">平 {industryBreadth.flat}</span>}
+      </BriefItem>
+      <BriefSep />
+      <BriefItem label="资金活跃">
+        <span className="text-foreground">{activeIndustry?.key ?? '—'}</span>
+        <span>{activeIndustry ? fmtBigNum(activeIndustry.totalAmount) : '等待行情'}</span>
+      </BriefItem>
+      <BriefSep />
+      <span className="flex items-center gap-1 whitespace-nowrap">
+        <span className="text-muted">龙头算法</span>
+        <span className="font-medium text-warning" title="强势 + 承接 + 容量">6 因子</span>
+      </span>
     </div>
   )
 }
 
-function HeroMetric({ icon: Icon, label, value, hint, tone }: {
-  icon: typeof TrendingUp
-  label: string
-  value: ReactNode
-  hint: ReactNode
-  tone: 'up' | 'down' | 'gold' | 'blue'
-}) {
-  const toneClass = {
-    up: 'text-bull bg-bull/10',
-    down: 'text-bear bg-bear/10',
-    gold: 'text-warning bg-warning/10',
-    blue: 'text-blue-300 bg-blue-400/10',
-  }[tone]
-  const valueClass = {
-    up: 'text-bull',
-    down: 'text-bear',
-    gold: 'text-warning',
-    blue: 'text-foreground',
-  }[tone]
-  return (
-    <div className="rounded-dialog border border-border bg-surface px-3 py-2">
-      <div className="flex items-center justify-between text-micro text-muted">
-        <span>{label}</span>
-        <span className={cn('rounded-btn p-1', toneClass)}><Icon className="h-3.5 w-3.5" /></span>
-      </div>
-      <div className={cn('mt-1 truncate text-xl font-semibold tabular-nums', valueClass)}>{value}</div>
-      <div className="mt-0.5 truncate text-micro text-muted">{hint}</div>
-    </div>
-  )
-}
-
-// ===== MarketPulse =====
-
-function MarketPulse({
-  leading,
-  falling,
-  selectedKey,
-  onSelect,
-  onStockClick,
-  activeSymbol,
-}: {
-  leading: IndustryStat[]
-  falling: IndustryStat[]
-  selectedKey: string | null
-  onSelect: (key: string) => void
-  onStockClick: (symbol: string, name?: string, navList?: NavItem[]) => void
-  activeSymbol: string | null
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-      <PulseList title="领涨主线" items={leading} mode="up" selectedKey={selectedKey} onSelect={onSelect} onStockClick={onStockClick} activeSymbol={activeSymbol} />
-      <PulseList title="领跌方向" items={falling} mode="down" selectedKey={selectedKey} onSelect={onSelect} onStockClick={onStockClick} activeSymbol={activeSymbol} />
-    </div>
-  )
-}
-
-function PulseList({
-  title,
-  items,
-  mode,
-  selectedKey,
-  onSelect,
-  onStockClick,
-  activeSymbol,
-}: {
-  title: string
-  items: IndustryStat[]
-  mode: 'up' | 'down'
-  selectedKey: string | null
-  onSelect: (key: string) => void
-  onStockClick: (symbol: string, name?: string, navList?: NavItem[]) => void
-  activeSymbol: string | null
-}) {
-  const toneText = mode === 'up' ? 'text-bull' : 'text-bear'
-  const toneBorder = mode === 'up' ? 'border-bull/20' : 'border-bear/20'
-  const toneBg = mode === 'up' ? 'bg-bull/10' : 'bg-bear/10'
-  const toneHover = mode === 'up' ? 'hover:border-bull/35' : 'hover:border-bear/35'
-
-  return (
-    <div className={cn('rounded-dialog border bg-base/35 p-2', toneBorder)}>
-      <div className="mb-1.5 flex items-center justify-between px-1">
-        <div className={cn('flex items-center gap-1.5 text-xs font-medium', toneText)}>
-          {mode === 'up' ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-          {title}
-        </div>
-        <span className="rounded-btn bg-elevated/60 px-2 py-0.5 text-micro text-muted">Top 10</span>
-      </div>
-      <div className="space-y-1">
-        {items.map((item, idx) => {
-          const active = selectedKey === item.key
-          const sortedStocks = [...item.stocks].sort((a, b) => b.leaderScore - a.leaderScore)
-          const leaders = sortedStocks.slice(0, 3)
-          const upPct = item.count > 0 ? (item.upCount / item.count) * 100 : 0
-          const downPct = item.count > 0 ? (item.downCount / item.count) * 100 : 0
-          const flatPct = Math.max(0, 100 - upPct - downPct)
-          return (
-            <button
-              key={item.key}
-              onClick={() => onSelect(item.key)}
-              className={cn(
-                'block w-full rounded-card border border-transparent bg-surface/45 px-2 py-1.5 text-left transition-colors',
-                active ? cn('bg-blue-400/[0.08]', toneBorder) : cn('hover:bg-elevated/35', toneHover),
-              )}
-            >
-              <div className="grid gap-2 md:grid-cols-[minmax(0,0.9fr)_minmax(16rem,1.1fr)] md:items-center">
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-btn font-mono text-micro', idx < 3 ? cn(toneBg, toneText) : 'bg-elevated/70 text-muted')}>{idx + 1}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-xs font-medium text-foreground">{item.key}</span>
-                        <span className="shrink-0 text-micro text-muted">
-                          <span className="text-bull">{item.upCount}</span>涨
-                          <span className="mx-0.5 text-muted/40">/</span>
-                          <span className="text-bear">{item.downCount}</span>跌
-                        </span>
-                        <span className={cn('ml-auto shrink-0 font-mono text-micro tabular-nums', priceColorClass(item.avgPct))}>{item.avgPct != null ? fmtPct(item.avgPct) : '—'}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="ml-7 mt-1">
-                    <div className="flex h-1 overflow-hidden rounded-full bg-elevated">
-                      <div className="h-full bg-bull/70" style={{ width: `${upPct}%` }} />
-                      {flatPct > 0 && <div className="h-full bg-muted/25" style={{ width: `${flatPct}%` }} />}
-                      <div className="h-full bg-bear/70" style={{ width: `${downPct}%` }} />
-                    </div>
-                  </div>
-                </div>
-                <div className="grid min-w-0 grid-cols-3 gap-1">
-                  {Array.from({ length: 3 }).map((_, i) => {
-                    const stock = leaders[i]
-                    return stock ? (
-                      <span key={stock.symbol} title={stock.name || stock.symbol} onClick={e => { e.stopPropagation(); onStockClick(stock.symbol, stock.name || undefined, toNavItems(sortedStocks.slice(0, MAX_RENDERED_STOCKS))) }} className={cn('flex min-w-0 items-center gap-1 rounded-btn px-1.5 py-0.5 text-micro cursor-pointer hover:brightness-125', i === 0 ? 'bg-warning/10 text-foreground' : 'bg-surface border border-border text-foreground', stock.symbol === activeSymbol && 'ring-1 ring-accent/60')}>
-                        <span className="flex min-w-0 items-center gap-1">
-                          <span className="min-w-0 truncate font-medium">{stock.name || stock.symbol}</span>
-                        </span>
-                        <span className={cn('shrink-0 font-mono', priceColorClass(stock.change_pct))}>{stock.change_pct != null ? fmtPct(stock.change_pct) : '—'}</span>
-                      </span>
-                    ) : <span key={i} className="rounded-btn bg-elevated/30 px-1.5 py-0.5 text-micro text-muted/40">—</span>
-                  })}
-                </div>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ===== IndustryRail（左侧列表面板） =====
-
-function IndustryRail({
-  stats,
-  selectedKey,
-  search,
-  sortMode,
-  onSearch,
-  onSort,
+/**
+ * [R774] 热力图底下原来那行「领涨/领跌」chips, 现在是页头第二行的左半部分。
+ *
+ * 各 4 条, 第 1 名已在第一行「最强行业/最大风险」里, 这里剔掉它、顺位补到第 5 名 ——
+ * 同一屏里同一个行业出现两遍, 读的人会以为其中一处是错的。
+ */
+function IndustryLeaders({
+  leaders,
+  fallers,
   onSelect,
 }: {
-  stats: IndustryStat[]
-  selectedKey: string | null
-  search: string
-  sortMode: SortMode
-  onSearch: (v: string) => void
-  onSort: (v: SortMode) => void
-  onSelect: (v: string) => void
+  leaders: IndustryStat[]
+  fallers: IndustryStat[]
+  onSelect?: (key: string) => void
 }) {
+  if (leaders.length === 0) return null
   return (
-    <section className="rounded-dialog border border-border bg-surface p-2.5">
-      <div className="px-1 pb-2.5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">行业矩阵</h3>
-          <span className="text-micro text-muted">Top {stats.length}</span>
-        </div>
-        <div className="mt-2 relative">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-          <input value={search} onChange={e => onSearch(e.target.value)} placeholder="搜索行业" className="h-8 w-full rounded-card border border-border bg-base pl-8 pr-3 text-xs text-foreground outline-none focus:border-accent/50" />
-        </div>
-        <div className="mt-2 grid grid-cols-5 overflow-hidden rounded-card border border-border text-micro">
-          {([
-            ['heat', '强度'], ['avgPct', '涨幅'], ['leader', '龙头'], ['amount', '成交'], ['down', '跌幅'],
-          ] as [SortMode, string][]).map(([key, label]) => (
-            <button key={key} onClick={() => onSort(key)} className={cn('py-1.5 transition-colors', sortMode === key ? 'bg-warning/15 text-warning' : 'bg-base text-secondary hover:text-foreground')}>{label}</button>
-          ))}
-        </div>
-      </div>
-      <div className="max-h-[620px] overflow-auto rounded-card border border-border/50">
-        {stats.map(item => {
-          const active = selectedKey === item.key
-          return (
-            <button key={item.key} onClick={() => onSelect(item.key)} className={cn('w-full border-b border-border/50 px-2.5 py-2 text-left transition-colors last:border-b-0', active ? 'bg-warning/[0.08]' : 'hover:bg-elevated/40')}>
-              <div className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{item.key}</span>
-                <span className={cn('font-mono text-xs', priceColorClass(item.avgPct))}>{item.avgPct != null ? fmtPct(item.avgPct) : '—'}</span>
-              </div>
-              <div className="mt-1 flex items-center gap-2 text-micro text-muted">
-                <span>{item.count}只</span>
-                <span className="text-bull">{item.upCount}涨</span>
-                <span className="text-bear">{item.downCount}跌</span>
-                <span className="ml-auto">强度 {item.heatScore.toFixed(0)}</span>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-    </section>
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-micro text-muted">
+      <span className="shrink-0 text-bull">领涨</span>
+      {leaders.map(item => (
+        <BriefChip key={item.key} item={item} onSelect={onSelect} />
+      ))}
+      <BriefSep />
+      <span className="shrink-0 text-bear">领跌</span>
+      {fallers.map(item => (
+        <BriefChip key={item.key} item={item} onSelect={onSelect} />
+      ))}
+    </div>
+  )
+}
+
+/** [R774] 领涨/领跌榜里的一项: 行业名 + 平均涨幅, 点了开右侧详情抽屉(与点热力图格子同一个动作) */
+function BriefChip({ item, onSelect }: { item: IndustryStat; onSelect?: (key: string) => void }) {
+  return (
+    <button
+      onClick={() => onSelect?.(item.key)}
+      className="flex items-center gap-1 whitespace-nowrap rounded-btn px-1 py-0.5 transition-colors hover:bg-elevated"
+      title={`${item.key} · 等权平均涨幅 ${item.avgPct != null ? fmtPct(item.avgPct) : '—'} · ${item.count} 只标的`}
+    >
+      <span className="text-foreground">{item.key}</span>
+      <span className={priceColorClass(item.avgPct)}>{item.avgPct != null ? fmtPct(item.avgPct) : '—'}</span>
+    </button>
+  )
+}
+
+/** 项与项之间的分隔点: 纯间隔会让「+3.10%」和下一个标签糊在一起 */
+function BriefSep() {
+  return <span aria-hidden className="select-none text-muted/40">·</span>
+}
+
+function BriefItem({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <span className="flex items-center gap-1 whitespace-nowrap">
+      <span className="text-muted">{label}</span>
+      <span className="font-medium tabular-nums">{children}</span>
+    </span>
   )
 }
 
 // ===== IndustryFocus（右侧聚焦面板） =====
 
+/**
+ * [R776] 抽屉加宽到 800px 之后重排。
+ *
+ * 原来那版是按「560px 窄抽屉」写的, 但里面用的是**视口断点**(`lg:flex-row`、
+ * `lg:w-[520px]`、`lg:grid-cols-[1fr_1.15fr]`)—— 屏幕够宽就按宽屏排, 而抽屉只有
+ * 560, 于是标题与五个读数挤成一行、三龙头卡被压到 ~90px、表格 8 列横向溢出。
+ * 现在一律按抽屉自身宽度排:
+ *
+ * 1. 标题 + 强度徽标一行, 下面一行读数(成分/平均/上涨占比/成交额/均换手);
+ * 2. 五个读数格五等分整行(窄屏三列);
+ * 3. 三龙头、评分拆解各占一整行 —— 并排放时三张龙头卡只剩 100 出头, 挤;
+ * 4. 成分股表吃剩余高度, 单元格 px-3 让 8 列在 768 内容宽内不横滚。
+ */
 function IndustryFocus({ stat, onStockClick, activeSymbol }: { stat: IndustryStat | null; onStockClick: (symbol: string, name?: string, navList?: NavItem[]) => void; activeSymbol: string | null }) {
   if (!stat) return null
   const stocks = [...stat.stocks].sort((a, b) => b.leaderScore - a.leaderScore).slice(0, MAX_RENDERED_STOCKS)
   const topLeaders = stocks.slice(0, 3)
   const focusNav: NavItem[] = toNavItems(stocks)
   return (
-    <section className="flex max-h-[720px] flex-col overflow-hidden rounded-dialog border border-border bg-surface">
-      <div className="shrink-0 border-b border-border px-5 py-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <h3 className="truncate text-xl font-semibold text-foreground">{stat.key}</h3>
-              <span className="rounded-btn bg-warning/10 px-2 py-0.5 text-micro text-warning">强度 {stat.heatScore.toFixed(0)}</span>
-            </div>
-            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-              <span>{stat.count} 只成分</span>
-              <span className={priceColorClass(stat.avgPct)}>平均 {stat.avgPct != null ? fmtPct(stat.avgPct) : '—'}</span>
-              <span>上涨占比 {(stat.upRate * 100).toFixed(0)}%</span>
-              <span>成交额 {fmtBigNum(stat.totalAmount)}</span>
-              {stat.avgTurnover != null && <span>均换手 {stat.avgTurnover.toFixed(2)}%</span>}
-            </div>
-          </div>
-          <div className="grid grid-cols-5 gap-2 lg:w-[520px]">
-            <MiniStat label="均涨" value={stat.avgPct != null ? fmtPct(stat.avgPct) : '—'} cls={priceColorClass(stat.avgPct)} />
-            <MiniStat label="中位" value={stat.medianPct != null ? fmtPct(stat.medianPct) : '—'} cls={priceColorClass(stat.medianPct)} />
-            <MiniStat label="强势" value={`${stat.strongCount}`} cls="text-bull" />
-            <MiniStat label="弱势" value={`${stat.weakCount}`} cls="text-bear" />
-            <MiniStat label="量比" value={stat.avgVolRatio != null ? stat.avgVolRatio.toFixed(2) : '—'} cls="text-foreground" />
-          </div>
+    <section className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="shrink-0 border-b border-border px-5 py-3">
+        <div className="flex items-baseline gap-2">
+          <h3 className="truncate text-lg font-semibold leading-tight text-foreground">{stat.key}</h3>
+          <span className="shrink-0 rounded-btn bg-warning/10 px-2 py-0.5 text-micro text-warning">强度 {stat.heatScore.toFixed(0)}</span>
+        </div>
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+          <span>{stat.count} 只成分</span>
+          <span className={priceColorClass(stat.avgPct)}>平均 {stat.avgPct != null ? fmtPct(stat.avgPct) : '—'}</span>
+          <span>上涨占比 {(stat.upRate * 100).toFixed(0)}%</span>
+          <span>成交额 {fmtBigNum(stat.totalAmount)}</span>
+          {stat.avgTurnover != null && <span>均换手 {stat.avgTurnover.toFixed(2)}%</span>}
         </div>
       </div>
 
-      <div className="grid shrink-0 gap-3 border-b border-border bg-base/25 p-4 lg:grid-cols-[1fr_1.15fr]">
+      <div className="grid shrink-0 grid-cols-3 gap-2 border-b border-border bg-base/25 px-5 py-3 sm:grid-cols-5">
+        <MiniStat label="均涨" value={stat.avgPct != null ? fmtPct(stat.avgPct) : '—'} cls={priceColorClass(stat.avgPct)} />
+        <MiniStat label="中位" value={stat.medianPct != null ? fmtPct(stat.medianPct) : '—'} cls={priceColorClass(stat.medianPct)} />
+        <MiniStat label="强势" value={`${stat.strongCount}`} cls="text-bull" />
+        <MiniStat label="弱势" value={`${stat.weakCount}`} cls="text-bear" />
+        <MiniStat label="量比" value={stat.avgVolRatio != null ? stat.avgVolRatio.toFixed(2) : '—'} cls="text-foreground" />
+      </div>
+
+      <div className="flex shrink-0 flex-col gap-3 border-b border-border bg-base/25 px-5 py-3">
         <LeaderStage stocks={topLeaders} activeSymbol={activeSymbol} onStockClick={(sym, name) => onStockClick(sym, name, focusNav)} />
         <ScoreExplain stock={topLeaders[0]} />
       </div>
@@ -809,30 +765,30 @@ function IndustryFocus({ stat, onStockClick, activeSymbol }: { stat: IndustrySta
         <table className="min-w-full text-left text-xs">
           <thead className="bg-elevated/60 text-xs text-muted">
             <tr>
-              <th className="px-4 py-2 font-medium">排名</th>
-              <th className="px-4 py-2 font-medium">股票</th>
-              <th className="px-4 py-2 font-medium">涨跌幅</th>
-              <th className="px-4 py-2 font-medium">换手率</th>
-              <th className="px-4 py-2 font-medium">成交额</th>
-              <th className="px-4 py-2 font-medium">流通市值</th>
-              <th className="px-4 py-2 font-medium">量比</th>
-              <th className="px-4 py-2 font-medium">龙头分</th>
+              <th className="px-3 py-2 font-medium">排名</th>
+              <th className="px-3 py-2 font-medium">股票</th>
+              <th className="px-3 py-2 font-medium">涨跌幅</th>
+              <th className="px-3 py-2 font-medium">换手率</th>
+              <th className="px-3 py-2 font-medium">成交额</th>
+              <th className="px-3 py-2 font-medium">流通市值</th>
+              <th className="px-3 py-2 font-medium">量比</th>
+              <th className="px-3 py-2 font-medium">龙头分</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/70">
             {stocks.map((s, idx) => (
               <tr key={`${s.symbol}-${idx}`} className={cn('cursor-pointer', s.symbol === activeSymbol ? 'bg-accent/10 hover:bg-accent/15' : 'hover:bg-elevated/30')} onClick={() => onStockClick(s.symbol, s.name || undefined, focusNav)}>
-                <td className="px-4 py-2 font-mono text-muted">{idx + 1}</td>
-                <td className="px-4 py-2">
+                <td className="px-3 py-2 font-mono text-muted">{idx + 1}</td>
+                <td className="px-3 py-2">
                   <div className="font-medium text-foreground">{s.name || '—'}</div>
                   <div className="font-mono text-micro text-muted">{s.symbol}</div>
                 </td>
-                <td className={cn('px-4 py-2 font-mono tabular-nums', priceColorClass(s.change_pct))}>{s.change_pct != null ? fmtPct(s.change_pct) : '—'}</td>
-                <td className="px-4 py-2 font-mono text-foreground">{s.turnover_rate != null ? `${s.turnover_rate.toFixed(2)}%` : '—'}</td>
-                <td className="px-4 py-2 font-mono text-foreground">{fmtBigNum(s.amount)}</td>
-                <td className="px-4 py-2 font-mono text-foreground">{fmtBigNum(s.float_market_cap ?? s.market_cap)}</td>
-                <td className="px-4 py-2 font-mono text-foreground">{s.vol_ratio_5d != null ? s.vol_ratio_5d.toFixed(2) : '—'}</td>
-                <td className="px-4 py-2">
+                <td className={cn('px-3 py-2 font-mono tabular-nums', priceColorClass(s.change_pct))}>{s.change_pct != null ? fmtPct(s.change_pct) : '—'}</td>
+                <td className="px-3 py-2 font-mono text-foreground">{s.turnover_rate != null ? `${s.turnover_rate.toFixed(2)}%` : '—'}</td>
+                <td className="px-3 py-2 font-mono text-foreground">{fmtBigNum(s.amount)}</td>
+                <td className="px-3 py-2 font-mono text-foreground">{fmtBigNum(s.float_market_cap ?? s.market_cap)}</td>
+                <td className="px-3 py-2 font-mono text-foreground">{s.vol_ratio_5d != null ? s.vol_ratio_5d.toFixed(2) : '—'}</td>
+                <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
                     <span className="w-9 font-mono text-warning">{s.leaderScore.toFixed(0)}</span>
                     <div className="h-1.5 w-16 rounded-full bg-elevated"><div className="h-full rounded-full bg-warning" style={{ width: `${Math.max(4, s.leaderScore)}%` }} /></div>
@@ -888,7 +844,7 @@ function ScoreExplain({ stock }: { stock?: EnrichedStock }) {
         <span className="text-xs font-medium text-foreground">主龙头评分拆解</span>
         <span className="text-xs text-muted">涨幅 / 换手 / 成交 / 市值 / 量比 / 连板</span>
       </div>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 lg:grid-cols-6">
         <Part label="动能" value={parts.momentum} cls="bg-red-400" />
         <Part label="换手" value={parts.turnover} cls="bg-warning" />
         <Part label="成交" value={parts.amount} cls="bg-blue-400" />

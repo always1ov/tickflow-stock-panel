@@ -14,13 +14,22 @@ interface Props {
   onClose: () => void
   /** 维度: concept 概念(默认) / industry 行业 */
   kind?: 'concept' | 'industry'
+  /**
+   * [R769] 只留 AI 报告: 行业页把矩阵并进热力图后, 这个弹窗再画一遍同一份矩阵
+   * 就是第二个入口两套语义。传 true 时下半区矩阵整块不渲染。
+   */
+  aiOnly?: boolean
+  /** [R769] 跟随热力图当前口径打开, 免得 AI 读 12 天而用户正看 30 天 */
+  initialDays?: number
+  initialLevel?: number
 }
 
 const DEFAULT_DAYS = 12
-const ROW_HEIGHT = 30        // 每行高度(px), 与单元格样式配合
+// [R764] 行高必须与实际渲染高度一致, 否则虚拟滚动的占位行会算错(原来 30 而实际 46)
+const ROW_HEIGHT = 34
 const OVERSCAN = 8           // 上下额外渲染行数, 减少滚动时的白屏闪烁
-const MIN_DAYS = 7
-const MAX_DAYS = 30
+// [R764] 天数从 7~30 滑杆改成 4 档 chip, 塞进标题行
+const DAY_PRESETS = [7, 12, 20, 30]
 
 // 涨幅 → 背景色梯度(A 股语义: 红涨绿跌)。强度越大色越深, 一眼看出强势/弱势概念
 function pctBgClass(pct: number): string {
@@ -49,14 +58,20 @@ function rankColorClass(rank: number, total: number): string {
 }
 
 // [R504] R105 加的「弹窗内切换行业/概念」随复盘页那个统一入口一起撤了 —— 入口回到行业/概念两页, 各开各的
-export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
+export function RpsRotationDialog({
+  onClose,
+  kind = 'concept',
+  aiOnly = false,
+  initialDays = DEFAULT_DAYS,
+  initialLevel,
+}: Props) {
   // 维度文案: concept→概念, industry→行业
   const dimLabel = kind === 'industry' ? '行业' : '概念'
-  const [days, setDays] = useState(DEFAULT_DAYS)
+  const [days, setDays] = useState(initialDays)
   const [reversed, setReversed] = useState(false)        // false=高→低, true=低→高
   const [selected, setSelected] = useState<string | null>(null)  // 点中的成员名, 高亮追踪
   // 行业层级(仅 industry): 1/2/3 级, 默认 2 级。concept 时为 null 不生效。
-  const [level, setLevel] = useState<number>(kind === 'industry' ? 2 : 0)
+  const [level, setLevel] = useState<number>(kind === 'industry' ? (initialLevel ?? 2) : 0)
 
   // ---- AI 轮动分析状态 (组件内, 不建全局 store: 切页即关对话框) ----
   const [analysis, setAnalysis] = useState('')            // 累积的 Markdown 报告
@@ -174,14 +189,14 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
             key={d}
             onClick={() => setSelected(prev => prev === name ? null : name)}
             className={cn(
-              'px-2 py-1 cursor-pointer whitespace-nowrap text-center align-middle transition-colors',
+              'px-1.5 py-0 cursor-pointer whitespace-nowrap text-center align-middle transition-colors',
               pctBgClass(pct),
               isSelected && 'ring-1 ring-inset ring-accent bg-accent/20',
             )}
           >
-            <div className="flex flex-col items-center gap-0.5 leading-tight">
+            <div className="flex flex-col items-center gap-0 leading-none">
               <span className={cn(
-                'text-xs max-w-[84px] truncate',
+                'text-micro max-w-[84px] truncate',
                 isSelected ? 'text-accent font-medium' : 'text-secondary',
               )} title={name}>{name}</span>
               <span className={cn(
@@ -213,15 +228,20 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
       onClose={onClose}
       labelledBy="rps-rotation-title"
       overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      panelClassName="w-[92vw] max-w-read h-[88vh] bg-surface border border-border rounded-card shadow-xl flex flex-col"
+      panelClassName={cn(
+        'w-[92vw] bg-surface border border-border rounded-card shadow-xl flex flex-col',
+        aiOnly ? 'h-[70vh] max-w-read' : 'h-[88vh] max-w-wide',
+      )}
     >
           {/* 标题栏 */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
             <div className="flex items-center gap-2">
               <Repeat className="h-4 w-4 text-accent" />
-              <span id="rps-rotation-title" className={TYPE.section}>{dimLabel}涨幅轮动</span>
+              <span id="rps-rotation-title" className={TYPE.section}>
+                {aiOnly ? `${dimLabel} AI 轮动分析` : `${dimLabel}涨幅轮动`}
+              </span>
               <span className="text-xs text-muted">
-                {conceptCount > 0 ? `${dates.length} 天 · ${conceptCount} 个${dimLabel}` : '暂无数据'}
+                {conceptCount > 0 ? `${dates.length} 日 · ${conceptCount} 个${dimLabel}` : '暂无数据'}
               </span>
               {/* 行业层级选择器: 1/2/3 级, 默认 2 级。仅 kind=industry 显示 */}
               {kind === 'industry' && (
@@ -240,20 +260,62 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                   ))}
                 </div>
               )}
+              {/* [R764] 天数改 4 档 chip + 排序并入标题行: 原工具栏 47px 整行省掉 */}
+              <div className="ml-1 flex items-center rounded-btn border border-border bg-base/60 p-0.5">
+                {DAY_PRESETS.map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setDays(d)}
+                    className={cn(
+                      'h-5 rounded-[5px] px-2 text-micro tabular-nums transition-colors',
+                      days === d ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground',
+                    )}
+                  >
+                    {d}日
+                  </button>
+                ))}
+              </div>
+              {/* [R769] aiOnly 模式没有矩阵可翻, 排序开关一并收起 */}
+              {!aiOnly && (
+                <button
+                  onClick={() => setReversed(r => !r)}
+                  className={cn(
+                    'inline-flex h-6 items-center gap-1 rounded-btn px-2 text-micro transition-colors cursor-pointer border',
+                    reversed
+                      ? 'border-foreground bg-foreground font-medium text-surface'
+                      : 'border-border text-secondary hover:bg-elevated',
+                  )}
+                  title="翻转排序(高↔低)"
+                >
+                  <ArrowDownUp className="h-3 w-3" />
+                  {reversed ? '低→高' : '高→低'}
+                </button>
+              )}
+              {!aiOnly && selected && (
+                <button onClick={() => setSelected(null)} className="text-micro text-accent hover:underline cursor-pointer">
+                  取消追踪
+                </button>
+              )}
             </div>
             <button aria-label="关闭" onClick={onClose} className="p-1 rounded-btn hover:bg-elevated transition-colors cursor-pointer">
               <X className="h-4 w-4 text-muted" />
             </button>
           </div>
 
-          {/* 上半区: AI 轮动分析 */}
-          <div className="shrink-0 border-b border-border flex flex-col max-h-[42%]">
+          {/* 上半区: AI 轮动分析。aiOnly 时它就是全部内容, 不再压 42% 的高度上限 */}
+          <div className={cn('shrink-0 border-b border-border flex flex-col', aiOnly ? 'min-h-0 flex-1' : 'max-h-[42%]')}>
             {/* 标题栏: 标题 + meta 摘要 + focus 输入 + 触发按钮 */}
             <div className="flex items-center gap-2 px-4 py-1.5 bg-elevated/30 shrink-0">
               <Sparkles className={cn('h-3.5 w-3.5 text-accent/60', analyzing && 'animate-pulse')} />
               <span className="text-xs text-muted shrink-0">AI 轮动分析</span>
               {analysisMeta?.summary && (
                 <span className="text-xs text-accent/80 truncate">{analysisMeta.summary}</span>
+              )}
+              {/* [R764] 空态提示并进标题行, 不再占一整块纵向空间 */}
+              {!analysis && !analyzing && !analysisError && (
+                <span className="min-w-0 truncate text-micro text-muted/60">
+                  点击「生成分析」: 主线研判 / 新晋强势 / 退潮预警 / 机构vs游资 · 最近 {days} 日
+                </span>
               )}
               <div className="flex items-center gap-1.5 ml-auto">
                 <input
@@ -283,7 +345,8 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
               </div>
             </div>
 
-            {/* 报告内容区: 四态渲染 */}
+            {/* 报告内容区: 空态不占纵向(提示已并入标题行), 有结果才展开 */}
+            {(analysisError || analysis || analyzing) && (
             <div ref={analysisRef} className="flex-1 min-h-0 overflow-auto">
               {analysisError ? (
                 <div className="flex items-center gap-2 px-4 py-4 text-xs text-danger">
@@ -301,53 +364,14 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                     <span className="inline-block w-1.5 h-3.5 bg-accent animate-pulse align-middle ml-0.5" />
                   )}
                 </div>
-              ) : (
-                <div className="px-4 py-4 text-center text-xs text-muted/60">
-                  点击「生成分析」,AI 将从主线研判 / 新晋强势 / 退潮预警 / 机构vs游资 等角度分析最近 {days} 天的概念轮动
-                </div>
-              )}
+              ) : null}
             </div>
-          </div>
-
-          {/* 工具栏 */}
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-border shrink-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-muted">天数</span>
-              <input
-                type="range"
-                min={MIN_DAYS}
-                max={MAX_DAYS}
-                step={1}
-                value={days}
-                onChange={e => setDays(Number(e.target.value))}
-                className="w-24 accent-accent cursor-pointer"
-              />
-              <span className="text-xs text-secondary tabular-nums w-5">{days}</span>
-            </div>
-            <button
-              onClick={() => setReversed(r => !r)}
-              className={cn(
-                'inline-flex items-center gap-1 px-2 py-1 rounded-btn text-xs transition-colors cursor-pointer border',
-                reversed
-                  ? 'border-foreground bg-foreground font-medium text-surface'
-                  : 'border-border text-secondary hover:text-secondary hover:bg-elevated',
-              )}
-              title="翻转排序(高↔低)"
-            >
-              <ArrowDownUp className="h-3 w-3" />
-              {reversed ? '低→高' : '高→低'}
-            </button>
-            {selected && (
-              <button
-                onClick={() => setSelected(null)}
-                className="text-xs text-accent hover:underline cursor-pointer"
-              >
-                取消追踪「{selected}」
-              </button>
             )}
           </div>
 
-          {/* 下半区: 涨幅轮动矩阵(虚拟滚动) */}
+          {/* 下半区: 涨幅轮动矩阵(虚拟滚动) — [R769] aiOnly 时整块不渲染 */}
+          {!aiOnly && (
+          <>
           <div className="flex-1 min-h-0 flex flex-col">
             {isLoading ? (
               <div className="flex items-center justify-center py-16">
@@ -451,6 +475,17 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
               每列各自按当日涨幅排序 · 点击单元格追踪概念在各日的排名变化
             </span>
           </div>
+          </>
+          )}
+
+          {/* [R769] aiOnly: 矩阵已并进热力图, 这里只交代口径与边界 */}
+          {aiOnly && (
+            <div className="px-4 py-1.5 border-t border-border shrink-0">
+              <span className="text-micro text-muted">
+                最近 {days} 日 · 报告由 AI 生成，名次与涨幅以矩阵为准
+              </span>
+            </div>
+          )}
     </Modal>
   )
 }

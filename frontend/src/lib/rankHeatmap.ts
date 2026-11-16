@@ -60,24 +60,33 @@ const RANK_BANDS: [maxRank: number, color: string][] = [
 /** 图例用：10 档底色，顺序即名次由前到后。 */
 export const RANK_BAND_COLORS = RANK_BANDS.map(([, color]) => color)
 
-function bandIndex(rank: number) {
-  const r = Math.min(Math.max(rank, 1), 50)
-  const i = RANK_BANDS.findIndex(([maxRank]) => r <= maxRank)
-  return i === -1 ? RANK_BANDS.length - 1 : i
+/**
+ * [R769] 档位宽度跟着总行数走：前 45 名时仍是参考图的「每 5 名一档」，
+ * 展开成全部 257 名时改成「每 26 名一档」—— 否则 46~257 名会挤在最后一档，
+ * 一整片同色等于没有信息。total ≤ 50 时结果与 R761 逐档一致。
+ */
+function bandSpan(total: number) {
+  return Math.max(1, Math.ceil(total / RANK_BANDS.length))
 }
 
-/** 名次 → 格子底色。 */
-export function rankColor(rank: number) {
-  return RANK_BANDS[bandIndex(rank)][1]
+function bandIndex(rank: number, total = 50) {
+  const span = bandSpan(total)
+  const r = Math.min(Math.max(rank, 1), span * RANK_BANDS.length)
+  return Math.min(RANK_BANDS.length - 1, Math.floor((r - 1) / span))
+}
+
+/** 名次 → 格子底色。total 为当日榜单总行数，缺省按前 50 名分档。 */
+export function rankColor(rank: number, total = 50) {
+  return RANK_BANDS[bandIndex(rank, total)][1]
 }
 
 /**
- * 名次 → 格子文字色。中间四档（黄/黄绿，16~35 名）底色太亮，白字会糊，
+ * 名次 → 格子文字色。中间四档（黄/黄绿）底色太亮，白字会糊，
  * 参考图那几档用的是深色字；红段和绿段仍是白字。
  */
-export function rankTextColor(rank: number) {
-  const r = Math.min(Math.max(rank, 1), 50)
-  return r >= 16 && r <= 35 ? '#1F2A37' : '#FFFFFF'
+export function rankTextColor(rank: number, total = 50) {
+  const i = bandIndex(rank, total)
+  return i >= 3 && i <= 6 ? '#1F2A37' : '#FFFFFF'
 }
 
 /** 格内第二行：当日涨幅，一位小数带符号（参考图写法 +1.6 / +0.0 / -0.0）。 */

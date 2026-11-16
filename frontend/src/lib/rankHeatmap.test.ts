@@ -72,6 +72,18 @@ describe('rankColor', () => {
     expect(rankColor(0)).toBe(rankColor(1))
     expect(rankColor(254)).toBe(rankColor(50))
   })
+
+  it('传入总行数时按总量均分 10 档，榜尾不再挤成一片同色', () => {
+    // 257 行 → 每档 26 名
+    expect(rankColor(1, 257)).toBe('#E53935')
+    expect(rankColor(26, 257)).toBe('#E53935')
+    expect(rankColor(27, 257)).toBe('#F4511E')
+    expect(rankColor(257, 257)).toBe('#2E7D31')
+    expect(new Set(Array.from({ length: 257 }, (_, i) => rankColor(i + 1, 257))).size).toBe(10)
+    // 中间四档的深色字跟着档位走，不是固定 16~35 名
+    expect(rankTextColor(79, 257)).toBe('#1F2A37')
+    expect(rankTextColor(78, 257)).toBe('#FFFFFF')
+  })
 })
 
 describe('rankTextColor', () => {

@@ -1,10 +1,20 @@
 import { cn } from '@/lib/cn'
 
 interface Props {
-  title: string
+  /** [R776] 可省略: 侧栏已经标出当前页时, 页头不必再重复一遍页面名(行业板块页) */
+  title?: string
   subtitle?: React.ReactNode
   /** 标题右侧、subtitle 之前的额外节点(如状态徽标) */
   titleExtra?: React.ReactNode
+  /**
+   * [R765] subtitle 之后的额外节点。
+   *
+   * 存在的理由: subtitle 那个 span 带 `truncate`(overflow hidden + nowrap), 塞进去的
+   * 内容超宽会被**静默截断**。需要「一行放得下就同行, 放不下整体折到第二行」的内容
+   * (行业页那组行情摘要)必须放在这个 span 之外 —— 它是左块的兄弟 flex item,
+   * 父级 `flex-wrap` 负责它在窄屏换行, 一个字都不会丢。
+   */
+  afterSubtitle?: React.ReactNode
   right?: React.ReactNode
   className?: string
 }
@@ -38,7 +48,7 @@ interface Props {
  * 断点取 `md`(768px), 与 `useIsDesktop()` 的 `min-width: 768px` 是同一个数 ——
  * 按钮在哪个宽度出现, 位置就在哪个宽度让出来, 不能各写各的。
  */
-export function PageHeader({ title, subtitle, titleExtra, right, className }: Props) {
+export function PageHeader({ title, subtitle, titleExtra, afterSubtitle, right, className }: Props) {
   return (
     <header
       className={cn(
@@ -70,9 +80,10 @@ export function PageHeader({ title, subtitle, titleExtra, right, className }: Pr
         一个字不剩)。宽屏还原成原来的自适应宽度。
       */}
       <div className="flex min-w-0 shrink-0 basis-full flex-wrap items-center gap-x-2.5 gap-y-0.5 pl-11 md:shrink md:basis-auto md:pl-0">
-        <h1 className="shrink-0 text-xl font-semibold leading-tight tracking-tight">{title}</h1>
+        {title && <h1 className="shrink-0 text-xl font-semibold leading-tight tracking-tight">{title}</h1>}
         {titleExtra}
         {subtitle && <span className="min-w-0 truncate text-xs leading-[18px] text-muted">{subtitle}</span>}
+        {afterSubtitle}
       </div>
       {/* [R374] 窄屏兜底: 工具栏多个按钮 + date input 等组合, 默认 shrink-0 会顶破
           375px。改为 flex-wrap + 允许压缩, 窄屏上内部自然换行, 整行不会被撑出去。
