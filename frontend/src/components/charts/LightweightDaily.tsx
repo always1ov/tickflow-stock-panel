@@ -278,7 +278,13 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
   useLayoutEffect(() => {
     const el = barRef.current
     if (!showInfoBar || !el) return
-    const measure = () => setReadoutBarHeight(el.getBoundingClientRect().height)
+    // [R758] 读数条内容随悬停的K线变(异动标签、「至今 · 周期」), 折行多一行条就高一行、
+    // 图跟着矮一行 —— 鼠标扫过K线时主图会一跳一跳的。只认更高的那个: 为最占位的读数
+    // 让出空间后不再收回, 悬停也就不再改变图高。
+    const measure = () => {
+      const measured = el.getBoundingClientRect().height
+      setReadoutBarHeight(prev => measured > prev ? measured : prev)
+    }
     measure()
     // 单测 jsdom 没有 ResizeObserver: 量一次就够, 不挂观察器。
     if (typeof ResizeObserver === 'undefined') return
@@ -376,7 +382,8 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
   const turnover = stockInfo?.float_shares && current?.volume != null ? current.volume * 100 / stockInfo.float_shares : null
 
   return <div className="min-w-0" data-testid="lightweight-daily">
-    {showInfoBar && <div ref={barRef} className="min-h-[46px] border-b border-border/50 px-3 py-1 text-micro font-mono tabular-nums">
+    {showInfoBar && <div ref={barRef} className="min-h-[46px] border-b border-border/50 px-3 py-1 text-micro font-mono tabular-nums"
+      style={readoutBarHeight ? { minHeight: readoutBarHeight } : undefined}>
       <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium text-foreground">{current?.date ?? '—'}</span>
         {currentEvent && <span style={{ color: eventTextColor(currentEvent, current, theme) }} title="阴阳按收盘价与开盘价判断，影线保留原来的涨跌色">

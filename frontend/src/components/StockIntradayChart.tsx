@@ -88,7 +88,12 @@ export function StockIntradayChart({
   // [R625] 「拿不到」要区分于「还没取」: 只有加载完且数据源确认没有(或指数)才算空,
   // 「是否立即获取」那种还能取的状态不算 —— 收起来会把获取入口一起藏掉。
   const sourceEmpty = !minute.isLoading && minuteRows.length === 0 && (isIndex || sourceIsNone)
-  useEffect(() => { onSourceEmptyChange?.(sourceEmpty) }, [sourceEmpty, onSourceEmptyChange])
+  // [R758] 换日期时新查询先进入 loading: 这期间不回报(旧结论保持不变), 否则日K侧会先按
+  // "非空"展开分时栏、等结果回来又收起 —— 两栏宽度来回切一次, 主图看上去闪一下。
+  useEffect(() => {
+    if (minute.isLoading) return
+    onSourceEmptyChange?.(sourceEmpty)
+  }, [sourceEmpty, minute.isLoading, onSourceEmptyChange])
 
   if (!symbol || !date) return null
 

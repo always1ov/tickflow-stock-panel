@@ -264,8 +264,10 @@ export function StockPanel({
   // 财务指标最新一期（metrics 按 period_end 排序，取首项）
   const financialMetrics: FinancialMetricRecord | undefined = financials.data?.data?.[0]
 
-  // [R625] 换天/换票先复位: 收起后子图就卸载了, 不复位它永远没机会知道新日期的数据回来了
-  useEffect(() => { setEmptyIntraday(false) }, [symbol, selectedDate])
+  // [R625] 换票先复位: 收起后子图不可见, 不该把上一只股票的空结论带过来。
+  // [R758] 换天不再复位 —— 分时栏现在始终挂着(收起只是隐藏), 新日期有没有数据由子图
+  // 查完再回报。若照旧在换天时复位, 点一下日K 就会"展开→收起"抖一次, 主图跟着闪。
+  useEffect(() => { setEmptyIntraday(false) }, [symbol])
   const intradayVisible = showIntraday && !!selectedDate && !intradayDismissed
   const collapseIntraday = hideEmptyIntraday && emptyIntraday
 
@@ -325,8 +327,12 @@ export function StockPanel({
           refreshLive={refreshLive}
         />
 
-        {intradayVisible && !collapseIntraday && (
-          <div className={renderer === 'lightweight' ? 'relative min-w-0 border-t border-border/60 xl:border-l xl:border-t-0' : 'relative flex-1 min-w-0 border-l border-border pl-3'}>
+        {/* [R758] 收起分时不再卸载: 只是隐藏。挂着的子图才能在换天时把"这天有没有分钟数据"
+            查回来(收起→展开) 而不必先展开一次再收起, 日K 的宽度就不会抖。 */}
+        {intradayVisible && (
+          <div className={renderer === 'lightweight'
+            ? (collapseIntraday ? 'hidden' : 'relative min-w-0 border-t border-border/60 xl:border-l xl:border-t-0')
+            : `relative flex-1 min-w-0 border-l border-border pl-3${collapseIntraday ? ' hidden' : ''}`}>
             <button
               onClick={() => onIntradayClose ? onIntradayClose() : setIntradayDismissed(true)}
               className={renderer === 'lightweight' ? 'absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-elevated hover:text-foreground' : 'absolute -left-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface text-secondary shadow-sm transition-colors hover:text-foreground hover:bg-elevated'}
