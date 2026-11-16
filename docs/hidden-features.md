@@ -37,6 +37,7 @@
 | **开发者工具** | 调试用，从来不进菜单 | 路由 `/dev` | 地址栏输入 `/dev` | 作者原有 |
 | **日K 副图的 MACD**（工具栏那颗 MACD 胶囊；开后在 K 线下方多一条 DIF / DEA / 柱状副图） | 用户：「日K里面的副图MACD可以删除了」。同一张图已有「量化MACD」副图（R649 并入），两套 MACD 挨着看只会互相干扰 | 数据与画法都在：`SUB_CHART_META` 里 MACD 那条、`LightweightDaily` 与 `EChartsCandlestick` 的 MACD 绘制照旧；指数页（`frontend/src/pages/Indices.tsx` 的 `activeIndicators={['vol', 'macd']}`）仍在用 | 只补前端：`frontend/src/components/StockDailyKChart.tsx` 的 `DAILY_SUB_CHARTS` 过滤器（去掉 `def.key !== 'macd'`），工具栏改回 `SUB_CHART_META.map` | R659 |
 | **「关键价位」的图表组件**（`AnalysisKChart` / `StockLevelsPanel` 的图本体、量化MACD 分析副图、六态趋势条） | 用户：「如果没问题就可以删除关键价位这部分了」（R663）。独立弹窗与个股预览弹窗里的「关键价位」视图都撤了，画线 / 开关 / 通道 / 斐波那契Ⅱ型 / 右侧标签带全并进日K，组件本身不再有入口 | 组件与画法全在（`frontend/src/components/stock-analysis/AnalysisKChart.tsx`、`StockLevelsPanel.tsx`），日K 与左栏仍在复用其中的 `useShownLevels`、`LevelOverview`、`useStockLevels`、`useAnalysisKline` 与副图常量 | 只补前端：任意卡片挂 `<StockLevelsPanel symbol={...} bare controls={useLevelControls()} />` 即可恢复整块；组件测试 `AnalysisKChart.test.tsx` 仍绿 | R663 |
+| **AI 对话**（后端 `/api/custom/assistant/*`：对话、状态、建议、会话历史、动作确认、流式输出） | 用户：「删掉 minds 页面」，对话是 Minds 页「对话」栏唯一的入口，入口随页面一起删除；后端 `app/custom/assistant` 是独立扩展，不属于笔记/消息面，先原样保留 | 接口与实现全在（`backend/app/custom/assistant/`，`build_router()` 挂 `/api/custom/assistant`），会话历史 `user_data/assistant_sessions.json` 仍在磁盘 | 只补前端：`git show <R751 提交>^:frontend/src/custom/assistant/extension.tsx` 取回整个扩展目录（含 `AssistantLauncher.tsx`、`ui/AssistantDrawer.tsx`），再补回 `minds.chat` 插槽定义与一个承载页 | R751 |
 
 ---
 
@@ -67,6 +68,7 @@
 | **日K 主图上原来的「BOLL」叠加**（工具栏那颗 BOLL 开关；开后在 K 线上画 26 日布林上 / 中 / 下轨，读数行跟着显示三轨） | 用户：「日k里面主图原来的boll可以删除了」。26 日布林已由「关键价位」那排开关的「26日布林」画（R653 并入日K），同一张图两个入口说同一件事 | 无（数据仍是接口的 `boll26_*`，`OHLC` 里那三个字段照给；「关键价位」的「26日布林」开关照旧能画同名三轨） | `git log --grep R656` 找到提交，`git show <该提交>^:frontend/src/components/charts/LightweightDaily.tsx`（`bollFields` 与 BOLL 读数行）、`git show <该提交>^:frontend/src/components/EChartsCandlestick.tsx`（`showBOLL` 那一段）；工具栏那颗开关在 `frontend/src/lib/chart-indicators.ts` 的 `OVERLAY_INDICATORS` | R656 |
 | **「关键价位」的独立弹窗与预览弹窗里的第 3 个视图**（`LevelsDialog`；个股弹窗右栏「日 K / 分时 / 关键价位 / 复盘」的中间那页；决策台点一行就弹的那个窗） | 用户：「如果没问题就可以删除关键价位这部分了」（R663）。日K 已接管它的价位画线、开关、通道、斐波那契Ⅱ型、分析副图与右侧标签带，再留两处入口是同一件事说两遍 | 无存档（数据接口 `stockLevels` / `stockTrend` 照旧，日K 在用；[R724] `stockTrendQuant` 已随「趋势量化」删除） | `git log --grep R663` 找到提交：`git show <该提交>^:frontend/src/components/stock-analysis/LevelsDialog.tsx`（整个弹窗）；预览弹窗那一页：`git show <该提交>^:frontend/src/components/StockPreviewDialog.tsx`，搜 `'levels'`；入口两处 `git show <该提交>^:frontend/src/custom/stock-analysis/Page.tsx`、`frontend/src/components/paper/FlipFollowCard.tsx` | R663 |
 | **趋势量化副图**（「关键价位」与日K 弹窗里的第二张分析副图，以及工具栏那颗「趋势量化」胶囊） | 用户：「彻底删掉趋势量化这个指标」（R724）。它与紧随其后的量化MACD 同看一只票的两套动量口径，用户只要量化MACD | 无存档。前端 `lib/trendQuantSeries.ts`、后端 `app/indicators/trend_quant.py` 与 `GET /api/stocks/{symbol}/trend-quant` 已整张删除；量化MACD（`quant_macd` / `/quant-macd`）原样保留 | `git log --grep R724` 找到提交后整轮回退 `git revert <提交号>`；单看实现：`git show <该提交>^:frontend/src/lib/trendQuantSeries.ts`、`git show <该提交>^:backend/app/indicators/trend_quant.py`、`git show <该提交>^:backend/app/api/stocks.py`（搜 `trend-quant`） | R724 |
+| **Minds 页与观察笔记 / 消息面**（页面四栏：笔记 · 洞见 · 计划 · 对话；原「观察笔记」R502 改名 Minds） | 用户：「删掉 minds 页面」「好的，连后端一起清理」—— 笔记不看了，消息面（新闻总览 + 附件）是它的子栏，一起撤 | 前端页面 `pages/Minds.tsx`、`pages/UsageNotes.tsx`、助手扩展 `custom/assistant/`（7 文件）、`components/CollapsibleText.tsx` 全删；后端 `api/usage_notes.py`、`services/usage_notes.py`、`services/news_desk.py` 全删，`api/today.py` 不再向 AI 提示注入消息面。**存档留在磁盘**：`user_data/usage_notes.json`、`user_data/news_desk_summary.json`、`user_data/news_desk/`，体检已登记为「已撤」 | `git log --grep R751` 找到提交后整轮回退 `git revert <提交号>`；单看实现：`git show <该提交>^:backend/app/services/usage_notes.py`、`git show <该提交>^:frontend/src/pages/Minds.tsx` | R751 |
 
 ---
 
@@ -76,7 +78,6 @@
 |---|---|---|
 | 看板 / 连板梯队 / 概念分析 / 行业分析 | 侧栏「闲置功能」分组，默认折叠 | R57 / R64 |
 | 板块 RPS 轮动 | 行业分析、概念分析两页页头的「涨幅RPS轮动分析」 | R504（从复盘页放回作者原来的位置） |
-| AI 对话 | 左侧菜单 Minds →「对话」一栏；任何页面按 Ctrl+K 直达 | R502（原来是悬浮球 + 右侧抽屉） |
 | 任何被隐藏的菜单项 | 设置 → 菜单，点眼睛图标 | 作者原有 |
 
 ---

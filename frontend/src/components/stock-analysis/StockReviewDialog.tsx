@@ -482,49 +482,84 @@ const TONE_CN: Record<string, string> = {
 }
 
 
-export function EvidencePanel({ ch, edge }: {
+export function EvidencePanel({ ch, edge, compact = false }: {
   ch: NonNullable<StockReview['channel']>
   edge: StockReview['verdict_edge']
+  /** [R737] 个股弹窗的窄列: 收成一个问号, 正文默认藏起来(展开才渲染) */
+  compact?: boolean
 }) {
   const { explain, phase } = ch
   const [open, setOpen] = useState(() => storage.reviewEvidenceOpen.get(false))
   const rows = explain?.length ?? 0
   if (!rows && !phase?.why && !edge) return null
+
+  const body = (
+    <div className="space-y-2">
+      {!!phase?.why && (
+        <p className="text-micro leading-relaxed text-secondary">
+          <span className="text-muted">阶段判定:</span> {phase.why}
+        </p>
+      )}
+      {!!edge && (
+        <p className="text-micro leading-relaxed text-secondary">
+          <span className="text-muted">通道档位:</span> {edge.text}
+        </p>
+      )}
+      {rows > 0 && (
+        <div className="overflow-hidden rounded-card border border-border/50">
+          {explain!.map((r, i) => (
+            <div key={r.label}
+                 className={cn('flex items-start gap-2 px-3 py-1.5',
+                   i % 2 ? 'bg-elevated/20' : 'bg-elevated/35')}>
+              <span className="w-14 shrink-0 text-micro text-muted">{r.label}</span>
+              <span className="w-20 shrink-0 font-mono text-micro tabular-nums text-foreground/90">
+                {r.value}
+              </span>
+              <span className="min-w-0 flex-1 text-micro leading-relaxed text-secondary">
+                {r.why}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  // [R737] 用户: 「依据里面的内容搞成小问号折叠藏起来」—— 那行「▸ 依据 · N 项读数」
+  // 在 420px 的常驻列里也占一行, 收成问号: 点开才渲染正文。
+  if (compact) {
+    return (
+      <div className="px-3">
+        <div className="flex items-center gap-1.5">
+          <span className="text-micro text-muted">依据</span>
+          <button
+            type="button"
+            aria-label="依据"
+            aria-expanded={open}
+            title={`依据${rows > 0 ? ` · ${rows} 项读数` : ''} —— 阶段判定、通道档位与逐项读数`}
+            onClick={() => setOpen(v => !v)}
+            className={cn(
+              'inline-flex h-4 w-4 items-center justify-center rounded-full border text-micro leading-none transition-colors',
+              open
+                ? 'border-border bg-elevated text-foreground'
+                : 'border-border/70 text-muted hover:text-secondary',
+            )}
+          >
+            ?
+          </button>
+        </div>
+        {open && <div className="mt-1.5">{body}</div>}
+      </div>
+    )
+  }
+
   return (
     <ReviewDisclosure
       label={rows > 0 ? `依据 · ${rows} 项读数` : '依据'}
       defaultOpen={open}
       onOpenChange={(v) => { setOpen(v); storage.reviewEvidenceOpen.set(v) }}
     >
-        <div className="space-y-2">
-          {!!phase?.why && (
-            <p className="text-micro leading-relaxed text-secondary">
-              <span className="text-muted">阶段判定:</span> {phase.why}
-            </p>
-          )}
-          {!!edge && (
-            <p className="text-micro leading-relaxed text-secondary">
-              <span className="text-muted">通道档位:</span> {edge.text}
-            </p>
-          )}
-          {rows > 0 && (
-            <div className="overflow-hidden rounded-card border border-border/50">
-              {explain!.map((r, i) => (
-                <div key={r.label}
-                     className={cn('flex items-start gap-2 px-3 py-1.5',
-                       i % 2 ? 'bg-elevated/20' : 'bg-elevated/35')}>
-                  <span className="w-14 shrink-0 text-micro text-muted">{r.label}</span>
-                  <span className="w-20 shrink-0 font-mono text-micro tabular-nums text-foreground/90">
-                    {r.value}
-                  </span>
-                  <span className="min-w-0 flex-1 text-micro leading-relaxed text-secondary">
-                    {r.why}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      {body}
     </ReviewDisclosure>
   )
 }

@@ -46,6 +46,9 @@ STILL_THERE = [
     ("信号栏的「盯着」一段", "backend/app/services/flip_today.py", '"stage": STAGE_WATCH,'),
     ("手填成本输入框", "backend/app/api/watchlist.py", "cost: float | None = None"),
     ("手填成本输入框", "backend/app/api/watchlist.py", "positions.set_position(symbol, req.held, req.cost, req.weight)"),
+    # [R751] Minds 页删除后对话没有前端入口, 但后端助手扩展原样还在
+    ("AI 对话", "backend/app/custom/assistant/routes.py", 'APIRouter(prefix="/api/custom/assistant"'),
+    ("AI 对话", "backend/app/custom/assistant/routes.py", '@router.post("/chat")'),
 ]
 
 # 登记簿说「留在磁盘上」的存档 —— 必须仍在数据体检的名单里
@@ -53,6 +56,8 @@ ARCHIVES = [
     "user_data/today_ai.json", "user_data/ai_pick_ledger.json", "user_data/ladder_ai_reports.json",
     "user_data/seesaw_history.json", "user_data/signals.json", "user_data/paper_traders.json",
     "user_data/lots",
+    # [R751] 笔记/消息面撤下, 存档留在磁盘
+    "user_data/usage_notes.json", "user_data/news_desk_summary.json", "user_data/news_desk",
 ]
 
 

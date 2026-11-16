@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { SeriesMarker, Time } from 'lightweight-charts'
 import type { ChartMarker, DailyChartProps, OHLC } from '@/lib/chart-types'
-import { ATR_BAND_COLORS, DAILY_LINE_COLORS, SUB_CHART_META, computeAtrBandSeries, computeInstitutionSeries, volumeRatioAt } from '@/lib/chart-indicators'
+import { ATR_BAND_COLORS, DAILY_LINE_COLORS, ENERGY_BANDS, ENERGY_COLORS, SUB_CHART_META, computeAtrBandSeries, computeEnergyInertia, computeInstitutionSeries, volumeRatioAt } from '@/lib/chart-indicators'
 import { CHART_COLORS as C, lineData, validDailyRows, type PlotSeries } from '@/lib/lightweight-model'
 import { fmtVolume, fmtPct, pricePrecision } from '@/lib/format'
 import { CHART_LAYOUT, plotPaneHeights } from '@/lib/chart-layout'
@@ -39,6 +39,21 @@ const INST_COLORS = { up: '#FF0000', down: '#00FF00', text: '#FFFFFF' } as const
 const price = (v: number | null | undefined, digits = 2) => v != null && Number.isFinite(v)
   ? (Number(v.toFixed(digits)) === 0 ? 0 : v).toFixed(digits) : '—'
 const volume = (v: number | null | undefined) => v != null && Number.isFinite(v) && v >= 0 ? fmtVolume(v) : '—'
+/**
+ * [R723] ATR 原始版叠在副图上的读数。数据不足 20 根时不出值, 也不摆一排「—」。
+ * [R753] 它现在同时服务成交量(指数页)与能量惯性(日K)两只副图, 所以提到组件外共用一份。
+ */
+function atrReadout(point: ReturnType<typeof computeAtrBandSeries>[number] | undefined, theme: Theme) {
+  const result: NonNullable<AnnotationData['readouts']> = []
+  if (point?.atr == null) return result
+  result.push({ text: `S ${price(point.atr)}`, color: ATR_BAND_COLORS.atr[theme] })
+  result.push({ text: `BASIS ${price(point.basis)}`, color: ATR_BAND_COLORS.basis[theme] })
+  result.push({ text: `UPPER ${price(point.upper)}`, color: ATR_BAND_COLORS.band[theme] })
+  result.push({ text: `LOWER ${price(point.lower)}`, color: ATR_BAND_COLORS.band[theme] })
+  result.push({ text: `REFMID ${price(point.refMid)}`, color: ATR_BAND_COLORS.refMid[theme] })
+  if (point.crossUp) result.push({ text: '上穿', color: ATR_BAND_COLORS.icon[theme] })
+  return result
+}
 const EVENT_COLORS = {
   limit_up: { body: { dark: '#FACC15', light: '#CA8A04' }, label: { dark: '#FACC15', light: '#A16207' } },
   limit_down: { body: { dark: '#22D3EE', light: '#0891B2' }, label: { dark: '#67E8F9', light: '#0E7490' } },
@@ -106,6 +121,31 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         : []
     }),
   }), [rows, atrBand, theme])
+  // [R753] 通达信「能量惯性」: 十段 STICKLINE(正负各五段) + 零轴上穿箭头, 没有线可画。
+  const energySeries = useMemo(() => computeEnergyInertia(rows), [rows])
+  const energyDecor = useMemo<PaneDecorData>(() => {
+    const items: DecorItem[] = []
+    rows.forEach((row, idx) => {
+      const point = energySeries[idx]
+      if (!point.inertia) return
+      const palette = point.inertia >= 0 ? ENERGY_COLORS.positive[theme] : ENERGY_COLORS.negative[theme]
+      ENERGY_BANDS.forEach(([near, far], band) => {
+        items.push({
+          kind: 'stick', time: row.date,
+          from: point.inertia - point.inertia * near,
+          to: point.inertia - point.inertia * far,
+          color: palette[band], widthPx: 3,
+        })
+      })
+    })
+    // DRAWICON(能量惯性>0 AND REF(能量惯性,1)<0,0,1) —— 箭头钉在 0 轴上
+    rows.forEach((row, idx) => {
+      if (energySeries[idx].crossUp) {
+        items.push({ kind: 'icon', time: row.date, value: 0, up: true, color: ENERGY_COLORS.icon[theme] })
+      }
+    })
+    return { items }
+  }, [rows, energySeries, theme])
   // [R726] 未来格数也算进取景键: 开关二型时时间轴多三格, 要按新长度重新取景。
   const scope = `${symbol}:${rows[0]?.date ?? ''}:${ranges?.map(range => `${range.start}:${range.end}`).join(';') ?? ''}:${levelFuture?.dates.length ?? 0}`
   const [hover, setHover] = useState<{ scope: string; time: string } | null>(null)
@@ -139,6 +179,11 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     // [R709] 用户: 「悬浮的时候MA也在主图显示了」—— 悬停某个价位点位时, 价位线压到 12%,
     // 均线还是全亮, 对比之下像多画了一条。这里给均线同一档压暗(35%), 退出悬停恢复原色。
     for (const [key, token] of visibleMA) addLine(key, lineData(rows, key), dimLines ? `${color(token)}59` : color(token))
+    // [R722] ATR 五条线按字段摊平成 lightweight 的 {time, value}; 成交量与能量惯性两只副图共用
+    const atrLine = (field: 'atr' | 'basis' | 'upper' | 'lower' | 'refMid') => rows.map((r, idx) => {
+      const value = atrBand[idx][field]
+      return typeof value === 'number' ? { time: r.date, value } : { time: r.date }
+    })
     selected.forEach((key, offset) => {
       const pane = offset + 1
       if (key === 'vol') {
@@ -149,15 +194,32 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         // 原来的 VOL5 / VOL10 均量线撤掉; ATR 五条线改画在成交量这只 pane 里。
         // 成交量是千万级、ATR 只有几十, 同一条刻度上会被压成贴着底边的直线 —— 所以给 ATR
         // 单独一只 overlay 刻度(`priceScaleId: 'atr'`, 不显示、只负责纵向分配), 柱子高度不受影响。
-        const band = (field: 'atr' | 'basis' | 'upper' | 'lower' | 'refMid') => rows.map((r, idx) => {
-          const value = atrBand[idx][field]
-          return typeof value === 'number' ? { time: r.date, value } : { time: r.date }
-        })
-        addLine('atr_s', band('atr'), ATR_BAND_COLORS.atr[theme], pane, { lineWidth: 2, priceScaleId: 'atr', decorHost: true })
-        addLine('atr_basis', band('basis'), ATR_BAND_COLORS.basis[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
-        addLine('atr_upper', band('upper'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
-        addLine('atr_lower', band('lower'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
-        addLine('atr_refmid', band('refMid'), ATR_BAND_COLORS.refMid[theme], pane, { lineWidth: 1, priceScaleId: 'atr' })
+        addLine('atr_s', atrLine('atr'), ATR_BAND_COLORS.atr[theme], pane, { lineWidth: 2, priceScaleId: 'atr', decorHost: true })
+        addLine('atr_basis', atrLine('basis'), ATR_BAND_COLORS.basis[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
+        addLine('atr_upper', atrLine('upper'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
+        addLine('atr_lower', atrLine('lower'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
+        addLine('atr_refmid', atrLine('refMid'), ATR_BAND_COLORS.refMid[theme], pane, { lineWidth: 1, priceScaleId: 'atr' })
+      } else if (key === 'energy') {
+        // [R753] 公式全是 `:=` 与 STICKLINE, 只有「能量惯性:」是冒号 —— 通达信会画一条输出线,
+        // 这里照画(暗色为白, 亮色转深灰); 这条线同时负责把副图刻度钉在能量惯性上,
+        // 也是柱与零轴箭头的坐标宿主(`decorHost`)。
+        // 0 必须留在刻度里(上穿箭头钉在 0 轴), 全为 0 时给 ±1 免得刻度塌成一条线。
+        let max = 0, min = 0
+        for (const point of energySeries) {
+          if (point.inertia > max) max = point.inertia
+          if (point.inertia < min) min = point.inertia
+        }
+        if (max === min) max = min + 1
+        addLine('energy_scale', rows.map((r, idx) => ({ time: r.date, value: energySeries[idx].inertia })),
+          ENERGY_COLORS.line[theme], pane, { lineWidth: 1, range: { min, max }, precision: 2, decorHost: true })
+        // [R753] 用户: 「那个叠加要保留叠加上去」—— R723 的 ATR 五线跟着成交量副图撤掉后,
+        // 改叠到能量惯性这只 pane 上; 仍是独立 overlay 刻度, 不参与惯性柱的纵向分配。
+        // 上穿箭头由第二组图元(host = atr_s)按 ATR 刻度画, 见 paneDecor 与 FinancialPlot。
+        addLine('atr_s', atrLine('atr'), ATR_BAND_COLORS.atr[theme], pane, { lineWidth: 2, priceScaleId: 'atr', decorHost: true })
+        addLine('atr_basis', atrLine('basis'), ATR_BAND_COLORS.basis[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
+        addLine('atr_upper', atrLine('upper'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
+        addLine('atr_lower', atrLine('lower'), ATR_BAND_COLORS.band[theme], pane, { lineWidth: 2, priceScaleId: 'atr' })
+        addLine('atr_refmid', atrLine('refMid'), ATR_BAND_COLORS.refMid[theme], pane, { lineWidth: 1, priceScaleId: 'atr' })
       } else if (key === 'inst') {
         // 公式里 机构线 / 机构趋势 都是 `:=` 变量、不画线; 只留一条透明线把副图刻度钉在 0~100
         addLine('inst_scale', rows.map(r => ({ time: r.date, value: 50 })), 'rgba(0,0,0,0)', pane, { range: { min: 0, max: 100 } })
@@ -171,7 +233,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       }
     })
     return series
-  }, [rows, visibleMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, dimLines, atrBand])
+  }, [rows, visibleMA, selected, activeIndicators, events, markerStyle, showMarkers, theme, dimLines, atrBand, energySeries])
 
   // [R649] 底部并入的分析副图(量化MACD): 排在各指标副图之后, 高度由调用方算好。
   // 与关键价位那张图同一份画法(`lib/analysisPanes.ts`), 这里只负责 pane 下标与版面。
@@ -266,31 +328,37 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
       ...(levelFuture ? { futureZone: { start: levelFuture.dates[0], count: levelFuture.dates.length, fill: FUTURE_ZONE[theme].fill } } : {}),
     }
   }, [rows, ranges, priceLines, addedDate, levelLines, levelRanges, levelBands, levelLabels, levelVerticals, levelFuture, theme])
-  const volumeLabels = useMemo(() => volumeCompare.enabled ? rows.flatMap((row, idx) => {
+  // [R753] 量比标签只属于成交量柱; 日K 换成能量惯性后没有成交量 pane, 不必再逐行算一遍
+  // (指数页仍选 `vol`, 那边照旧)。
+  const volumeLabels = useMemo(() => volumeCompare.enabled && selected.includes('vol') ? rows.flatMap((row, idx) => {
     const ratio = volumeRatioAt(rows, idx, volumeCompare.days)
     return ratio == null ? [] : [{ time: row.date, value: row.volume ?? 0, text: `${ratio.toFixed(1)}x` }]
-  }) : [], [rows, volumeCompare.enabled, volumeCompare.days])
+  }) : [], [rows, volumeCompare.enabled, volumeCompare.days, selected])
   const paneTitles = useMemo(
     () => ['', ...selected.map(key => SUB_CHART_META.find(d => d.key === key)!.label), ...analysis.titles],
     [selected, analysis.titles])
   const paneReadouts = useMemo(() => [[], ...selected.map(key => {
     const result: NonNullable<AnnotationData['readouts']> = []
-    if (key === 'vol') {
+    if (key === 'energy') {
+      // [R753] 公式只画柱与箭头, 读数补上 能量 / 惯性 两个数, 方便对照柱子;
+      // [R753] 用户: 「那个叠加要保留叠加上去」—— ATR 五线叠在这只副图上, 读数并进同一行。
+      const point = energySeries[i]
+      result.push({ text: `能量 ${price(point?.energy)}` })
+      if (point) {
+        result.push({
+          text: `惯性 ${price(point.inertia)}`,
+          color: point.inertia >= 0 ? ENERGY_COLORS.positive[theme][4] : ENERGY_COLORS.negative[theme][4],
+        })
+        if (point.crossUp) result.push({ text: '上穿', color: ENERGY_COLORS.icon[theme] })
+      }
+      result.push(...atrReadout(atrBand[i], theme))
+    } else if (key === 'vol') {
       result.push({ text: `量 ${volume(current?.volume)}`, color: current ? color(current.close >= current.open ? 'up' : 'down') : undefined })
       if (volumeCompare.enabled) {
         const ratio = volumeRatioAt(rows, i, volumeCompare.days)
         result.push({ text: `量比 ${ratio == null ? '—' : `${ratio.toFixed(2)}x`}` })
       }
-      // [R723] ATR原始 叠在这只副图上, 读数并进同一行; 数据不足 20 根时不出值, 也不摆一排「—」
-      const point = atrBand[i]
-      if (point?.atr != null) {
-        result.push({ text: `S ${price(point.atr)}`, color: ATR_BAND_COLORS.atr[theme] })
-        result.push({ text: `BASIS ${price(point.basis)}`, color: ATR_BAND_COLORS.basis[theme] })
-        result.push({ text: `UPPER ${price(point.upper)}`, color: ATR_BAND_COLORS.band[theme] })
-        result.push({ text: `LOWER ${price(point.lower)}`, color: ATR_BAND_COLORS.band[theme] })
-        result.push({ text: `REFMID ${price(point.refMid)}`, color: ATR_BAND_COLORS.refMid[theme] })
-        if (point.crossUp) result.push({ text: '上穿', color: ATR_BAND_COLORS.icon[theme] })
-      }
+      result.push(...atrReadout(atrBand[i], theme))
     } else if (key === 'inst') {
       // 通达信不显示这两条线的数值, 这里沿用副图读数习惯补上, 方便对照柱子
       const point = instSeries[i]
@@ -303,7 +371,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
         color: current?.macd_hist == null || !Number.isFinite(current.macd_hist) ? undefined : color(current.macd_hist >= 0 ? 'up' : 'down') })
     }
     return result
-  }), ...analysis.readouts], [selected, current, rows, i, volumeCompare.days, volumeCompare.enabled, theme, instSeries, atrBand, analysis.readouts])
+  }), ...analysis.readouts], [selected, current, rows, i, volumeCompare.days, volumeCompare.enabled, theme, instSeries, atrBand, energySeries, analysis.readouts])
   const change = previous?.close ? current.close / previous.close - 1 : null
   const turnover = stockInfo?.float_shares && current?.volume != null ? current.volume * 100 / stockInfo.float_shares : null
 
@@ -336,7 +404,9 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     <FinancialPlot scope={scope} series={plotSeries} height={plotHeight} paneHeights={paneHeights} pricePrecision={precision}
       paneTopInsets={[0, ...selected.map(() => 0), ...analysis.insets]}
       paneHeaderHeights={[0, ...selected.map(() => 0), ...analysis.headers]}
-      paneDecor={[undefined, ...selected.map(key => key === 'inst' ? instDecor : key === 'vol' ? atrDecor : undefined), ...analysis.decor]}
+      // [R753] 能量惯性 pane 挂两组图元: 柱/零轴箭头按惯性刻度(host = energy_scale),
+      // ATR 上穿箭头按 atr overlay 刻度(host = atr_s)。数组顺序对应 pane 内 decorHost 的先后。
+      paneDecor={[undefined, ...selected.map(key => key === 'inst' ? instDecor : key === 'vol' ? atrDecor : key === 'energy' ? [energyDecor, atrDecor] : undefined), ...analysis.decor]}
       hidePaneAxis={analysis.hidden.length ? analysis.hidden : undefined}
       markers={chartMarkers} annotations={annotations} volumeLabels={volumeLabels} paneTitles={paneTitles} paneReadouts={paneReadouts}
       linkedPrice={linkedPrice} visibleBars={pickedBars} currentPrice={rows.at(-1)?.close}

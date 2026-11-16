@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { BarChart3, Brain, Globe2, Tags } from 'lucide-react'
+import { BarChart3, Globe2, Tags } from 'lucide-react'
 import {
   IconWatchlist, IconStrategy, IconFactors, IconBacktest, IconStockFocus,
   IconLadder, IconConcept, IconIndustry, IconFinancials, IconMonitor,
@@ -19,8 +19,7 @@ export type NavigationEntry = {
  * [R598] 核心菜单沿用 fork 口径 (上游 v0.3.36 把此表抽成文件夹式导航的条目源)。
  * 根路径 `/` 在本 fork 指向虚拟账户 (R564)，因此固定置顶项由 navLayout 的
  * `HOME_NAV_ID` 指定为 `/paper`，这里不再保留上游的 `/`「看板」行。
- * 图标沿用 fork 已对齐的品牌图标族；「Minds」上游没有，用 lucide Brain 之外的
- * 品牌图标没有对应项，改由 extension 注册前的内置条目提供。
+ * 图标沿用 fork 已对齐的品牌图标族；上游没有的页面不再单独补图标。
  */
 export const CORE_NAVIGATION: NavigationEntry[] = [
   // [R561 同步上游] 图标使用上游 v0.3.2 的品牌图标族(描边跟随文字色, 不带紫)
@@ -42,8 +41,6 @@ export const CORE_NAVIGATION: NavigationEntry[] = [
   { id: '/paper', label: '模拟盘', icon: IconPaper },
   { id: '/signals', label: '信号库', icon: IconSignals },
   { id: '/review', label: '复盘', icon: IconReview },
-  // [fork 增强] R93 使用观察笔记 → [R180] 消息面 → [R502] Minds
-  { id: '/minds', label: 'Minds', icon: Brain },
   { id: '/indices', label: '指数', icon: IconIndices },
   { id: '/data', label: '数据', icon: IconData },
 ].map(x => ({ ...x, to: x.id, type: 'builtin' as const, visible: true, arch: 'core' as const }))

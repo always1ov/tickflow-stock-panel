@@ -15,10 +15,17 @@ export const DAILY_LINE_COLORS = {
 } as const
 
 export const SUB_CHART_META = [
-  { key: 'vol', label: '成交量', height: 84 },
+  // [R752] 用户: 「副图指标成交量重新命名」「一看就能看懂成交量叠加了什么」——
+  // R723 之后这只副图里除了量柱, 还叠了「ATR原始」那五条线(ATR20 / BASIS / ±2σ 通道 / REFMID),
+  // 只叫「成交量」看不出叠加物。胶囊只有 65px 宽(R669), 再长的名字会被挤出按钮, 所以取「量能 ATR」。
+  { key: 'vol', label: '量能 ATR', height: 84 },
   { key: 'macd', label: 'MACD', height: 72 },
   { key: 'rsi', label: 'RSI', height: 72 },
   { key: 'kdj', label: 'KDJ', height: 72 },
+  // [R753] 用户: 「用这个指标替换原来的副图指标成交量, 完美复刻」—— 通达信「能量惯性」。
+  // 日K 的这只副图原来画量柱(R723 之后还叠了 ATR 五线), 现在整只换成能量惯性;
+  // `vol` 仍保留给指数页(那边还在用 `['vol', 'macd']`)。
+  { key: 'energy', label: '能量惯性', height: 96 },
   // [R714] 用户: 「新增一个副图指标, 再完美复刻」—— 通达信「主力COME」, 只有柱和字, 见下面计算。
   { key: 'inst', label: '主力COME', height: 96 },
   // [R723] 用户: 「刚刚的『ATR原始』叠加到成交量上去」—— 它不再单独占一只副图, 五条线
@@ -111,6 +118,96 @@ export function computeInstitutionSeries(rows: OHLC[]): InstPoint[] {
     return { inst: inst[i], trend: trend[i], mainForce, mainSignal }
   })
 }
+/**
+ * [R753] 通达信「能量惯性」的 STICKLINE 分段 —— 每一段是 (惯性 - 惯性×近端, 惯性 - 惯性×远端),
+ * 正负两支各五段, 远端到 0.95、近端贴着 0.05, 段间留 0.05 的缝。公式顺序: 先近后远。
+ */
+export const ENERGY_BANDS = [
+  [0.05, 0.15],
+  [0.2, 0.35],
+  [0.4, 0.55],
+  [0.6, 0.75],
+  [0.8, 0.95],
+] as const
+
+/**
+ * [R753] 公式里的 COLOR 常量 —— 通达信一律按 **BBGGRR** 排, 与本项目 `QUANT_MACD_COLORS`
+ * (R415)、`INST_COLORS` (R714) 同一约定:
+ *
+ *   COLOR0000CC → #CC0000 深红    COLOR0066FF → #FF6600   COLOR0099FF → #FF9900
+ *   COLOR00CCFF → #FFCC00         COLOR00FFFF → #FFFF00 黄
+ *   COLORFF3300 → #0033FF 蓝      COLORFF6600 → #0066FF   COLORFF9900 → #0099FF
+ *   COLORFFCC00 → #00CCFF         COLORFFFF00 → #00FFFF 青
+ *
+ * 所以: 惯性 ≥0 是「红→黄」(贴 0 轴的是黄), 惯性 <0 是「蓝→青」(贴 0 轴的是青)。
+ * 用户: 「买卖量能的颜色搞反了, 我通达信里面显示上涨是黄色」—— 首版按 RGB 直读,
+ * 正负两支正好上下颠倒, 这里是修正后的取色。
+ *
+ * 暗色用公式换算后的原色; 亮色换成同色相深一档(与 `ATR_BAND_COLORS` 同一做法),
+ * 否则 #FFFF00 / #00FFFF 落在白底上等于没画。
+ */
+export const ENERGY_COLORS = {
+  positive: {
+    dark: ['#CC0000', '#FF6600', '#FF9900', '#FFCC00', '#FFFF00'],
+    light: ['#B91C1C', '#C2410C', '#B45309', '#A16207', '#854D0E'],
+  },
+  negative: {
+    dark: ['#0033FF', '#0066FF', '#0099FF', '#00CCFF', '#00FFFF'],
+    light: ['#1E3A8A', '#1D4ED8', '#0369A1', '#0891B2', '#0E7490'],
+  },
+  /** DRAWICON(...,0,1) —— 1 号是红色向上箭头(与量化MACD 实测同一枚) */
+  icon: { dark: '#EF4444', light: '#DC2626' },
+  /**
+   * `能量惯性:` 用的是冒号, 通达信会把它当输出线画出来(公式没写颜色)。
+   * 通达信默认输出线是白色; 亮色主题换成深灰, 避免白线消失。
+   */
+  line: { dark: '#FFFFFF', light: '#334155' },
+} as const
+
+export interface EnergyPoint {
+  /** 能量 := SQRT(VOL) * ((CLOSE-(HIGH+LOW)/2) / ((HIGH+LOW)/2)) */
+  energy: number
+  /** 平滑能量 := EMA(能量,16) */
+  smooth: number
+  /** 能量惯性 := EMA(平滑能量,16) */
+  inertia: number
+  /** DRAWICON(能量惯性>0 AND REF(能量惯性,1)<0,0,1): 从负翻正那一根 */
+  crossUp: boolean
+}
+
+/**
+ * [R753] 通达信「能量惯性」, 逐行照搬:
+ *
+ *   能量:=SQRT(VOL)*(((CLOSE-(HIGH+LOW)/2))/((HIGH+LOW)/2));
+ *   平滑能量:=EMA(能量,16);
+ *   能量惯性:EMA(平滑能量,16);
+ *   DRAWICON(能量惯性>0 AND REF(能量惯性,1)<0,0,1);
+ *   STICKLINE(能量惯性>=0, 惯性-惯性*0.05, 惯性-惯性*0.15, 3, 0), COLOR0000CC;
+ *   …… (正负各五段, 见 `ENERGY_BANDS` / `ENERGY_COLORS`)
+ *
+ * `能量惯性` 那一行是冒号, 通达信会把它作为输出线画出来(颜色取 `ENERGY_COLORS.line`);
+ * `:=` 的中间变量都不画线。画法交给调用方(见 LightweightDaily / EChartsCandlestick)。
+ * 两个 EMA 都是通达信口径(α=2/(N+1), 首值取 X), 与 `tdxEma` 同一实现;
+ * 除零(高开低全为 0 / 无量)按通达信的 0 处理。
+ */
+export function computeEnergyInertia(rows: OHLC[], n = 16): EnergyPoint[] {
+  const energy = rows.map(row => {
+    const mid = (row.high + row.low) / 2
+    const volume = row.volume
+    if (!(mid > 0) || volume == null || !Number.isFinite(volume) || volume <= 0) return 0
+    return Math.sqrt(volume) * (row.close - mid) / mid
+  })
+  const smooth = tdxEma(energy, n)
+  const inertia = tdxEma(smooth, n)
+  return rows.map((_, i) => ({
+    energy: energy[i],
+    smooth: smooth[i],
+    inertia: inertia[i],
+    // 严格大于 / 严格小于: 通达信写的就是 `>0 AND REF(...)<0`, 等于 0 不算上穿
+    crossUp: i > 0 && inertia[i] > 0 && inertia[i - 1] < 0,
+  }))
+}
+
 /**
  * [R722] 通达信「ATR 原始版 - 副图」的配色。**暗色取公式原色**, 亮色换成同色相的深一档
  * (与 `DAILY_LINE_COLORS` 同一做法), 否则 `#00FF00` 落在白底上几乎看不见。

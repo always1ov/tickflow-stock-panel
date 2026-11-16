@@ -58,7 +58,6 @@ from app.api import (
     strategy_pool,
     task_registry,
     today,  # [fork 增强] 今日总览
-    usage_notes,  # [fork 增强] R93 使用观察笔记
     watchlist,
 )
 from app.api import auth as auth_api
@@ -976,7 +975,6 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(overview.router)
     app.include_router(paper.router)  # [R561 同步上游] 上游 v0.3.2 虚拟账户(模拟撮合)
     app.include_router(today.router)  # [fork 增强] 今日总览
-    app.include_router(usage_notes.router)  # [fork 增强] R93 使用观察笔记
     app.include_router(focus.router)  # [fork 增强] R159 推送焦点名单
     app.include_router(abnormal.router)
     app.include_router(regime.router)

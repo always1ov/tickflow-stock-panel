@@ -95,7 +95,6 @@ _EXPECTED_ROUTERS = (
     # [R561 同步上游] 上游 v0.3.2 的虚拟账户(模拟撮合)
     "paper.router",
     "today.router",
-    "usage_notes.router",
     "focus.router",
     # [R611] 外部网页改成「外链导航」: 抓取 / 内嵌端点随 api/external_page.py 一起删除
     "abnormal.router",

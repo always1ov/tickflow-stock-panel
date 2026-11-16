@@ -6,7 +6,7 @@ import type { ECharts, EChartsOption } from 'echarts'
 
 import type { OHLC, ChartMarker, ChartRange, ChartPriceLine, VolumeCompareConfig, DailyChartProps } from '@/lib/chart-types'
 export type { OHLC, ChartMarker, ChartRange, ChartPriceLine, StockInfo, VolumeCompareConfig } from '@/lib/chart-types'
-import { volumeRatioAt, SUB_CHART_META } from '@/lib/chart-indicators'
+import { volumeRatioAt, SUB_CHART_META, ENERGY_BANDS, ENERGY_COLORS, computeEnergyInertia } from '@/lib/chart-indicators'
 
 interface SubChartContext {
   compact: boolean
@@ -38,6 +38,9 @@ function fmtVol(v: number | null | undefined): string {
 function fmtVolumeRatio(value: number | null, digits = 2): string {
   return value == null ? '—' : `${value.toFixed(digits)}x`
 }
+
+/** 按 key 取副图元信息 —— 不再按数组下标, 免得 META 里插一项就串位 */
+const subMeta = (key: string) => SUB_CHART_META.find(d => d.key === key)!
 
 export const SUB_CHARTS: SubChartDef[] = [
   {
@@ -199,6 +202,76 @@ export const SUB_CHARTS: SubChartDef[] = [
       ]
     },
   },
+  {
+    ...subMeta('energy'),
+    // [R753] 能量惯性: STICKLINE 与 DRAWICON 用 custom series 画十段浮空柱 + 零轴箭头;
+    // 「能量惯性:」带冒号, 通达信会把惯性值画成一条输出线, 由下面那条 line 系列照画。
+    // 刻度必须含 0(上穿箭头钉在 0 轴); 全为 0 时给 ±1, 否则 min=max=0 会把副图压成一条线。
+    yAxisConfig: {
+      min: ({ min }: { min: number }) => (min === 0 ? -1 : Math.min(0, min)),
+      max: ({ max }: { max: number }) => (max === 0 ? 1 : Math.max(0, max)),
+    },
+    buildSeries: (data) => {
+      const theme = getTheme()
+      const points = computeEnergyInertia(data)
+      return [
+        {
+          name: '能量惯性',
+          type: 'custom',
+          silent: true,
+          animation: false,
+          encode: { x: 0, y: 1 },
+          data: points.map((p, i) => [i, p.inertia, p.crossUp ? 1 : 0]),
+          renderItem: (_params: any, api: any) => {
+            const idx = Math.round(Number(api.value(0)))
+            const inertia = Number(api.value(1))
+            const [x] = api.coord([idx, 0])
+            const children: any[] = []
+            if (inertia !== 0 && Number.isFinite(inertia)) {
+              const palette = inertia >= 0 ? ENERGY_COLORS.positive[theme] : ENERGY_COLORS.negative[theme]
+              ENERGY_BANDS.forEach(([near, far], band) => {
+                const yNear = api.coord([idx, inertia - inertia * near])[1]
+                const yFar = api.coord([idx, inertia - inertia * far])[1]
+                children.push({
+                  type: 'rect',
+                  shape: {
+                    x: x - 1.5, y: Math.min(yNear, yFar), width: 3,
+                    // 段间高度可能不足 1px, 留 1px 才看得见
+                    height: Math.max(1, Math.abs(yFar - yNear)),
+                  },
+                  style: { fill: palette[band] },
+                })
+              })
+            }
+            if (Number(api.value(2)) === 1) {
+              const [, y0] = api.coord([idx, 0])
+              children.push({
+                type: 'polygon',
+                shape: { points: [[x, y0 - 8], [x - 4, y0], [x + 4, y0]] },
+                style: { fill: ENERGY_COLORS.icon[theme] },
+              })
+            }
+            return { type: 'group', children }
+          },
+        },
+        {
+          // 「能量惯性:」的输出线(通达信默认白线), 同时负责撑开 Y 轴
+          // (custom series 的数据不参与 extent)
+          name: '能量惯性线',
+          type: 'line',
+          silent: true,
+          animation: false,
+          symbol: 'none',
+          data: points.map(p => p.inertia),
+          lineStyle: { width: 1, color: ENERGY_COLORS.line[theme] },
+          itemStyle: { color: ENERGY_COLORS.line[theme] },
+          z: 1,
+        },
+      ]
+    },
+    // 读数需要行号, 在 buildSubInfoGraphics 里按 infoIdx 补(同 vol 的量比)
+    buildInfo: () => [],
+  },
 ]
 
 /** 向后兼容的 INDICATORS 导出 (不含 vol) */
@@ -258,6 +331,18 @@ function buildSubInfoGraphics(
           value: fmtVolumeRatio(ratio),
         })
       }
+    }
+    if (def.key === 'energy' && d) {
+      // [R753] 公式只画柱与箭头, 读数补 能量 / 惯性 两个数, 方便对照柱子
+      const point = computeEnergyInertia(data)[infoIdx]
+      const theme = getTheme()
+      items.push({ label: '能量', color: CT().text, value: point.energy.toFixed(2) })
+      items.push({
+        label: '惯性',
+        color: point.inertia >= 0 ? ENERGY_COLORS.positive[theme][4] : ENERGY_COLORS.negative[theme][4],
+        value: point.inertia.toFixed(2),
+      })
+      if (point.crossUp) items.push({ label: '上穿', color: ENERGY_COLORS.icon[theme], value: '' })
     }
 
     // 每个元素加固定 id，确保 ECharts 增量更新时能正确匹配

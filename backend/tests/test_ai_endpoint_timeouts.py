@@ -46,10 +46,9 @@ AI_METHODS = {
     # [R352] `todayAi` 删了(用户不要 AI 导读了) —— 名单跟着它一起去掉。
     # 立论不变: **会真出一段文本的接口才放宽超时**, 这一条只是少了一个对象。
     # [R504] `ladderAiReview` / `regimeSeesawDetect` 删了(AI 打板复盘连同跷跷板整套撤掉)。
+    # [R751] `usageNoteDigest` / `usageNotesSummaryBuild` 删了(笔记/消息面整套撤掉)。
     "watchlistImportText": "粘整篇文章 → AI 认票并按小分队归类",
     "customSignalsAiGenerate": "自定义信号 AI 生成",
-    "usageNoteDigest": "消息面单条凝练",
-    "usageNotesSummaryBuild": "消息面「一大段总的」",
     "todayScoreLedgerDigest": "台账 AI 提炼",
 }
 
@@ -58,7 +57,7 @@ NOT_AI_METHODS = {
     "strategyAiStatus": "读配置状态",
     # [R352] `todayAiTrackRecord` 删了 —— 它从 R351 起就没人调(只服务于
     # 已随今日总览删掉的优选面板)。
-    "usageNotesSummaryGet": "读已存的那一段, 不重新生成",
+    # [R751] `usageNotesSummaryGet` 随笔记/消息面整套删除。
     "strategyAiTest": "调模型, 但只发「Reply exactly: OK」—— 连通性测试要的就是快失败",
 }
 

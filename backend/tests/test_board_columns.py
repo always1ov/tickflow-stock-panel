@@ -1037,8 +1037,8 @@ def test_R427_复盘并进个股弹窗_两个入口同一个弹窗():
 
     dlg = code_of("components/StockPreviewDialog.tsx")
     # [R479] 旧复盘页随旧顶栏删了: 复盘就是新「复盘」块; [R612] 它成了右栏第 4 个视图,
-    # 'review' 入口直接把视图落在那里
-    assert "<ReviewSection" in dlg and "iv === 'review' ? 'review'" in dlg and "chartView === 'review' ? (" in dlg, \
+    # 'review' 入口直接把视图落在那里; [R732] ≥1536 时它常驻左列, 右栏那一支不再出现
+    assert "<ReviewSection" in dlg and "iv === 'review' ? 'review'" in dlg and "chartView === 'review' && !showReviewWide ? (" in dlg, \
         "个股弹窗里没有复盘, 或 'review' 入口没定位到它"
     assert "initialView" in dlg, "个股弹窗不能指定落在哪一页 —— 走势/位置就没法直达复盘"
 

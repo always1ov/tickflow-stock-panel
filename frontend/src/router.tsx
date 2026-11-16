@@ -32,8 +32,8 @@ const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.S
 const Regime = lazy(() => import('./pages/Regime').then(m => ({ default: m.Regime })))
 const Dev = lazy(() => import('./pages/Dev').then(m => ({ default: m.Dev })))
 const ExternalPage = lazy(() => import('./pages/ExternalPage').then(m => ({ default: m.ExternalPage })))
-// [fork 增强] R93 使用观察笔记 → [R502] 并进 Minds 的「笔记」一栏
-const Minds = lazy(() => import('./pages/Minds').then(m => ({ default: m.Minds })))
+// [R751] 用户: 「删掉 minds 页面」—— 原 R502 把「消息面」改名 Minds 并进笔记/洞见/计划/对话,
+// 那一页整页撤掉; 路由与菜单里都不再留入口。
 
 const CORE_ROUTE_PATHS = new Set([
   '/',
@@ -52,7 +52,6 @@ const CORE_ROUTE_PATHS = new Set([
   '/paper-trading',
   '/lots',            // [R170] 上游加 /lots 路由时漏了这一条; 它现在托管仓位中心
   '/external-page',
-  '/minds',
   '/data',
   '/indices',
   '/regime',
@@ -60,8 +59,6 @@ const CORE_ROUTE_PATHS = new Set([
   '/settings',
   '/dev',
   '/external-page',
-  '/usage-notes',     // [R502] 旧地址, 重定向到 /minds?tab=notes
-  '/minds',
   '/settings/keys',
   '/settings/ai',
   '/settings/queries',
@@ -160,9 +157,6 @@ export function createAppRouter() {
       { path: 'indices', element: <Indices /> },
       { path: 'regime', element: <Regime /> },
       { path: 'external-page', element: <ExternalPage /> },
-      { path: 'minds', element: <Minds /> },
-      // [R502] 「消息面」改名 Minds, 原页成了「笔记」一栏 —— 书签与旧链接照旧能进
-      { path: 'usage-notes', element: <Navigate to="/minds?tab=notes" replace /> },
       { path: 'branding', element: <Branding /> },
       { path: 'settings', element: <Settings /> },
       // 隐藏路由：开发者工具（不暴露在菜单，仅供调试）

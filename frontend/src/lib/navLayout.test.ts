@@ -65,10 +65,11 @@ describe('nav layout', () => {
       .toEqual(['/paper', '/analysis/auction', '/company/offline', '/watchlist', '/screener'])
   })
   it('ships a grouped default layout for users who never reordered the menu', () => {
+    // [R751] Minds 页删除, 默认分组里不再有它
     const all = ['/paper', '/watchlist', '/screener', '/dashboard', '/indices',
       '/stock-analysis', '/limit-ladder', '/concept-analysis', '/industry-analysis', '/financials',
       '/regime', '/abnormal', '/signals', '/backtest', '/factors', '/review',
-      '/data', '/monitor', '/minds'].map(id => ({ id, visible: true }))
+      '/data', '/monitor'].map(id => ({ id, visible: true }))
     const result = resolveNavLayout(null, all)
     expect(result.items[0]).toEqual({ type: 'page', id: '/paper' })
     expect(result.items.slice(1, 9).map(x => x.type === 'group' ? x.label : x.id))

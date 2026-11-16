@@ -66,9 +66,6 @@ export const storage = {
   flipMaxPositions:     kv<number>('flip-max-positions'),
   flipYears:            kv<number>('flip-years'),
 
-  /** [R266] 消息面总览是否展开 —— 默认收起(那一段很长), 但看惯了展开的人不该每次重点 */
-  newsDeskSummaryOpen:  kv<boolean>('news-desk-summary-open'),
-
   /** [R269] 复盘·通道档位里那块「依据」是否展开 —— 默认收起, 正文让给历史段落 */
   reviewEvidenceOpen:   kv<boolean>('review-evidence-open'),
   // [R270 加, R292 删] `reviewTrendStatsOpen` 在这里删掉了 —— 它记的是「趋势状态」
@@ -92,9 +89,6 @@ export const storage = {
   stockInfoBarFields:   kv<unknown[]>('stock_info_bar_fields'),
   /** 信息条指标「默认方案」快照 */
   stockInfoBarFieldsBaseline: kv<unknown[] | null>('stock_info_bar_fields_baseline'),
-
-  /** 个股日K成交量对比设置 */
-  stockVolumeCompare:   kv<{ enabled: boolean; days: number }>('stock_volume_compare'),
 
   /** 个股详情多日分时周期 */
   stockPreviewIntradayDays: kv<number>('stock_preview_intraday_days'),

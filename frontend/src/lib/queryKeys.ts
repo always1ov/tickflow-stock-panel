@@ -237,8 +237,6 @@ export const QK = {
   stockTrendsAll:       ['stock-trends'] as const,
   // 个股分析顶栏行情摘要 —— 键形刻意与页内看板一致, 共享缓存不发第二次请求
   analysisKline:        (symbol: string) => ['kline', symbol, ''] as const,
-  // R93 使用观察笔记
-  usageNotes:           ['usage-notes'] as const,
   // R110 竞价一进二扫描
   auctionScan:          ['auction-scan'] as const,
 } as const

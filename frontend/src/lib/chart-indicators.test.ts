@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeAtrBandSeries, computeInstitutionSeries, tdxEma, tdxSma } from './chart-indicators'
+import { computeAtrBandSeries, computeEnergyInertia, computeInstitutionSeries, ENERGY_COLORS, tdxEma, tdxSma } from './chart-indicators'
 import type { OHLC } from './chart-types'
 
 const row = (i: number, close: number, high = close + 0.5, low = close - 0.5): OHLC => ({
@@ -52,6 +52,57 @@ describe('[R714] 通达信公式的最小实现', () => {
     expect(signals.length).toBeGreaterThan(0)
     for (let k = 1; k < signals.length; k++) expect(signals[k] - signals[k - 1]).toBeGreaterThanOrEqual(10)
     for (const point of points) if (point.mainSignal) expect(point.mainForce).toBe(true)
+  })
+})
+
+describe('[R753] 通达信「能量惯性」副图', () => {
+  const bar = (i: number, close: number, high: number, low: number, volume = 100): OHLC =>
+    ({ ...row(i, close, high, low), volume })
+
+  it('能量 = SQRT(VOL) * (C - (H+L)/2) / ((H+L)/2)', () => {
+    const points = computeEnergyInertia([bar(0, 10.5, 11, 9, 100), bar(1, 9.5, 11, 9, 400)])
+    expect(points[0].energy).toBeCloseTo(0.5)   // sqrt(100) * 0.5/10
+    expect(points[1].energy).toBeCloseTo(-1)    // sqrt(400) * -0.5/10
+  })
+
+  it('平滑能量与能量惯性是连续两次 EMA16, 首值取第一根', () => {
+    const bars = Array.from({ length: 40 }, (_, i) => bar(i, 10 + Math.sin(i / 2), 10.5, 9.5, 100 + i * 10))
+    const points = computeEnergyInertia(bars)
+    const smooth = tdxEma(points.map(p => p.energy), 16)
+    const inertia = tdxEma(smooth, 16)
+    points.forEach((point, i) => {
+      expect(point.smooth).toBeCloseTo(smooth[i])
+      expect(point.inertia).toBeCloseTo(inertia[i])
+    })
+  })
+
+  it('无量 / 高低为 0 时按 0 处理, 不产生 NaN', () => {
+    const points = computeEnergyInertia([bar(0, 10, 0, 0, 0), bar(1, 10, 11, 9, 0)])
+    for (const point of points) {
+      expect(point.energy).toBe(0)
+      expect(Number.isFinite(point.inertia)).toBe(true)
+    }
+  })
+
+  it('从负翻正那一根才算上穿(等于 0 不算)', () => {
+    const bars = [
+      ...Array.from({ length: 40 }, (_, i) => bar(i, 9.5, 11, 9, 100)),
+      ...Array.from({ length: 40 }, (_, i) => bar(40 + i, 10.5, 11, 9, 100)),
+    ]
+    const points = computeEnergyInertia(bars)
+    // 公式写的是 `能量惯性>0 AND REF(能量惯性,1)<0`, 严格不等号
+    const expected = points.map((point, i) => i > 0 && point.inertia > 0 && points[i - 1].inertia < 0)
+    expect(points.map(point => point.crossUp)).toEqual(expected)
+    expect(points.some(point => point.crossUp)).toBe(true)
+  })
+
+  it('颜色按通达信 BBGGRR 序: 惯性≥0 红→黄, <0 蓝→青(贴 0 轴的是黄/青)', () => {
+    expect(ENERGY_COLORS.positive.dark).toEqual(['#CC0000', '#FF6600', '#FF9900', '#FFCC00', '#FFFF00'])
+    expect(ENERGY_COLORS.negative.dark).toEqual(['#0033FF', '#0066FF', '#0099FF', '#00CCFF', '#00FFFF'])
+    // COLOR0000CC 是深红不是蓝, COLOR00FFFF 是黄不是青 —— R753 首版按 RGB 直读把正负搞反了
+    expect(ENERGY_COLORS.positive.dark[0]).not.toBe('#0000CC')
+    expect(ENERGY_COLORS.positive.dark[4]).toBe('#FFFF00')
+    expect(ENERGY_COLORS.negative.dark[4]).toBe('#00FFFF')
   })
 })
 

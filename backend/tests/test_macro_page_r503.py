@@ -49,4 +49,3 @@ def test_R503_页名与菜单同名_市场环境():
     assert 'title="市场环境"' in src
     assert "{ id: '/regime', label: '市场环境', icon: IconRegime }" in code_of("lib/navigation.ts")
     assert "getNavigationEntries(" in code_of("pages/settings/MenuSettings.tsx")
-    assert "'/regime': '市场环境'," in code_of("custom/assistant/AssistantLauncher.tsx")

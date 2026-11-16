@@ -2,8 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type KlineRow } from '@/lib/api'
 import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
-import { storage } from '@/lib/storage'
-import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyAnalysisPane, DailyChartProps, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
+import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyAnalysisPane, DailyChartProps, OHLC } from '@/lib/chart-types'
 import { DAILY_LINE_COLORS, SUB_CHART_META } from '@/lib/chart-indicators'
 
 /**
@@ -17,8 +16,11 @@ import { DAILY_LINE_COLORS, SUB_CHART_META } from '@/lib/chart-indicators'
  * 同样只在 lightweight 里有画法。
  * [R723] 用户: 「刚刚的『ATR原始』叠加到成交量上去」—— 它不再是自己一只副图, 五条线
  * 由 `LightweightDaily` 画进成交量 pane, 所以这里没有它的胶囊。
+ * [R753] 用户: 「用这个指标替换原来的副图指标成交量, 完美复刻」—— 能量惯性接替成交量;
+ * 用户随后要求「那个叠加要保留叠加上去」, R723 的 ATR 五线因此从成交量 pane 移到能量惯性 pane
+ * (仍走独立 overlay 刻度)。成交量(`vol`)本身留给指数页。
  */
-const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key === 'vol' || def.key === 'inst')
+const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key === 'energy' || def.key === 'inst')
 
 /** [R694] 用户: 「不搞圆点和颜色切换了，异动这个按钮就直接控制，效果以后只有颜色这一种显示方式」——
  *  「圆点 / 颜色」两个显示方式撤掉, 「异动」只剩开关一个职责, 图上固定按颜色画。 */
@@ -63,7 +65,6 @@ const MA_DOTS: Record<typeof MA_KEYS[number], { dark: string; light: string }> =
   ma20: DAILY_LINE_COLORS.orange,
   ma60: DAILY_LINE_COLORS.plum,
 }
-const DEFAULT_VOLUME_COMPARE: VolumeCompareConfig = { enabled: true, days: 1 }
 /**
  * [R705] 用户: 「压力支撑、枢轴点、前高前低、整数关口、缺口位都放在主图指标 MA 那一行,
  * 排在 MA60 后面」—— 这五颗最常见的价位开关并进第一行; 其余(布林、量化通道三档、
@@ -83,13 +84,6 @@ const pickGroups = (order: LevelType[]) => order
   .filter((group): group is { key: LevelType; label: string } => group != null)
 const MAIN_ROW_LEVEL_GROUPS = pickGroups(MAIN_ROW_LEVEL_ORDER)
 const SUB_ROW_LEVEL_GROUPS = pickGroups(SUB_ROW_LEVEL_ORDER)
-
-function normalizeVolumeCompare(config: VolumeCompareConfig): VolumeCompareConfig {
-  return {
-    enabled: config.enabled !== false,
-    days: Math.max(1, Math.min(20, Math.round(Number(config.days) || 1))),
-  }
-}
 
 interface Props {
   symbol: string
@@ -279,19 +273,19 @@ export function StockDailyKChart({
   toolbarExtra,
   refreshLive = false,
 }: Props) {
-  const [activeIndicators, setActiveIndicators] = useState<string[]>(['vol'])
+  // [R751] 用户: 「默认打开副图指标：成交量、量化macd、主力come」—— 三只副图开箱即开。
+  // [R753] 成交量换成能量惯性, 默认仍开。
+  const [activeIndicators, setActiveIndicators] = useState<string[]>(['energy', 'inst'])
   // [R652] 四条主图均线逐条可控。[R655] 用户要求默认只留 MA20, 其余三条默认关。
   // ECharts 渲染器画不了单条, 仍按 showMA 整组。
   const [maKeys, setMaKeys] = useState<string[]>(() => showMA ? ['ma20'] : [])
-  // [R649] 关键价位那张量化MACD 副图并入日K, 默认关闭 —— 与改版前日K一样只留成交量。
+  // [R649] 关键价位那张量化MACD 副图并入日K。
   // [R724] 用户: 「彻底删掉趋势量化这个指标」—— 原来并排的「趋势量化」整张删除。
-  const [showQuantMacd, setShowQuantMacd] = useState(false)
+  // [R751] 改成默认打开。
+  const [showQuantMacd, setShowQuantMacd] = useState(true)
   const [showMarkers, setShowMarkers] = useState(true)
   // 加入自选日标注（与「异动」标记相互独立）
   const [showAddedMark, setShowAddedMark] = useState(true)
-  const [volumeCompare, setVolumeCompare] = useState<VolumeCompareConfig>(() =>
-    normalizeVolumeCompare(storage.stockVolumeCompare.get(DEFAULT_VOLUME_COMPARE)),
-  )
   const dateRange = externalDateRange ?? getDefaultRange()
 
   // 查询配置统一来自 klineDailyQueryOptions, 与 StockPanel 信息条/邻近预取共享同一 cache key (只发一次请求)
@@ -326,17 +320,12 @@ export function StockDailyKChart({
     setMaKeys(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
   }, [])
 
-  const updateVolumeCompare = useCallback((patch: Partial<VolumeCompareConfig>) => {
-    setVolumeCompare(prev => {
-      const next = normalizeVolumeCompare({ ...prev, ...patch })
-      storage.stockVolumeCompare.set(next)
-      return next
-    })
-  }, [])
-
+  // [R751] 主力COME 默认打开, 但它只有 lightweight 画法 —— ECharts 那边按同一口径滤掉,
+  // 否则会为一张不画的副图留出高度。
   const activeSubDefs = activeIndicators
     .map(key => SUB_CHART_META.find(s => s.key === key))
     .filter((d): d is typeof SUB_CHART_META[number] => !!d)
+    .filter(d => renderer === 'lightweight' || d.key !== 'inst')
 
   // [R649] 分析副图只在 lightweight 渲染下存在; 数据与关键价位视图同源(同一查询键)。
   const qmacdQ = useStockQuantMacd(symbol, showQuantMacd)
@@ -496,38 +485,7 @@ export function StockDailyKChart({
     />
   ))
 
-  // [R683] 「量比」只对成交量生效; [R686] 排位从成交量后面挪到副图指标全部之后。
-  const volumeCompareControl = activeIndicators.includes('vol') && (
-    <div className="ml-0.5 flex h-5 items-center gap-1.5 border-l border-border/70 pl-2">
-      <span className="text-micro text-muted">量比</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={volumeCompare.enabled}
-        aria-label="开启量能对比"
-        title={volumeCompare.enabled ? '关闭量能对比' : '开启量能对比'}
-        onClick={() => updateVolumeCompare({ enabled: !volumeCompare.enabled })}
-        className={`relative h-3.5 w-6 shrink-0 rounded-full transition-colors ${
-          volumeCompare.enabled ? 'bg-accent' : 'bg-surface border border-border'
-        }`}
-      >
-        <span className={`absolute left-0 top-0.5 h-2.5 w-2.5 rounded-full bg-white transition-transform ${
-          volumeCompare.enabled ? 'translate-x-3' : 'translate-x-0.5'
-        }`} />
-      </button>
-      <select
-        aria-label="量能对比周期"
-        value={volumeCompare.days}
-        disabled={!volumeCompare.enabled}
-        onChange={event => updateVolumeCompare({ days: Number(event.target.value) })}
-        className="h-5 rounded-btn border border-border bg-base px-1 text-micro text-secondary outline-none disabled:opacity-40"
-      >
-        {Array.from({ length: 20 }, (_, index) => index + 1).map(days => (
-          <option key={days} value={days}>前{days}日均量</option>
-        ))}
-      </select>
-    </div>
-  )
+  // [R753] 成交量换成了能量惯性, 「量比」开关失去对象 —— 连同状态一起撤掉。
 
   // [R649] 从「关键价位」并过来的量化MACD 副图 —— 固定排在各指标副图之后; ECharts 渲染没有这张副图, 不给开关。
   // [R724] 「趋势量化」已彻底删除。
@@ -678,14 +636,12 @@ export function StockDailyKChart({
                 <span className="w-16 shrink-0 text-micro text-muted" title="画在下方副图里的指标">副图指标</span>
                 {subIndicatorPills}
                 {analysisPanePills}
-                {volumeCompareControl}
               </div>
             </>
           )}
           {renderer !== 'lightweight' && (
             <>
               {subIndicatorPills}
-              {volumeCompareControl}
               {markerControls}
             </>
           )}
@@ -727,7 +683,6 @@ export function StockDailyKChart({
           onPriceDoubleClick={onPriceDoubleClick}
           visibleBars={visibleBars ?? (renderer === 'lightweight' ? undefined : 60)}
           activeIndicators={activeIndicators}
-          volumeCompare={volumeCompare}
           addedDate={showAddedMark ? addedDate : null}
           analysisPanes={fittedPanes}
           levelLines={levelLines}

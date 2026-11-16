@@ -121,18 +121,30 @@ it('[R694] 异动只剩一颗开关: 显示方式固定为颜色, 关掉就不�
   expect(props().markers).toContainEqual(expect.objectContaining({ date: '2026-11-06', event: 'broken_limit_up' }))
 })
 
-it('[R649] 量化MACD 副图默认不画, 点开后才追加到日K底部', async () => {
+it('[R649/R751] 量化MACD 副图默认就画, 点一下收起', async () => {
   await render()
-  expect(props().analysisPanes).toEqual([])
-  const pill = (label: string) => [...host.querySelectorAll('button')].find(button => button.textContent === label)!
-  await act(async () => pill('量化MACD').click())
   expect(props().analysisPanes.map((pane: any) => pane.kind)).toEqual(['quant'])
   expect(props().analysisPanes.every((pane: any) => pane.height > 0)).toBe(true)
+  const pill = (label: string) => [...host.querySelectorAll('button')].find(button => button.textContent === label)!
+  await act(async () => pill('量化MACD').click())
+  expect(props().analysisPanes).toEqual([])
+  await act(async () => pill('量化MACD').click())
+  expect(props().analysisPanes.map((pane: any) => pane.kind)).toEqual(['quant'])
   // ECharts 渲染没有这张副图, 工具栏也不给开关
   await render({ renderer: 'echarts' })
   expect(props().analysisPanes).toEqual([])
   // [R724] 趋势量化已整张删除, 工具栏里不该再有那颗胶囊
   expect([...host.querySelectorAll('button')].some(button => button.textContent === '趋势量化')).toBe(false)
+})
+
+it('[R753] 能量惯性接过成交量: 默认打开, 成交量胶囊不再出现', async () => {
+  await render()
+  expect(props().activeIndicators).toEqual(['energy', 'inst'])
+  const pill = [...host.querySelectorAll('button')].find(button => button.textContent === '能量惯性')!
+  expect(pill.getAttribute('aria-pressed')).toBe('true')
+  expect([...host.querySelectorAll('button')].some(button => button.textContent === '量能 ATR')).toBe(false)
+  await act(async () => pill.click())
+  expect(props().activeIndicators).toEqual(['inst'])
 })
 
 it('[R655] 主图均线默认只开 MA20, 留下的每条都能单独关掉再打开', async () => {
@@ -157,7 +169,7 @@ it('[R657] 日K 里指标开关键与价位开关键同一尺寸(跟原来那颗
   await render()
   const byLabel = (label: string) => [...host.querySelectorAll('button')]
     .find(button => button.textContent?.trim() === label)!
-  const indicator = byLabel('成交量')
+  const indicator = byLabel('能量惯性')
   const level = host.querySelector('[data-testid="level-toolbar"] button')
   expect(level).not.toBeNull()
   for (const button of [indicator, level!]) {
@@ -205,9 +217,8 @@ it('[R660] 价位开关状态可用外部那一份(与关键价位共用), 回�
 
 it('[R651] 空间不够只压分析副图, 主图与指标副图的高度不动', async () => {
   const openPanes = async (options: any) => {
+    // [R751] 量化MACD 默认已打开, 不必再点那颗胶囊
     await render(options)
-    const pill = [...host.querySelectorAll('button')].find(button => button.textContent === '量化MACD')!
-    await act(async () => pill.click())
     const panes: any[] = props().analysisPanes
     return {
       heights: panes.map(pane => pane.height),

@@ -230,6 +230,8 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
   // 这里仍按 `height` = 主图高来算, 公式与 R614 相同 —— 日K 的副图数量由图内工具栏决定、
   // 外面算不出来, 维持 420; 分时没有额外副图, 继续跟着右栏放宽。
   const wide = useMediaQuery('(min-width: 1280px)')
+  // [R732] ≥1536: 弹窗满宽满高, 左栏左边再拆一列常驻复盘(「复盘」标签随之隐藏)。
+  const showReviewWide = useMediaQuery('(min-width: 1536px)')
   const chartAreaRef = useRef<HTMLDivElement>(null)
   const [chartAreaH, setChartAreaH] = useState(0)
   useEffect(() => {
@@ -252,6 +254,11 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
     const el = chartAreaRef.current
     if (el) el.scrollTop = 0
   }, [chartView])
+  // [R732] 复盘改为左列常驻后, 中栏不再有这一页; 从决策台带 'review' 进来时落回日 K,
+  // 复盘内容就在最左边那一列里。
+  useEffect(() => {
+    if (showReviewWide && chartView === 'review') setChartView('daily')
+  }, [showReviewWide, chartView])
   const prevSymbolRef = useRef<string | null>(null)
   const initialViewRef = useRef(initialView)
   initialViewRef.current = initialView
@@ -357,7 +364,8 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
     // 那三颗原来装在一个带边距的分段容器里(容器 p-1 + 边框把它们整体撑大), 现在拆成
     // 和天数胶囊同一套独立按钮: 同样的边框/底色/选中样式、同样的 72×32。
     <div role="tablist" aria-label="图表视图" className="inline-flex shrink-0 items-center gap-2">
-      {VIEW_TABS.map(({ key, label, Icon }) => (
+      {/* [R732] 复盘已常驻在最左一列, 宽屏不再需要这个标签 */}
+      {VIEW_TABS.filter(tab => !(showReviewWide && tab.key === 'review')).map(({ key, label, Icon }) => (
         <button key={key} type="button" role="tab" aria-selected={chartView === key}
                 onClick={() => setChartView(key)}
                 className={`inline-flex h-8 w-[72px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-btn border text-xs transition-colors duration-hover ${
@@ -400,6 +408,8 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
               // [R623] 88vh → 96dvh: 关键价位要一屏装下主图 + 两张副图
               // [R624] 再吃到 calc(100dvh - 16px): 多出的 24px 全部给主图, 让主图明显大于副图
               'h-[min(1120px,calc(100dvh-16px))] min-h-[640px] w-[94vw] max-w-wide',
+              // [R732] ≥1536 满宽满高: 左栏再拆一列放复盘, 图与价位仍同屏
+              '2xl:h-[calc(100dvh-16px)] 2xl:w-[calc(100vw-16px)] 2xl:max-w-none',
               'max-md:h-[100dvh] max-md:max-h-none max-md:min-h-0 max-md:w-screen max-md:rounded-none max-md:border-0',
             )}
           >
@@ -438,7 +448,15 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                 [R682] 用户: 「跌破转弱站上转强都不要了, 剩下的趋势六态和通道阶段内容合并到
                 右里面, 从此左中右布局变成左右布局」—— 左栏撤掉, 现状整块并进右栏顶部,
                 图上方的宽度全给图。 */}
-            <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)_minmax(250px,300px)] xl:overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)_minmax(250px,300px)] xl:overflow-hidden 2xl:grid-cols-[minmax(420px,460px)_minmax(220px,250px)_minmax(0,1fr)_minmax(250px,290px)]">
+              {/* [R732] 用户: 「左里面划分多一列, 把复盘的内容都放进去」「弹窗还不是全屏, 可以用完长度」——
+                  宽屏时最左常驻一整列复盘(自己滚), 中栏从此只画图。窄屏这一列不挂载,
+                  复盘仍走顶部标签 —— 也避免没开复盘时白跑一次 250 日回算。 */}
+              {showReviewWide && (
+                <div className="border-border/60 px-4 py-4 sm:px-6 2xl:min-h-0 2xl:overflow-y-auto 2xl:border-r">
+                  <ReviewSection key={symbol} symbol={symbol} days={reviewDays} compact />
+                </div>
+              )}
               {/* [R707] 用户: 「恢复左中右布局, 左里面放『趋势状态 · 六态』和『通道阶段』」，
                   随后又补一句「上中下轨也放到左里面」—— 左栏三格齐全, 右栏只留价位阶梯。
                   宽度沿用 R672–R681 那版 240~290。 */}
@@ -465,7 +483,7 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                 {/* [R612-fix] 一律可滚: 关键价位的画布比这里的可视区高(下面挂着两张副图),
                     裁掉就等于把副图删了 —— 改版前靠弹窗整页滚, 现在是右栏自己滚。 */}
                 <div ref={chartAreaRef} className="mt-1 min-h-0 flex-1 overflow-y-auto">
-                  {chartView === 'review' ? (
+                  {chartView === 'review' && !showReviewWide ? (
                     // [R442] key 跟着票走(换票时「只看有事的日子」复位) —— 与旧复盘页一样
                     <ReviewSection key={symbol} symbol={symbol} days={reviewDays} />
                   ) : (

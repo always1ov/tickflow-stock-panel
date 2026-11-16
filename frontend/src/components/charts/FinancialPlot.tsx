@@ -46,8 +46,13 @@ interface Props {
   volumeLabels?: AnnotationData['labels']
   paneTitles?: string[]
   paneReadouts?: AnnotationData['readouts'][]
-  /** [R616] 副图里那些原生系列画不出来的图元(按 pane 下标); 不传 = 不画 */
-  paneDecor?: (PaneDecorData | undefined)[]
+  /**
+   * [R616] 副图里那些原生系列画不出来的图元(按 pane 下标); 不传 = 不画。
+   * [R753] 一张副图可以有多组图元、各自走不同的刻度(能量惯性的柱按惯性刻度,
+   * 叠上去的 ATR 箭头按 `atr` overlay 刻度) —— 一组 primitive 只能挂一条 series
+   * 换算纵向坐标, 所以按 `decorHost` 的 series 顺序逐组挂, 数组第 i 项给第 i 个 host。
+   */
+  paneDecor?: (PaneDecorData | PaneDecorData[] | undefined)[]
   /**
    * [R630] 隐藏副图右侧刻度数字(轴宽仍由主图决定, 图区不会被拉宽)。
    * 个股分析的分析副图按 R423 / R486 的原文约定不写刻度 —— ECharts 时代
@@ -91,7 +96,7 @@ export function FinancialPlot(props: Props) {
   const leftAnnotation = useRef(new ChartAnnotations())
   const attachedLeft = useRef<ISeriesApi<SeriesType> | null>(null)
   const paneAnnotations = useRef(new Map<number, { api: ISeriesApi<SeriesType>; annotation: ChartAnnotations; volume: boolean }>())
-  const paneDecorRef = useRef(new Map<number, { api: ISeriesApi<SeriesType>; decor: PaneDecor }>())
+  const paneDecorRef = useRef(new Map<string, { api: ISeriesApi<SeriesType>; decor: PaneDecor; pane: number; slot: number }>())
   const ct = useChartTheme()
   const themeRef = useRef(ct); themeRef.current = ct
   const compactRef = useRef(false)
@@ -384,14 +389,20 @@ export function FinancialPlot(props: Props) {
         paneAnnotations.current.set(pane, { api, annotation, volume: spec.id === 'volume' })
       }
       // [R616] 副图补画的图元与标注挂在同一条 series 上(同一张 pane)
-      // [R723] ATR 叠在成交量 pane 里, 它的箭头要用 overlay 刻度(atr_s)换算纵向坐标;
-      // 仍挂到成交量柱那条 series 就会按千万级的量级去算, 箭头全落到底边。
-      const decorSpec = props.series.find(s => s.pane === pane && s.decorHost) ?? spec
-      const decorApi = seriesRef.current.get(decorSpec.id)!.api
-      if (paneDecorRef.current.get(pane)?.api !== decorApi) {
-        const decor = new PaneDecor(); decorApi.attachPrimitive(decor)
-        paneDecorRef.current.set(pane, { api: decorApi, decor })
-      }
+      // [R723] ATR 的箭头要用 overlay 刻度(atr_s)换算纵向坐标; 挂到千万级的成交量柱上
+      // 箭头会全落到底边。没有 decorHost 时退回该 pane 的第一条 series。
+      // [R753] 能量惯性 pane 同时有「惯性刻度的柱」与「atr 刻度的箭头」两组图元,
+      // 一组 primitive 只能换算一套坐标, 因此按 decorHost 逐组挂。
+      const hosts = props.series.filter(s => s.pane === pane && s.decorHost)
+      const hostSpecs = hosts.length ? hosts : [spec]
+      hostSpecs.forEach((hostSpec, slot) => {
+        const key = `${pane}:${slot}`
+        const decorApi = seriesRef.current.get(hostSpec.id)!.api
+        if (paneDecorRef.current.get(key)?.api !== decorApi) {
+          const decor = new PaneDecor(); decorApi.attachPrimitive(decor)
+          paneDecorRef.current.set(key, { api: decorApi, decor, pane, slot })
+        }
+      })
     }
     props.paneHeights.forEach((value, i) => chart.panes()[i]?.setStretchFactor(value))
     if (props.intraday) chart.timeScale().fitContent()
@@ -428,7 +439,10 @@ export function FinancialPlot(props: Props) {
     paneAnnotations.current.forEach((item, pane) => item.annotation.update({ dates: [],
       labels: item.volume ? props.volumeLabels : undefined, title: props.paneTitles?.[pane], readouts: props.paneReadouts?.[pane],
       topInset: props.paneTopInsets?.[pane], textColor: ct.text }))
-    paneDecorRef.current.forEach(({ decor }, pane) => decor.update(props.paneDecor?.[pane]))
+    paneDecorRef.current.forEach(({ decor, pane, slot }) => {
+      const entry = props.paneDecor?.[pane]
+      decor.update(Array.isArray(entry) ? entry[slot] : slot === 0 ? entry : undefined)
+    })
     markerRef.current?.setMarkers(markersForView(props.markers, compactRef.current))
   }, [props.annotations, props.markers, props.volumeLabels, props.paneTitles, props.paneReadouts, props.paneDecor, props.paneTopInsets, props.linkedPrice, props.series, props.pricePrecision, ct])
 

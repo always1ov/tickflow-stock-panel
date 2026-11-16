@@ -119,13 +119,13 @@ STORES: tuple[Store, ...] = (
     # 模拟盘这个名字随转折模拟盘并进虚拟账户退役, 标签照实写
     Store("user_data/paper_traders.json", "AI 操盘手旧账本", shape=SHAPE_OPAQUE,
           note="功能已撤(R327)。账本读取自带老数据迁移(单本平铺 → books)。结构深, 不做字段级补齐"),
-    Store("user_data/usage_notes.json", "消息面记录", shape=SHAPE_RECORD_LIST,
+    # [R751] 笔记/消息面整套撤下(前后端代码全删), **存档文件没删**(用户定的: 删代码, 留存档)。
+    # 登记留着, 体检才不会把它们当成来路不明的孤儿。
+    Store("user_data/usage_notes.json", "消息面记录(已撤)", shape=SHAPE_RECORD_LIST,
           required=("id",),
-          fields={"status": "", "horizon": "news", "pinned": False,
-                  "digest": "", "due_at": None},
-          note="horizon(时效/埋伏/规律)与 digest 都是后加的"),
-    Store("user_data/news_desk_summary.json", "消息面总览", shape=SHAPE_OBJECT,
-          fields={"text": "", "as_of": "", "item_count": 0}),
+          note="功能已撤(R751), 只剩历史存档 —— 没有地方再读写它, 不需要可以删"),
+    Store("user_data/news_desk_summary.json", "消息面总览(已撤)", shape=SHAPE_OBJECT,
+          note="功能已撤(R751), 只剩历史存档 —— 没有地方再读写它, 不需要可以删"),
     Store("user_data/score_ledger.json", "把握分台账", shape=SHAPE_OPAQUE),
     # [R561 同步上游] 上游 v0.3.2 开放接口的 Token 表: 只存 SHA-256 哈希(明文只在创建那一刻给一次),
     # 不可重算 —— 丢了就得重新发 Token、改所有调用方的配置
@@ -167,8 +167,8 @@ STORES: tuple[Store, ...] = (
     Store("user_data/custom_factors", "自定义因子", fmt=FMT_DIR),
     Store("user_data/strategy_overrides", "策略参数覆盖", fmt=FMT_DIR),
     Store("user_data/auction_scan", "竞价扫描", fmt=FMT_DIR, kind=KIND_DERIVED),
-    Store("user_data/news_desk", "消息面附件", fmt=FMT_DIR,
-          note="图片凝练成功后原件即删, 目录里剩的是还没凝练成功的"),
+    Store("user_data/news_desk", "消息面附件(已撤)", fmt=FMT_DIR,
+          note="功能已撤(R751), 只剩历史存档 —— 原件凝练后即删, 目录里剩的是没凝练成功的"),
 
     # [R272] 下面这六处是**真机上跑了一次体检才发现漏登记的** —— 它们的路径不是
     # `data_dir / "user_data" / "字面量"`, 而是走 `JsonReportStore(filename)` 或模块常量,

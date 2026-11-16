@@ -28,13 +28,14 @@ const DEFAULT_NAV_FLAT: readonly string[] = [
 ]
 
 /**
- * [R608] 其余全部收进闲置: 看板/指数(总览) → 概念/行业/财务(研究) → 信号库/回测/因子(验证) → 监控中心/Minds
+ * [R608] 其余全部收进闲置: 看板/指数(总览) → 概念/行业/财务(研究) → 信号库/回测/因子(验证) → 监控中心
+ * [R751] Minds 页删除, 这一组里不再有它。
  */
 const DEFAULT_NAV_GROUPS: readonly { id: string; label: string; ids: readonly string[] }[] = [
   {
     id: BROWSE_GROUP_ID,
     label: BROWSE_GROUP.label,
-    ids: ['/dashboard', '/indices', '/concept-analysis', '/industry-analysis', '/financials', '/signals', '/backtest', '/factors', '/monitor', '/minds'],
+    ids: ['/dashboard', '/indices', '/concept-analysis', '/industry-analysis', '/financials', '/signals', '/backtest', '/factors', '/monitor'],
   },
 ]
 

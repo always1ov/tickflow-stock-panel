@@ -2057,41 +2057,6 @@ export interface AuctionScanPayload {
   error?: string
 }
 
-// [fork 增强] R93 使用观察笔记
-export interface UsageNote {
-  id: string
-  content: string
-  /** ''=随手记 / pending=待验证 / verified=已验证 / rejected=不成立 */
-  status?: '' | 'pending' | 'verified' | 'rejected'
-  pinned?: boolean
-  /** [R180] 消息形态; 老数据没有这个字段, 后端读时补 text */
-  kind?: 'text' | 'image' | 'file'
-  /** [R180] 凝练成功后 path 会被去掉、原件删除 —— 只保存凝练不保存图片。
-   *  留 name/size 是为了知道这条要点是从哪个文件来的。 */
-  attachment?: { path?: string; name: string; size: number } | null
-  /** AI 对这一条的凝练; 空 = 还没凝练过 */
-  digest?: string
-  digest_at?: string | null
-  /** [R181] 时效档 —— 与 status(成立了吗)正交的第二个轴: 这条多久有效。
-   *  news 时效(几天内有效, 影响今天买不买) /
-   *  thesis 埋伏(业绩等逻辑, 影响持有耐心, 到 due_at 回来核对) /
-   *  rule 规律(方法论, 不过期) */
-  horizon?: 'news' | 'thesis' | 'rule'
-  /** 埋伏的兑现检查点; 只有 thesis 有 */
-  due_at?: string | null
-  created_at: string
-  updated_at: string
-}
-
-/** [R180] 一大段总的 —— 综合全部条目, 之后每次 AI 决策都会带上它 */
-export interface NewsDeskSummary {
-  text: string
-  as_of: string
-  item_count: number
-  item_ids?: string[]
-}
-
-
 // ===== 大盘复盘 =====
 export interface AiReviewReport {
   id: string
@@ -5579,41 +5544,6 @@ export const api = {
   // [fork 增强] R110 竞价一进二扫描(昨日首板 × 当下竞价)
   auctionScan: (refresh = false) =>
     request<AuctionScanPayload>(`/api/abnormal/auction-scan${refresh ? '?refresh=true' : ''}`),
-  // [fork 增强] R93 使用观察笔记: 纯文本, 增删改
-  usageNotesList: () =>
-    request<{ items: UsageNote[] }>('/api/usage-notes'),
-  usageNoteCreate: (content: string) =>
-    request<UsageNote>('/api/usage-notes', { method: 'POST', body: JSON.stringify({ content }) }),
-  usageNoteUpdate: (id: string, patch: { content?: string; status?: string; pinned?: boolean; horizon?: string }) =>
-    request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(patch) }),
-  // [R180] 让 AI 凝练这一条(图片走多模态)
-  usageNoteDigest: (id: string) =>
-    request<UsageNote>(`/api/usage-notes/${encodeURIComponent(id)}/digest`,
-      { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS }),
-
-  // [R180] 传图片/文本文件, 建一条带附件的记录。落盘即返回, 凝练是单独一步 ——
-  // 上传要立刻有反馈, 不能卡在一次几十秒的 AI 调用上。
-  usageNoteUpload: (file: File, content = '') => {
-    const fd = new FormData()
-    fd.append('file', file)
-    return request<UsageNote>(
-      `/api/usage-notes/upload?content=${encodeURIComponent(content)}`,
-      { method: 'POST', body: fd })
-  },
-
-  // [R181] 到了兑现检查点、还没给结论的埋伏 —— 埋伏最容易失败的方式是记了之后忘了
-  usageNotesDue: () =>
-    request<{ items: UsageNote[] }>('/api/usage-notes/due'),
-
-  usageNotesSummaryGet: () =>
-    request<{ summary: NewsDeskSummary | null }>('/api/usage-notes/summary'),
-
-  usageNotesSummaryBuild: () =>
-    request<{ summary: NewsDeskSummary }>('/api/usage-notes/summary',
-      { method: 'POST', timeoutMs: AI_REQUEST_TIMEOUT_MS }),
-
-  usageNoteDelete: (id: string) =>
-    request<{ ok: boolean }>(`/api/usage-notes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   miningResult: (runId: string) =>
     request<MiningResult>(`/api/backtest/mining/runs/${encodeURIComponent(runId)}/result`),
 

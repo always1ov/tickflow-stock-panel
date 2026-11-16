@@ -147,12 +147,11 @@ def test_R271_认出后加字段的缺失(dd_dir):
 
 def test_R271_必填字段的缺失单独报而不是混进可补的里(dd_dir):
     """`id` 缺了不是"补个默认值"能解决的 —— 补出来的是一条假记录。"""
-    _write(dd_dir, "user_data/usage_notes.json", [
-        {"id": "a", "content": "正常", "status": "", "horizon": "news",
-         "pinned": False, "digest": "", "due_at": None},
-        {"content": "这条没有 id"},
+    _write(dd_dir, "user_data/ai_market_recaps.json", [
+        {"id": "a", "text": "正常"},
+        {"text": "这条没有 id"},
     ])
-    got = next(s for s in dd.scan(dd_dir)["stores"] if s["rel"] == "user_data/usage_notes.json")
+    got = next(s for s in dd.scan(dd_dir)["stores"] if s["rel"] == "user_data/ai_market_recaps.json")
     assert got["incomplete"] == {"id": 1}
     assert "id" not in got["missing"], "必填字段不该出现在「可补齐」那一栏"
 

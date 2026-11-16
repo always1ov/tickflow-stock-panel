@@ -35,10 +35,3 @@ def test_R523_数据页存储体积列不折行():
     code = code_of("pages/Data.tsx")
     assert code.count("whitespace-nowrap text-right") == 2
     assert not re.search(r"w-\d+(?:\.\d+)? text-right", code), "体积列又丢了 whitespace-nowrap"
-
-
-def test_R523_Minds笔记条数缺了不拖垮整页():
-    """接口回了个空对象时 `items.length` 直接白屏 —— 条数是分栏上的装饰, 缺就缺。"""
-    code = code_of("pages/Minds.tsx")
-    assert "notes: notesQ.data?.items?.length" in code
-    assert "notesQ.data?.items.length" not in code

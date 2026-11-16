@@ -10,7 +10,7 @@ import { LightweightDaily } from './LightweightDaily'
 import { LightweightIntraday } from './LightweightIntraday'
 import { minuteTime, type PlotSeries } from '@/lib/lightweight-model'
 import { CHART_LAYOUT, dailyChartHeight } from '@/lib/chart-layout'
-import { DAILY_LINE_COLORS } from '@/lib/chart-indicators'
+import { DAILY_LINE_COLORS, ENERGY_BANDS, ENERGY_COLORS, computeEnergyInertia } from '@/lib/chart-indicators'
 import { ChartAnnotations } from './ChartAnnotations'
 
 const native = vi.hoisted(() => {
@@ -274,7 +274,7 @@ it('shows every indicator readout at the hovered date, including MACD histogram 
     const readouts = (title: string) => [...updates.mock.calls].reverse().find(([d]) => d.title === title)![0].readouts!
     await render()
     expect(readouts('MACD').map(d => d.text)).toEqual(['DIF 0.001', 'DEA 0.000', 'MACD -0.002'])
-    expect(readouts('成交量').map(d => d.text)).toEqual(['量 12.00万', '量比 1.09x'])
+    expect(readouts('量能 ATR').map(d => d.text)).toEqual(['量 12.00万', '量比 1.09x'])
     expect(readouts('RSI').map(d => d.text)).toEqual(['RSI6 56.7', 'RSI14 48.3', 'RSI24 —'])
     expect(readouts('KDJ').map(d => d.text)).toEqual(['K 70.3', 'D 45.3', 'J 120.3'])
     const dif = native.chart.addSeries.mock.calls.findIndex(call => call[2] === 2 && call[0] === 'Line')
@@ -283,7 +283,7 @@ it('shows every indicator readout at the hovered date, including MACD histogram 
     expect(readouts('MACD')[2].color).toBe('#2D9B65')
     await act(async () => native.handlers.hover({ time: rows[3].date, paneIndex: 2 }))
     expect(readouts('MACD')[2].text).toBe('MACD 0.006')
-    expect(readouts('成交量').map(d => d.text)).toEqual(['量 4.00万', '量比 1.33x'])
+    expect(readouts('量能 ATR').map(d => d.text)).toEqual(['量 4.00万', '量比 1.33x'])
     native.appearance.theme = 'light'
     await render()
     expect(readouts('MACD')[0].color).toBe(native.series[dif].applyOptions.mock.calls.at(-1)![0].color)
@@ -300,12 +300,93 @@ it('[R723] 成交量副图不再画均量线, ATR 五条线叠在同一只 pane 
     const overlay = native.chart.addSeries.mock.calls.filter(call => call[1]?.priceScaleId === 'atr')
     expect(overlay).toHaveLength(5)
     expect(overlay.every(call => call[2] === 1)).toBe(true)
-    const readouts = [...updates.mock.calls].reverse().find(([d]) => d.title === '成交量')![0].readouts!
+    const readouts = [...updates.mock.calls].reverse().find(([d]) => d.title === '量能 ATR')![0].readouts!
     expect(readouts.map(d => d.text)).toContain('S 2.00')
     expect(readouts.map(d => d.text)).toContain('REFMID 2.00')
     expect(readouts.some(d => d.text.startsWith('VOL'))).toBe(false)
   } finally { updates.mockRestore() }
 })
+
+it('[R753] 能量惯性实现逻辑: 五段位置/正负取色/零轴箭头/输出线全按公式', async () => {
+  const updates = vi.spyOn(ChartAnnotations.prototype, 'update')
+  try {
+    // 前 40 根收在中轴下方(惯性转负), 后 60 根收在上方(惯性转正) —— 两种极性各取一根核对
+    const rows = Array.from({ length: 100 }, (_, i) => ({
+      date: new Date(Date.UTC(2026, 0, i + 1)).toISOString().slice(0, 10),
+      open: 10, high: 11, low: 9, close: i < 40 ? 9.5 : 10.5, volume: 90_000,
+    }))
+    const points = computeEnergyInertia(rows)
+    await act(async () => root.render(<LightweightDaily symbol="A" data={rows} activeIndicators={['energy']} />))
+
+    // 柱/箭头由 PaneDecor 画; 从真实挂载的 primitive 里取回调用方算好的图元数据
+    const prims = native.series.filter((s: any) => s.pane === 1)
+      .flatMap((s: any) => s.attachPrimitive.mock.calls.map((call: any[]) => call[0]))
+    const decor = prims.find((p: any) => p.data?.items?.some((it: any) => it.kind === 'stick'))
+    expect(decor).toBeTruthy()
+    const sticksAt = (date: string) => decor.data.items.filter((it: any) => it.kind === 'stick' && it.time === date)
+
+    // 正支: 五段都浮在 0 轴上, 第一段最远(深红), 第五段贴 0 轴(黄)
+    const posIdx = rows.length - 1
+    const posI = points[posIdx].inertia
+    expect(posI).toBeGreaterThan(0)
+    const positive = sticksAt(rows[posIdx].date)
+    expect(positive).toHaveLength(5)
+    ENERGY_BANDS.forEach(([near, far], band) => {
+      expect(positive[band].from).toBeCloseTo(posI - posI * near, 6)
+      expect(positive[band].to).toBeCloseTo(posI - posI * far, 6)
+      expect(positive[band].color).toBe(ENERGY_COLORS.positive.dark[band])
+      expect(positive[band].widthPx).toBe(3)
+    })
+    expect(Math.min(...positive.map((s: any) => Math.min(s.from, s.to)))).toBeGreaterThan(0)
+    expect(positive[0].from).toBeGreaterThan(positive[4].from)
+    expect(positive[4].to).toBeCloseTo(posI * 0.05, 6)
+
+    // 负支: 五段都沉在 0 轴下, 第一段最远(蓝), 第五段贴 0 轴(青)
+    const negIdx = 10
+    const negI = points[negIdx].inertia
+    expect(negI).toBeLessThan(0)
+    const negative = sticksAt(rows[negIdx].date)
+    expect(negative).toHaveLength(5)
+    ENERGY_BANDS.forEach(([near, far], band) => {
+      expect(negative[band].from).toBeCloseTo(negI - negI * near, 6)
+      expect(negative[band].to).toBeCloseTo(negI - negI * far, 6)
+      expect(negative[band].color).toBe(ENERGY_COLORS.negative.dark[band])
+    })
+    expect(Math.max(...negative.map((s: any) => Math.max(s.from, s.to)))).toBeLessThan(0)
+    expect(negative[0].from).toBeLessThan(negative[4].from)
+    expect(negative[4].to).toBeCloseTo(negI * 0.05, 6)
+
+    // DRAWICON: 只在「由负翻正」那一根出, 钉在 0 轴, 红色朝上
+    const crossIdx = points.findIndex(point => point.crossUp)
+    expect(crossIdx).toBeGreaterThan(0)
+    expect(points.filter(point => point.crossUp)).toHaveLength(1)
+    const icons = decor.data.items.filter((it: any) => it.kind === 'icon')
+    expect(icons).toEqual([{ kind: 'icon', time: rows[crossIdx].date, value: 0, up: true, color: ENERGY_COLORS.icon.dark }])
+
+    // 「能量惯性:」是冒号输出线: 可见、只画惯性值、刻度覆盖 min/max 且含 0
+    const lineCall = native.chart.addSeries.mock.calls.find((call: any[]) => call[1]?.color === ENERGY_COLORS.line.dark)
+    expect(lineCall).toBeTruthy()
+    const lineOption = lineCall![1]
+    // range 落到 autoscaleInfoProvider(钉住副图刻度), 不是普通 options 字段
+    const priceRange = lineOption.autoscaleInfoProvider().priceRange
+    expect(priceRange.minValue).toBeCloseTo(Math.min(...points.map(p => p.inertia)), 6)
+    expect(priceRange.maxValue).toBeCloseTo(Math.max(...points.map(p => p.inertia)), 6)
+    expect(priceRange.minValue).toBeLessThan(0)
+    expect(priceRange.maxValue).toBeGreaterThan(0)
+    const lineApi = native.chart.addSeries.mock.results[native.chart.addSeries.mock.calls.indexOf(lineCall!)].value
+    expect(lineApi.setData.mock.calls[0][0].map((d: any) => d.value)).toEqual(points.map(p => p.inertia))
+
+    // ATR 五线仍在同一只 pane、仍走独立 overlay 刻度
+    const overlay = native.chart.addSeries.mock.calls.filter(call => call[1]?.priceScaleId === 'atr')
+    expect(overlay).toHaveLength(5)
+    expect(overlay.every(call => call[2] === 1)).toBe(true)
+    const readouts = [...updates.mock.calls].reverse().find(([d]) => d.title === '能量惯性')![0].readouts!
+    expect(readouts.map(d => d.text).slice(0, 2).every(text => /^(能量|惯性) /.test(text))).toBe(true)
+    expect(readouts.map(d => d.text)).toContain('S 2.00')
+    expect(readouts.map(d => d.text)).toContain('REFMID 2.00')
+  } finally { updates.mockRestore() }
+})
+
 
 it('preserves missing and invalid indicator values instead of showing zero or an older date', async () => {
   const updates = vi.spyOn(ChartAnnotations.prototype, 'update')
