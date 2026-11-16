@@ -74,7 +74,15 @@ def test_R528_三个消费点都从同一处取():
 
 
 def test_R528_前端画的是26日_名字带周期_20日那组也带周期():
-    """[R529] 用户定的写法: 「26日布林」, 周期在前; 20 日那组同一个形状「20日布林上轨」。"""
+    """[R529] 用户定的写法: 「26日布林」, 周期在前; 20 日那组同一个形状「20日布林上轨」。
+
+    [R760] 口径对齐: 「26日布林」现在只有「关键价位」一个入口。R656 用户
+    「日k里面主图原来的boll可以删除了」撤下日K主图的 BOLL 叠加 ——
+    `EChartsCandlestick` 里那条 `bollLine('boll_mid', ...)` 与端点标签整段没了,
+    所以旧断言(在那里找 `label: '26日布林'` / `bollLine(...)`)是对着已撤的代码说的。
+    画到日K上的仍是 26 日那组(`StockDailyKChart` 把 `boll26_*` 映射成 `boll_*`);
+    读数行按 R705 用户要求只写「布林上轨 / 布林下轨」, 不在那一行重复周期。
+    """
     ak = code_of("components/stock-analysis/AnalysisKChart.tsx") + code_of("components/stock-analysis/analysis-chart-model.ts")
     assert "label: '26日布林'" in ak
     for lbl in ("26日布林上轨", "26日布林中轨", "26日布林下轨"):
@@ -82,9 +90,18 @@ def test_R528_前端画的是26日_名字带周期_20日那组也带周期():
     for rel in ("components/StockDailyKChart.tsx", "pages/Indices.tsx"):
         code = code_of(rel)
         assert "r.boll26_upper" in code and "r.boll26_mid" in code and "r.boll26_lower" in code, f"{rel} 还在读 20 日列"
+    # [R760] 日K 把 26 日那组映射成 boll_* 再喂给两个渲染器 —— 画上图的仍是 26 日, 不是 enriched 的 20 日列
+    assert "boll_upper: r.boll26_upper" in code_of("components/StockDailyKChart.tsx")
+    # [R760] R705 用户: 「换手下一行的『26日布林』都删掉『26日』」—— 这一处读数只写
+    # 「布林上轨 / 布林下轨」, 周期由上面那条映射保证, 读数行不再重复。
+    ld = code_of("components/charts/LightweightDaily.tsx")
+    assert "['boll_upper', '布林上轨']" in ld and "['boll_lower', '布林下轨']" in ld, "日K 读数行的布林上下轨没了"
+    assert "26日布林上轨" not in ld and "26日布林下轨" not in ld, "日K 读数行又把「26日」写回来了(R705)"
+    # [R760] R656 撤下日K主图的 BOLL 叠加: 26日布林只在「关键价位」画一次,
+    # ECharts 渲染器里不再有第二条入口, 也不再有第二份端点名字。
     ec = code_of("components/EChartsCandlestick.tsx")
-    assert "label: '26日布林'" in ec
-    assert "bollLine('boll_mid', '#14B8A6', '26日布林中轨')" in ec, "中轨不再是 MA20, 得自己画"
+    assert "bollLine(" not in ec, "日K主图的 BOLL 叠加(R656 已撤)又回来了"
+    assert "26日布林上轨" not in ec and "26日布林下轨" not in ec, "ECharts 里又写了一处 26 日布林的端点名字"
     assert "Number(d.ma20).toFixed(2)}/${Number(d.boll_lower)" not in ec, "悬停里的中轨还在印 MA20"
     # 20 日那组(表格列 / 条件字段)名字带 (20日), 与图表的 26 日分得开
     for rel in ("lib/watchlist-columns.ts", "lib/screener-columns.ts", "lib/signals.ts",

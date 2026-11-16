@@ -30,18 +30,49 @@ interface Props {
   defaultOpen?: boolean
   onOpenChange?: (open: boolean) => void
   className?: string
+  /** [R760] 窄列形态: 只露一个「?」按钮(原 R737 在 EvidencePanel 里另写的那套搬进来) */
+  icon?: boolean
+  /** [R760] 问号按钮的悬停说明 */
+  title?: string
   children: ReactNode
 }
 
 export function ReviewDisclosure({
-  label, note, defaultOpen = false, onOpenChange, className, children,
+  label, note, defaultOpen = false, onOpenChange, className, icon = false, title, children,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen)
+  const toggle = () => { const v = !open; setOpen(v); onOpenChange?.(v) }
+  // [R760] 同一条开合逻辑, 两种外观 —— 窄列只放得下一个问号
+  if (icon) {
+    return (
+      <div className={cn('px-3', className)}>
+        <div className="flex items-center gap-1.5">
+          <span className="text-micro text-muted">{label}</span>
+          <button
+            type="button"
+            aria-label={label}
+            aria-expanded={open}
+            title={title ?? label}
+            onClick={toggle}
+            className={cn(
+              'inline-flex h-4 w-4 items-center justify-center rounded-full border text-micro leading-none transition-colors',
+              open
+                ? 'border-border bg-elevated text-foreground'
+                : 'border-border/70 text-muted hover:text-secondary',
+            )}
+          >
+            ?
+          </button>
+        </div>
+        {open && <div className="mt-1.5">{children}</div>}
+      </div>
+    )
+  }
   return (
     <div className={cn('mx-4 mt-2', className)}>
       <button
         type="button"
-        onClick={() => { const v = !open; setOpen(v); onOpenChange?.(v) }}
+        onClick={toggle}
         aria-expanded={open}
         className="inline-flex items-center gap-1 text-micro text-secondary transition-colors hover:text-secondary"
       >

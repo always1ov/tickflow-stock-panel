@@ -13,6 +13,7 @@ DLG = "components/StockPreviewDialog.tsx"
 ST = "components/stock-preview/StatusSection.tsx"
 SEC = "components/stock-preview/ChartLevelsSection.tsx"
 CHART = "components/stock-analysis/AnalysisKChart.tsx"
+HERO = "components/stock-preview/PreviewHero.tsx"
 QM = "lib/quantMacdSeries.ts"
 
 
@@ -31,7 +32,9 @@ def test_R433_读数各自取自原来的产地():
     assert "POS_FILL[b.pos]" in st and "b?.pos_cn" in st, "三档位置的颜色 / 名字没用原来那份"
     assert "const ph = d?.channel?.phase ?? null" in st and "{ph?.cn ?? '—'}" in st, "通道阶段没用复盘接口那份"
     # 距离用后端给的带符号的数, 不在前端另算一遍
-    assert "t.flip_down_distance_pct" in st and "t.flip_up_distance_pct" in st
+    # [R760] 「跌破转弱 / 站上转强」两格已按 R682/R707 撤出本块, 翻转距离现在只
+    # 留在接口类型里、前端没有第二个产地 —— 原意改成: 不许在本文件里另算一遍。
+    assert "distance_pct" not in st, "翻转距离又在前端自己算了"
 
 
 def test_R433_下半块那套买卖判定没有被偷偷做进来():
@@ -41,20 +44,35 @@ def test_R433_下半块那套买卖判定没有被偷偷做进来():
 
 
 def test_R434_视图切换靠右():
-    """[R612] 切换条从「图表与价位」卡里提到右栏顶部, 仍然靠右、随视图变的那格靠左。"""
+    """[R612] 切换条从「图表与价位」卡里提到右栏顶部, 仍然靠右、随视图变的那格靠左。
+
+    [R760] R658/R679 把切换条并进弹窗头部右侧操作组(60/120/250 日左边), 它不再
+    自带 `ml-auto` —— 靠右由头部那条 `justify-between` 的第二组保证。守的原意没变:
+    仍靠右、仍在天数左边。
+    """
     dlg = code_of(DLG)
-    tool, tabs = dlg.index("{chartView === 'intraday' ? ("), dlg.index('role="tablist"')
-    assert tool < tabs, "视图切换没排在右边"
-    assert 'className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-btn' in dlg
+    hero = code_of(HERO)
+    assert "viewControls={viewControls}" in dlg, "视图切换没挂到弹窗头部"
+    group = hero[hero.index('className="flex shrink-0 flex-wrap items-center gap-2"'):]
+    assert group.index("{viewControls}") < group.index("HERO_DAYS.map"), "视图切换没排在右边天数左边"
+    assert 'role="tablist" aria-label="图表视图" className="inline-flex shrink-0 items-center gap-2"' in dlg
 
 
 def test_R612_双栏_左栏只放现状_窄屏单列():
     """[R612] 用户选的「双栏大弹窗」: 左「现状」/ 右图表与复盘;
-    ≥1280 才分栏, 768~1279 单列(现状在上), 手机上整屏。"""
+    ≥1280 才分栏, 768~1279 单列(现状在上), 手机上整屏。
+
+    [R760] R672/R707 恢复左中右三栏、R732 再在 2xl 拆出复盘列, 「双栏」已被多栏
+    取代 —— 原意逐条改钉当前实现: 现状独占一栏、窄屏单列且现状在图之前、手机整屏。
+    """
     dlg = code_of(DLG)
-    body = dlg[dlg.index('xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]'):]
-    assert body.index('<StatusSection') < body.index('role="tablist"'), "现状没在左栏"
-    assert "stacked={wide}" in body, "左栏只有 300~340px, 现状没改成一列"
+    st = code_of(ST)
+    grid = dlg[dlg.index("xl:grid xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)_minmax(250px,300px)]"):]
+    left = grid[grid.index("xl:overflow-y-auto xl:border-b-0 xl:border-r"):]
+    left = left[:left.index("</div>")]
+    assert "<StatusSection" in left and "<ChartLevelsSection" not in left, "左栏不是只放现状"
+    assert grid.index("<StatusSection") < grid.index("<ChartLevelsSection"), "现状没排在图前面"
+    assert "grid grid-cols-1 items-start" in st and "sm:grid-cols-2" not in st, "左栏只有 240~290px, 现状该是单列"
     assert "max-md:w-screen" in dlg and "max-md:h-[100dvh]" in dlg, "手机上没铺满整屏"
 
 
@@ -90,9 +108,42 @@ def test_R445_现状块删掉打码的部分_没有分隔竖线_四块等分():
         assert gone not in st, f"「{gone}」是用户打码删掉的"
     # 那一格只剩阶段, 标题跟着改名 —— 「通道档位」底下放阶段就是一个名字两个意思
     assert '<Cell label="通道阶段">' in st and "通道档位" not in st
-    # 四块同一个结构(小标题 + 读数), 等分一行, 窄屏两块一行
-    assert "grid grid-cols-1 items-start" in st and "sm:grid-cols-2 lg:grid-cols-4" in st
-    for label in ("<FlipCell label=\"跌破转弱\"", "<FlipCell label=\"站上转强\""):
-        assert label in st
+    # [R760] R707 把本块收成左栏一条纵列(240~290px), 「四块等分一行」不再成立;
+    # 守的原意改成: 单一列、顶端对齐, 不许再摊成多列。
+    assert "grid grid-cols-1 items-start" in st and "lg:grid-cols-4" not in st
+    # [R760] 「跌破转弱 / 站上转强」两格按 R682 撤掉、R707 未恢复 —— 改为守下架状态。
+    assert "FlipCell" not in st and "跌破转弱" not in st and "站上转强" not in st
     # [R448] 用户: 「删掉三档位置这四个字」
     assert "三档位置" not in st, "三档位置那块的小标题又回来了"
+
+
+# ================================================================
+# [R760] 反向守卫的另一半
+# ================================================================
+#
+# R682/R707/R445 之后, 本文件有几条只能守"撤掉的格子不许回来"。这里补上现在
+# 该有的三格 —— 免得哪天有人把现状卡删空, 上面那些反向断言照样全绿。
+
+def test_R760_现状卡那三格都还在():
+    """趋势状态(六态) / 通道阶段 / 三档位置(上中下轨) —— [R707] 用户:
+    「恢复左中右布局, 左里面放『趋势状态 · 六态』和『通道阶段』」, 随后
+    「上中下轨也放到左里面」。三格都常驻, 不带卡框、单列排。"""
+    st = code_of(ST)
+    assert "<Cell label={<>趋势状态 · 六态" in st, "趋势状态那一格没了"
+    assert "{t.state_cn}" in st and "{t.duration}" in st, "六态读数/已 N 天没了"
+    assert "<TrendSignalBadge" in st, "转折信号徽标丢了"
+    assert '<Cell label="通道阶段">' in st and "{ph?.cn ?? '—'}" in st, "通道阶段那一格没了"
+    assert "{BAND_CN[k]}" in st and "POS_FILL[b.pos]" in st, "三档位置的上中下轨没了"
+    for gone in ('<Cell label="三档位置"', '三档位置'):
+        assert gone not in st, "三档位置的小标题(R448 删过)又回来了"
+
+
+def test_R760_六态读数只在现状卡一处():
+    """[R551] 撤掉图上方那条六态条之后, 六态读数只有现状卡这一个产地 ——
+    正反都要守: 现状卡里得有, 图侧任何一个容器里都不许再挂。"""
+    assert "{t.state_cn}" in code_of(ST), "现状卡里的六态读数没了"
+    for rel in (DLG, "components/StockPanel.tsx", "components/StockDailyKChart.tsx",
+                "components/stock-preview/ChartLevelsSection.tsx"):
+        src = code_of(rel)
+        assert "<TrendStateBar" not in src and "trendBar" not in src, (
+            f"{rel} 又把六态条挂回图上方")

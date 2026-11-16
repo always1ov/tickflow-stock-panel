@@ -527,29 +527,19 @@ export function EvidencePanel({ ch, edge, compact = false }: {
 
   // [R737] 用户: 「依据里面的内容搞成小问号折叠藏起来」—— 那行「▸ 依据 · N 项读数」
   // 在 420px 的常驻列里也占一行, 收成问号: 点开才渲染正文。
+  // [R760] 问号这一套搬进共用件(`ReviewDisclosure icon`): 折叠按钮只许有一份实现。
+  const onChange = (v: boolean) => { setOpen(v); storage.reviewEvidenceOpen.set(v) }
   if (compact) {
     return (
-      <div className="px-3">
-        <div className="flex items-center gap-1.5">
-          <span className="text-micro text-muted">依据</span>
-          <button
-            type="button"
-            aria-label="依据"
-            aria-expanded={open}
-            title={`依据${rows > 0 ? ` · ${rows} 项读数` : ''} —— 阶段判定、通道档位与逐项读数`}
-            onClick={() => setOpen(v => !v)}
-            className={cn(
-              'inline-flex h-4 w-4 items-center justify-center rounded-full border text-micro leading-none transition-colors',
-              open
-                ? 'border-border bg-elevated text-foreground'
-                : 'border-border/70 text-muted hover:text-secondary',
-            )}
-          >
-            ?
-          </button>
-        </div>
-        {open && <div className="mt-1.5">{body}</div>}
-      </div>
+      <ReviewDisclosure
+        icon
+        label="依据"
+        title={`依据${rows > 0 ? ` · ${rows} 项读数` : ''} —— 阶段判定、通道档位与逐项读数`}
+        defaultOpen={open}
+        onOpenChange={onChange}
+      >
+        {body}
+      </ReviewDisclosure>
     )
   }
 
@@ -557,7 +547,7 @@ export function EvidencePanel({ ch, edge, compact = false }: {
     <ReviewDisclosure
       label={rows > 0 ? `依据 · ${rows} 项读数` : '依据'}
       defaultOpen={open}
-      onOpenChange={(v) => { setOpen(v); storage.reviewEvidenceOpen.set(v) }}
+      onOpenChange={onChange}
     >
       {body}
     </ReviewDisclosure>

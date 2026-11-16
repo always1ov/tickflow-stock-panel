@@ -9,6 +9,9 @@ export const DAILY_LINE_COLORS = {
   yellow: { dark: '#FACC15', light: '#A16207' },
   blue: { dark: '#3B82F6', light: '#2563EB' },
   // [R593] 键名避开 purple 族(守卫按族名查), 色值仍是图表线条色
+  // [R760] 只给图表线条用(MA60 / DEA / RSI24 / KDJ-J 与它们图例上的同色小字、工具栏色点);
+  // 界面元素(边框、底色、按钮)不许借用这个值 —— 《前端没有紫》守卫按文件放行这两个 hex,
+  // 拿去做界面就绕过了那道红线。
   plum: { dark: '#8B5CF6', light: '#7C3AED' },
   gray: { dark: '#A1A1AA', light: '#71717A' },
   orange: { dark: '#F97316', light: '#C2410C' },
