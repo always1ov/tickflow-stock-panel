@@ -14,7 +14,8 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
-import { AnalysisConfigDialog, DimensionHeatmap, PresetFetchState, type AnalysisFieldConfig } from '@/components/analysis-shared'
+import { AnalysisConfigDialog, PresetFetchState, type AnalysisFieldConfig } from '@/components/analysis-shared'
+import { SectorRankHeatmap } from '@/components/SectorRankHeatmap'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { toNavItems, type NavItem } from '@/lib/listNav'
 import { api, type MarketSnapshotRow } from '@/lib/api'
@@ -370,19 +371,6 @@ export function IndustryAnalysis() {
     return set.size
   }, [stats])
 
-  // 热力图用的 quoteMap（兼容 DimensionHeatmap 组件接口）
-  const heatmapQuoteMap = useMemo(() => {
-    const map = new Map<string, { symbol: string; pct?: number; change_pct?: number; name?: string; [k: string]: unknown }>()
-    for (const [k, v] of marketMap) {
-      map.set(k, {
-        ...v,
-        change_pct: v.change_pct ?? undefined,
-        name: v.name ?? undefined,
-      })
-    }
-    return map
-  }, [marketMap])
-
   const handleSaveConfig = (c: AnalysisFieldConfig) => {
     setFieldConfig(c)
     saveConfig(c)
@@ -476,14 +464,13 @@ export function IndustryAnalysis() {
             onStockClick={handleStockClick}
           />
 
-          {/* 热力图 */}
+          {/* [R761] 原位替换原「热度分布」标签云: 板块名稳定, 名次热力图才读得出迁移 */}
           {groups.length > 0 && (
-            <DimensionHeatmap
-              groups={groups}
-              quoteMap={heatmapQuoteMap}
+            <SectorRankHeatmap
+              kind="industry"
+              level={industryLevel}
               selectedKey={selectedKey}
-              onSelect={k => setSelectedKey(k)}
-              colorScheme="amber"
+              onSelect={setSelectedKey}
             />
           )}
 

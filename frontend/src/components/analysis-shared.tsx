@@ -3,7 +3,6 @@
  *
  * 包含：
  * - AnalysisConfigDialog: 字段配置弹窗
- * - DimensionHeatmap: 维度热力图块
  * - OverviewStatCards: 总览统计卡片
  * - DimensionGroupSidebar: 维度分组侧边栏
  */
@@ -16,7 +15,6 @@ import {
   AlertCircle,
   ArrowRight,
   BarChart3,
-  ChevronDown,
   Database,
   DownloadCloud,
   RefreshCw,
@@ -213,92 +211,6 @@ export function OverviewStatCards({
           <div className="mt-1 text-xs text-muted truncate">{card.hint}</div>
         </div>
       ))}
-    </div>
-  )
-}
-
-// ===== 维度热力图 =====
-
-export function DimensionHeatmap({
-  groups,
-  quoteMap,
-  selectedKey,
-  onSelect,
-  colorScheme,
-}: {
-  groups: DimensionGroup[]
-  quoteMap: Map<string, QuoteMap>
-  selectedKey: string | null
-  onSelect: (key: string | null) => void
-  colorScheme: 'blue' | 'amber'
-}) {
-  const [showAll, setShowAll] = useState(false)
-  // 收起时最大高度（约 3 行标签高度）
-  const collapsedMaxH = '8rem'
-
-  const enriched = useMemo(() => {
-    return groups.map(g => {
-      const qm = computeQuoteMetrics(g.stocks, quoteMap)
-      return { ...g, quoteMetrics: qm }
-    })
-  }, [groups, quoteMap])
-
-  // 根据涨跌比渲染颜色强度
-  const colors = colorScheme === 'blue'
-    ? { up: [59, 130, 246], down: [96, 165, 250], bg: [30, 64, 175] }
-    : { up: [245, 158, 11], down: [251, 191, 36], bg: [180, 83, 9] }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-muted">热度分布（按标的覆盖数）</span>
-        <button
-          onClick={() => setShowAll(v => !v)}
-          className="text-micro text-secondary hover:text-foreground flex items-center gap-0.5"
-        >
-          {showAll ? '收起' : `展开全部 (${enriched.length})`}
-          <ChevronDown className={`h-3 w-3 transition-transform ${showAll ? 'rotate-180' : ''}`} />
-        </button>
-      </div>
-      <div
-        className="flex flex-wrap gap-1.5 overflow-hidden transition-[max-height] duration-expand"
-        style={{ maxHeight: showAll ? 'none' : collapsedMaxH }}
-      >
-        {enriched.map(g => {
-          const qm = g.quoteMetrics
-          const total = qm.upCount + qm.downCount + qm.flatCount
-          const upRatio = total > 0 ? qm.upCount / total : 0.5
-          const size = Math.max(0.6, Math.min(1.4, g.count / (enriched[0]?.count || 1)))
-          const active = selectedKey === g.key
-          const [r, gr, b] = colors.up
-
-          return (
-            <button
-              key={g.key}
-              onClick={() => onSelect(active ? null : g.key)}
-              className="px-2.5 py-1.5 rounded-btn text-xs whitespace-nowrap cursor-pointer hover:brightness-125 transition-ui"
-              style={{
-                fontSize: `${10 + size * 2}px`,
-                color: active ? '#fff' : `rgba(${r},${gr},${b},${0.6 + upRatio * 0.4})`,
-                backgroundColor: active
-                  ? `rgba(${r},${gr},${b},0.7)`
-                  : `rgba(${r},${gr},${b},${0.08 + upRatio * 0.15})`,
-                outline: active ? `1px solid rgba(${r},${gr},${b},0.8)` : 'none',
-                outlineOffset: 1,
-              }}
-              title={`${g.key}: ${g.count}只, 涨${qm.upCount}/跌${qm.downCount}, 均幅${qm.avgPct != null ? fmtPct(qm.avgPct) : '—'}`}
-            >
-              {g.key}
-              <span className="ml-1 opacity-60">{g.count}</span>
-              {qm.avgPct != null && (
-                <span className={`ml-1 ${priceColorClass(qm.avgPct)}`} style={{ fontSize: '9px' }}>
-                  {fmtPct(qm.avgPct)}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
     </div>
   )
 }
