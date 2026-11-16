@@ -221,7 +221,13 @@ export const ATR_BAND_COLORS = {
   basis: { dark: '#FF8800', light: '#C2410C' },
   band: { dark: '#808080', light: '#6B7280' },
   refMid: { dark: '#00FF00', light: '#15803D' },
-  icon: { dark: '#EF4444', light: '#DC2626' },
+  /**
+   * [R755] 用户: 「出来的都是红箭头, 需要区分是哪个指标出来的箭头」—— 能量惯性的上穿箭头
+   * 已占住通达信 1 号的红色, ATR 这枚(DRAWICON(CROSS(S,REFMID),REFMID,1)) 撞成同色就分不清了。
+   * 箭头跟着「发出信号的那条线」上色: S 是蓝线, 所以 ATR 这枚用蓝; 能量惯性那枚保持红。
+   * 同一常量也喂读数条里的「上穿」二字, 文字与箭头永远对得上。
+   */
+  icon: { dark: '#3B82F6', light: '#2563EB' },
 } as const
 
 export interface AtrBandPoint {

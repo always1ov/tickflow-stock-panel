@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeAtrBandSeries, computeEnergyInertia, computeInstitutionSeries, ENERGY_COLORS, tdxEma, tdxSma } from './chart-indicators'
+import { computeAtrBandSeries, computeEnergyInertia, computeInstitutionSeries, ATR_BAND_COLORS, ENERGY_COLORS, tdxEma, tdxSma } from './chart-indicators'
 import type { OHLC } from './chart-types'
 
 const row = (i: number, close: number, high = close + 0.5, low = close - 0.5): OHLC => ({
@@ -127,5 +127,12 @@ describe('[R722] 通达信「ATR 原始版」副图', () => {
     expect(points[60].atr).toBeCloseTo((19 * 2 + 11) / 20)
     expect(points[60].crossUp).toBe(true)
     expect(points.filter(point => point.crossUp)).toHaveLength(1)
+  })
+
+  // [R755] 两只箭头上穿同画在一个 pane 里, 同色就分不清是哪只指标发出来的
+  it('ATR 的上穿箭头与能量惯性不同色, 且跟着发出信号的 S 线走', () => {
+    expect(ATR_BAND_COLORS.icon).toEqual(ATR_BAND_COLORS.atr)
+    expect(ATR_BAND_COLORS.icon.dark).not.toBe(ENERGY_COLORS.icon.dark)
+    expect(ATR_BAND_COLORS.icon.light).not.toBe(ENERGY_COLORS.icon.light)
   })
 })
