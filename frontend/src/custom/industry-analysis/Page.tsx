@@ -455,16 +455,10 @@ export function IndustryAnalysis() {
 
           <HeroPanel leading={leading[0]} falling={falling[0]} activeIndustry={activeIndustry} industryBreadth={industryBreadth} />
 
-          <MarketPulse
-            leading={leading}
-            falling={falling}
-            selectedKey={selected?.key ?? null}
-            onSelect={setSelectedKey}
-            activeSymbol={previewSymbol}
-            onStockClick={handleStockClick}
-          />
-
-          {/* [R761] 原位替换原「热度分布」标签云: 板块名稳定, 名次热力图才读得出迁移 */}
+          {/* [R762] 布局重排: 热力图提到第 2 位(紧跟指标卡), Top10 挪到页面末尾。
+              理由(1700×913 实机量): 原来 Top10 占 500px 却与热力图最新一列讲同一件事,
+              热力图被压到第 3 位、第一屏只露表头和 6 行; 且点格子后详情在 1.5 屏之外。
+              现在顺序 = 指标卡 → 热力图 → 行业矩阵+详情 → Top10, 联动可当场看到。 */}
           {groups.length > 0 && (
             <SectorRankHeatmap
               kind="industry"
@@ -500,6 +494,17 @@ export function IndustryAnalysis() {
           ) : (
             <EmptyState icon={Layers3} title="未匹配到行业数据" hint={resolved.hint || '请检查扩展数据是否包含行业/板块相关字段'} />
           )}
+
+          {/* [R762] Top10 挪到页尾(内容一条不少): 它是"行业 → 龙头股"的下钻入口,
+              在热力图与行业矩阵之后看更顺; 原来排第 2 位, 500px 高却与热力图首列重复。 */}
+          <MarketPulse
+            leading={leading}
+            falling={falling}
+            selectedKey={selected?.key ?? null}
+            onSelect={setSelectedKey}
+            activeSymbol={previewSymbol}
+            onStockClick={handleStockClick}
+          />
         </div>
       </div>
 

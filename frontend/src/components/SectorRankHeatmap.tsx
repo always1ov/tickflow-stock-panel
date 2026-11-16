@@ -84,7 +84,8 @@ export function SectorRankHeatmap({
       ) : rows.length === 0 ? (
         <div className="px-3 py-6 text-center text-micro text-muted">最近 {days} 个交易日没有排名数据</div>
       ) : (
-        <div className="max-h-[38rem] overflow-auto">
+        // [R762] 热力图现在是第一屏主角, 高度从 38rem 提到 40rem(一屏约 20 行)
+        <div className="max-h-[40rem] overflow-auto">
           {/* [R761] table-fixed + 零内边距: 每个日期列宽严格相等, 色块铺满整格、格与格之间
               不留空隙(只留 1px 分隔线), 与参考图一致 —— 之前 px-[3px] 留出的 6px 缝
               在 30 列下会把格子挤成方块。 */}
