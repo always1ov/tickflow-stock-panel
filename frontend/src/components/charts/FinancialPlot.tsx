@@ -368,7 +368,10 @@ export function FinancialPlot(props: Props) {
           // 不再叠加成交量 pane 那套 28% / 8% 边距 —— 否则走势被二次压缩、字道与数据对不上。
           scaleMargins: spec.id === 'volume' ? { top: props.intraday ? 0.22 : 0.3, bottom: 0 }
             : spec.priceScaleId === 'atr' ? { top: 0.16, bottom: 0.06 }
-            : hidesAxis(spec.pane) ? { top: topMargin, bottom: 0 } : { top: 0.28, bottom: 0.08 },
+            // [R757] 藏刻度的副图没有预留标题带时, 边距与普通副图一致(量化MACD 并入日K 后
+            // 标题与读数都由 pane 标注叠在顶部, 不再让出空白带, 数据也不该压到 pane 底边)。
+            : hidesAxis(spec.pane) ? (topInset > 0 ? { top: topMargin, bottom: 0 } : { top: 0.28, bottom: 0.08 })
+              : { top: 0.28, bottom: 0.08 },
         })
       }
     }

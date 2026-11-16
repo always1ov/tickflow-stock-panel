@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { KlineRow } from '@/lib/api'
+import { CHART_LAYOUT } from '@/lib/chart-layout'
 import { StockDailyKChart } from './StockDailyKChart'
 import { LEVEL_GROUPS } from './stock-analysis/analysis-chart-model'
 
@@ -124,7 +125,9 @@ it('[R694] 异动只剩一颗开关: 显示方式固定为颜色, 关掉就不�
 it('[R649/R751] 量化MACD 副图默认就画, 点一下收起', async () => {
   await render()
   expect(props().analysisPanes.map((pane: any) => pane.kind)).toEqual(['quant'])
-  expect(props().analysisPanes.every((pane: any) => pane.height > 0)).toBe(true)
+  // [R757] 与能量惯性 / 主力COME 同槽同版面: 固定 96 - 1, 不再预留标题空白带
+  expect(props().analysisPanes[0].height).toBe(CHART_LAYOUT.subPaneSlot - CHART_LAYOUT.separator)
+  expect([props().analysisPanes[0].topInset, props().analysisPanes[0].headerH]).toEqual([0, 0])
   const pill = (label: string) => [...host.querySelectorAll('button')].find(button => button.textContent === label)!
   await act(async () => pill('量化MACD').click())
   expect(props().analysisPanes).toEqual([])
@@ -216,7 +219,7 @@ it('[R660] 价位开关状态可用外部那一份(与关键价位共用), 回�
     .toEqual(['MA20', 'MA60'])
 })
 
-it('[R651] 空间不够只压分析副图, 主图与指标副图的高度不动', async () => {
+it('[R651/R757] 量化MACD 与指标副图同槽, 卡里空间不够也不动它', async () => {
   const openPanes = async (options: any) => {
     // [R751] 量化MACD 默认已打开, 不必再点那颗胶囊
     await render(options)
@@ -230,6 +233,8 @@ it('[R651] 空间不够只压分析副图, 主图与指标副图的高度不动'
   const roomy = await openPanes({ maxHeight: 2400 })
   const tight = await openPanes({ maxHeight: 600 })
   expect(tight.base).toBe(roomy.base)
-  expect(tight.heights.reduce((a, b) => a + b, 0)).toBeLessThan(roomy.heights.reduce((a, b) => a + b, 0))
-  expect(Math.min(...tight.heights)).toBeGreaterThanOrEqual(100)
+  // [R757] 量化MACD 现在与能量惯性 / 主力COME 同一个 96 槽, 已经矮于 100 的压缩下限;
+  // 空间不够时不再拿它开刀, 由整图溢出滚动兜底(R651 的口径)。
+  expect(roomy.heights).toEqual([CHART_LAYOUT.subPaneSlot - CHART_LAYOUT.separator])
+  expect(tight.heights).toEqual(roomy.heights)
 })

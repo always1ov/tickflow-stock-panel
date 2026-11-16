@@ -85,7 +85,9 @@ export function fitAnalysisPaneHeights(natural: number[], room: number): number[
   const total = natural.reduce((sum, value) => sum + value, 0)
   if (total === 0 || room >= total) return natural
   const scale = Math.max(0, room) / total
-  return natural.map(value => Math.max(MIN_ANALYSIS_PANE_H, Math.round(value * scale)))
+  // [R757] 量化MACD 改成与指标副图同槽(96 - 1 = 95)后比 `MIN_ANALYSIS_PANE_H` 还矮。
+  // 压缩只该往下压, 不能把本来就更矮的副图反撑回 100, 所以下限再夹一次 natural。
+  return natural.map(value => Math.min(value, Math.max(MIN_ANALYSIS_PANE_H, Math.round(value * scale))))
 }
 
 /** `height` = 主图高时, 关键价位那张图连分析副图、副图间隔与 [R635] 额外让给 MACD 的高度在内的总高(不含卡片里的按钮/图例)。 */

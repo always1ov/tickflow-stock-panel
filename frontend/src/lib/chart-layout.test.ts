@@ -58,4 +58,10 @@ describe('[R651] 空间不够时只压分析副图, 下限 100', () => {
   it('空间为负(指标副图已占满)也不低于下限, 由整图溢出滚动兜底', () => {
     expect(fitAnalysisPaneHeights([168, 130], -56)).toEqual([100, 100])
   })
+
+  // [R757] 日K 里的量化MACD 已改成 95px(与指标副图同槽), 压缩不能把它反撑回 100
+  it('本来就比下限矮的副图不会被撑高', () => {
+    expect(fitAnalysisPaneHeights([95], 40)).toEqual([95])
+    expect(fitAnalysisPaneHeights([164], 40)).toEqual([100])
+  })
 })

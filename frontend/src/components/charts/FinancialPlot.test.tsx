@@ -694,8 +694,8 @@ it('[R633] paneTopInsets 只在指定副图顶部留空白, 其余副图不受�
   await act(async () => root.render(
     <FinancialPlot scope="levels" series={series} height={400} paneHeights={[280, 120, 124]}
       paneTopInsets={[0, 0, 12]} hidePaneAxis />))
-  // pane 1 保持 0 边距; pane 2 把 12px 空白折算成价格刻度上边距(12 / 124)
-  expect(native.series[1].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 0, bottom: 0 } })
+  // [R757] 藏刻度且不让空白带的副图, 边距与普通副图一致(上下都留白); pane 2 把 12px 空白折算成上边距(12 / 124)
+  expect(native.series[1].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 0.28, bottom: 0.08 } })
   expect(native.series[2].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 12 / 124, bottom: 0 } })
 })
 
@@ -708,8 +708,8 @@ it('[R634] 标题行的高度也折进上边距, 走势从标题下方开始', a
       paneTopInsets={[0, 0, 12]} paneHeaderHeights={[0, 0, 18]} hidePaneAxis />))
   // MACD: 12px 空白 + 18px 标题行 = 30px, 柱子从标题下面起, 不再压字
   expect(native.series[2].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 30 / 124, bottom: 0 } })
-  // 标题行传 0 的那张副图只动空白带, 边距完全不变
-  expect(native.series[1].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 0, bottom: 0 } })
+  // 标题行传 0 的那张副图只动空白带, 边距仍是普通副图那套([R757])
+  expect(native.series[1].priceScale().applyOptions).toHaveBeenLastCalledWith({ entireTextOnly: false, scaleMargins: { top: 0.28, bottom: 0.08 } })
 })
 
 it('links ETF price and percentage scales, including the single-session tab, and removes stale axes on context changes', async () => {

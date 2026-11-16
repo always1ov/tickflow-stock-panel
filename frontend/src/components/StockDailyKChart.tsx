@@ -25,9 +25,8 @@ const DAILY_SUB_CHARTS = SUB_CHART_META.filter(def => def.key === 'energy' || de
 /** [R694] 用户: 「不搞圆点和颜色切换了，异动这个按钮就直接控制，效果以后只有颜色这一种显示方式」——
  *  「圆点 / 颜色」两个显示方式撤掉, 「异动」只剩开关一个职责, 图上固定按颜色画。 */
 import {
-  CHART_LAYOUT, SUB_PANE_GAP, dailyChartHeight, fitAnalysisPaneHeights, quantPaneHeight,
+  CHART_LAYOUT, dailyChartHeight, fitAnalysisPaneHeights,
 } from '@/lib/chart-layout'
-import { PANE_HEADER_H } from '@/lib/analysisPanes'
 import { useStockQuantMacd } from '@/lib/useStockAnalysisPanes'
 import { useShownLevels } from '@/components/stock-analysis/AnalysisKChart'
 import { Fib2GrainDialog } from '@/components/stock-analysis/Fib2GrainDialog'
@@ -422,12 +421,20 @@ export function StockDailyKChart({
     const panes: DailyAnalysisPane[] = []
     if (showQuantMacd) {
       panes.push({
-        kind: 'quant', height: quantPaneHeight(height), topInset: SUB_PANE_GAP, headerH: PANE_HEADER_H,
+        /**
+         * [R757] 用户: 「先分析另外两个副图是怎么搞的, 再重新调整量化macd副图」——
+         * 能量惯性 / 主力COME 走的是指标副图那条路: 96 槽固定高度、标题与读数由 pane 标注
+         * 直接叠在副图顶部(topInset / headerH 都是 0)、上下边距 28% / 8%。
+         * 量化MACD 原来走分析副图那套: 主图 28% + 12 间隔 + 25 额外(480 高时 164px)、
+         * 顶上再让出 12 + 18 = 30px 空白带、底边距 0。三张副图叠在一起时, 它比邻居高 69px、
+         * 数据又贴着底边, 网格只能摊成三四行 —— 现在整只副图按指标副图那套版面走。
+         */
+        kind: 'quant', height: CHART_LAYOUT.subPaneSlot - CHART_LAYOUT.separator, topInset: 0, headerH: 0,
         data: qmacdQ.data, error: qmacdQ.isError,
       })
     }
     return panes
-  }, [renderer, showQuantMacd, height, qmacdQ.data, qmacdQ.isError])
+  }, [renderer, showQuantMacd, qmacdQ.data, qmacdQ.isError])
   // ECharts 渲染器(EChartsCandlestick 自己排版)的副图占位, 与 R650 前一致, 本轮不动。
   let subExtraH = 0
   activeSubDefs.forEach(def => { subExtraH += SUB_INFO_H + def.height })
