@@ -3744,6 +3744,33 @@ export interface DataSourcesResponse {
   config_dir: string
 }
 
+/** 分时备用接口 (独立配置, 所有数据源共用) */
+export interface HistMinuteBackupConfig {
+  url: string
+  method: string
+  symbol_param: string
+  date_param: string
+  response_path: string
+  field_map: Record<string, string>
+  params: Record<string, unknown>
+  timeout: number
+}
+
+export interface HistMinuteBackupStatus {
+  configured: boolean
+  config: HistMinuteBackupConfig | null
+  display_name?: string
+  error?: string
+}
+
+export interface HistMinuteBackupTestResult {
+  ok: boolean
+  trade_date?: string
+  rows: number
+  columns: string[]
+  preview: Record<string, unknown>[]
+}
+
 export interface DataSourceTestResult {
   error?: string
   provider: string
@@ -4472,6 +4499,22 @@ export const api = {
     }),
   deleteDataSource: (name: string) =>
     request<DataSourcesResponse>(`/api/settings/data-sources/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  histMinuteBackup: () => request<HistMinuteBackupStatus>('/api/settings/hist-minute-backup'),
+  saveHistMinuteBackup: (body: Partial<HistMinuteBackupConfig>) =>
+    request<HistMinuteBackupStatus>('/api/settings/hist-minute-backup', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteHistMinuteBackup: () =>
+    request<{ configured: boolean; purged_minute_rows: number }>(
+      '/api/settings/hist-minute-backup',
+      { method: 'DELETE' },
+    ),
+  testHistMinuteBackup: (symbol = '000001.SH') =>
+    request<HistMinuteBackupTestResult>(
+      `/api/settings/hist-minute-backup/test?symbol=${encodeURIComponent(symbol)}`,
+      { method: 'POST', quiet: true },
+    ),
   reloadDataSources: () => request<DataSourcesResponse>('/api/settings/data-sources/reload', { method: 'POST' }),
   installPlugin: (name: string) => {
     // npm install 可能耗时较长, 用 6 分钟超时
@@ -4975,6 +5018,8 @@ export const api = {
       expected?: number
       actual?: number
       asset_type?: 'stock' | 'etf' | 'index'
+      /** 该帧来自分时备用源时显示其名称 (主源可用时不返回) */
+      backup_source?: string | null
       price_limit?: PriceLimitInfo | null
       prev_close?: number | null
     }>(

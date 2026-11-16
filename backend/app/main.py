@@ -33,6 +33,7 @@ from app.api import (
     financials,
     focus,  # [fork 增强] R159 推送焦点名单
     guardian,  # [R578 同步上游 v0.3.16] 策略守护
+    hist_minute_backup,  # [fork 增强] R781 分时备用接口
     import_center,  # [R588 同步上游 v0.3.26] 导入中心
     indices,
     intraday,
@@ -989,6 +990,7 @@ def _register_routers(app: FastAPI) -> None:
     app.include_router(stock_analysis.router)
     app.include_router(market_recap.router)
     app.include_router(settings_api.router)
+    app.include_router(hist_minute_backup.router)  # [fork 增强] R781 分时备用接口
     app.include_router(upgrade_guard_api.router)  # [v0.3.8 同步上游] 二次开发升级保护
     app.include_router(strategy.router)
     app.include_router(strategy_pool.router)  # [R597 同步上游 v0.3.35] 策略池

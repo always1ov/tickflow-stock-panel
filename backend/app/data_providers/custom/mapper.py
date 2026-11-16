@@ -28,19 +28,48 @@ def extract_rows(payload: Any, response_path: str = "") -> list[dict]:
     return []
 
 
-def map_rows(rows: list[dict], field_map: dict[str, str]) -> pl.DataFrame:
+def map_rows(rows: list[dict], field_map: dict[str, str], *, infer: bool = False) -> pl.DataFrame:
     if not rows:
         return pl.DataFrame()
     # 全量扫描推断: 默认 100 行采样会把稀疏列(前 100 行全 null, 如仅银行股
     # 有值的财务费用)推断成 Null 列, 后续数值行 append 直接 ComputeError —
     # 财务批 batch=100 时整表拉空 (与 fuyao 插件 infer_schema_length=None 同因)。
     df = pl.DataFrame(rows, infer_schema_length=None)
+    if infer and not field_map:
+        field_map = infer_minute_field_map(df.columns)
     rename = {src: dst for src, dst in field_map.items() if src in df.columns and src != dst}
     if rename:
         df = df.rename(rename)
     keep = list(dict.fromkeys(field_map.values()))
     keep = [col for col in keep if col in df.columns]
     return df.select(keep) if keep else pl.DataFrame()
+
+
+# 分钟接口常见列名 (标准 JSON 分钟线多为 open/high/low/close/volume)。
+_MINUTE_ALIASES: dict[str, tuple[str, ...]] = {
+    "datetime": ("datetime", "date_time", "timestamp", "trade_time", "time", "t", "date"),
+    "open": ("open", "o"),
+    "high": ("high", "h"),
+    "low": ("low", "l"),
+    "close": ("close", "c", "price", "last"),
+    "volume": ("volume", "vol", "v"),
+    "amount": ("amount", "amt", "turnover"),
+}
+
+
+def infer_minute_field_map(columns: list[str]) -> dict[str, str]:
+    """按常见列名推断分钟字段映射; 仅当显式 field_map 为空时使用。
+
+    返回 source→target。找不到的字段留空, 由上层校验决定是否可用。
+    """
+    lowered = {str(col).strip().lower(): col for col in columns}
+    out: dict[str, str] = {}
+    for target, aliases in _MINUTE_ALIASES.items():
+        for alias in aliases:
+            if alias in lowered:
+                out[str(lowered[alias])] = target
+                break
+    return out
 
 
 def apply_transforms(df: pl.DataFrame, transforms: dict[str, str]) -> pl.DataFrame:

@@ -23,7 +23,13 @@ from app.price_limits import (
     parse_listing_date,
     price_limit_pct,
 )
-from app.services import kline_sync, minute_adjust, minute_gaps, trading_day
+from app.services import (
+    hist_minute_backup,
+    kline_sync,
+    minute_adjust,
+    minute_gaps,
+    trading_day,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -173,6 +179,24 @@ def _minute_allowed(capset) -> bool:
     if error is not None:
         logger.warning("minute provider resolution failed while checking access: %s", error)
     return error is None and not fallback
+
+
+def _fetch_minute_with_backup(repo, symbol, trade_date, asset_type, capset, raw_basis):
+    """当前分钟源拉空时自动尝试 hist_minute 备用源 (仅单只, 批量路径不引用)。
+
+    返回 (df, backup_source)。backup_source 非空表示这一帧来自备用源,
+    前端据此显示「备用源」角标; 数据已由服务层校验并写入主分钟存储。
+    """
+    df = kline_sync.fetch_minute_single(
+        symbol, trade_date, asset_type=asset_type, capset=capset,
+        raw_basis=raw_basis,
+    )
+    if not df.is_empty():
+        return df, None
+    return hist_minute_backup.fetch(
+        symbol, trade_date, asset_type,
+        write_lock=getattr(repo, "_write_lock", None),
+    )
 
 
 @lru_cache(maxsize=8192)
@@ -1277,9 +1301,8 @@ def get_minute(
     if trade_date is None:
         # 本地无任何分钟K, 尝试从当前有效分钟源拉取当天
         trade_date = cn_today()
-        df = kline_sync.fetch_minute_single(
-            symbol, trade_date, asset_type=asset_type, capset=capset,
-            raw_basis=raw_basis,
+        df, backup_source = _fetch_minute_with_backup(
+            repo, symbol, trade_date, asset_type, capset, raw_basis,
         )
         if raw_basis:
             df = minute_adjust.apply_minute_adjustment(df, repo.store.data_dir, asset_type)
@@ -1295,6 +1318,7 @@ def get_minute(
                 "symbol": symbol, "name": stock_name, "stock_info": stock_info,
                 "date": str(trade_date), "rows": df.to_dicts(),
                 "source": "live" if not df.is_empty() else "none",
+                "backup_source": backup_source,
                 "asset_type": asset_type,
                 "price_limit": price_limit,
                 "prev_close": prev_close,
@@ -1310,11 +1334,10 @@ def get_minute(
     )
 
     if live and trade_date == cn_today() and in_continuous_session():
-        # 详情分时轮询: 当日盘中实时拉取最新一根K, 不落盘; 拉空(源侧延迟/
-        # 时段边界)则落回下方本地优先路径。
-        live_df = kline_sync.fetch_minute_single(
-            symbol, trade_date, asset_type=asset_type, capset=capset,
-            raw_basis=raw_basis,
+        # 详情分时轮询: 当日盘中实时拉取最新一根K; 拉空(源侧延迟/时段边界)
+        # 自动尝试备用源, 再落回下方本地优先路径。
+        live_df, backup_source = _fetch_minute_with_backup(
+            repo, symbol, trade_date, asset_type, capset, raw_basis,
         )
         if not live_df.is_empty():
             if raw_basis:
@@ -1327,6 +1350,7 @@ def get_minute(
                     "symbol": symbol, "name": stock_name, "stock_info": stock_info,
                     "date": str(trade_date), "rows": live_df.to_dicts(),
                     "source": "live", "asset_type": asset_type,
+                    "backup_source": backup_source,
                     "price_limit": price_limit, "prev_close": prev_close,
                 },
                 pref_key="minute_batch_compress",
@@ -1352,6 +1376,11 @@ def get_minute(
             expected = 240
 
     is_complete = not df.is_empty() and len(df) >= expected * 0.9  # 允许 10% 容差
+    # 本地帧若由备用源写过, 保持角标口径一致 (本地完整/不完整两条返回都标)
+    backup_source = (
+        hist_minute_backup.written_by(symbol, trade_date, asset_type)
+        if not df.is_empty() else None
+    )
 
     if is_complete:
         return _gzip_payload(
@@ -1359,6 +1388,7 @@ def get_minute(
             {
                 "symbol": symbol, "name": stock_name, "stock_info": stock_info,
                 "date": str(trade_date), "rows": df.to_dicts(), "source": "local",
+                "backup_source": backup_source,
                 "asset_type": asset_type,
                 "price_limit": price_limit,
                 "prev_close": prev_close,
@@ -1379,6 +1409,7 @@ def get_minute(
                 "date": str(trade_date), "rows": df.to_dicts(),
                 "source": "local_partial",
                 "expected": expected, "actual": len(df),
+                "backup_source": backup_source,
                 "asset_type": asset_type,
                 "price_limit": price_limit,
                 "prev_close": prev_close,
@@ -1386,10 +1417,10 @@ def get_minute(
             pref_key="minute_batch_compress",
         )
 
-    # 本地无数据 (或当日盘中数据落后) → 从当前有效分钟源实时拉取
-    live_df = kline_sync.fetch_minute_single(
-        symbol, trade_date, asset_type=asset_type, capset=capset,
-        raw_basis=raw_basis,
+    # 本地无数据 (或当日盘中数据落后) → 从当前有效分钟源实时拉取;
+    # 主源拉空时自动尝试 hist_minute 备用源 (仅单只弹窗场景)。
+    live_df, backup_source = _fetch_minute_with_backup(
+        repo, symbol, trade_date, asset_type, capset, raw_basis,
     )
     if raw_basis and not live_df.is_empty():
         live_df = minute_adjust.apply_minute_adjustment(
@@ -1401,6 +1432,7 @@ def get_minute(
             "symbol": symbol, "name": stock_name, "stock_info": stock_info,
             "date": str(trade_date), "rows": live_df.to_dicts(),
             "source": "live" if not live_df.is_empty() else "none",
+            "backup_source": backup_source,
             "asset_type": asset_type,
             "price_limit": price_limit,
             "prev_close": prev_close,

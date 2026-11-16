@@ -163,6 +163,16 @@ export function StockIntradayChart({
       )}
       {minuteRows.length > 0 && (
         <>
+          {minute.data?.backup_source && (
+            <div className="mb-1 flex items-center gap-1.5 text-micro text-muted">
+              <span
+                className="rounded-btn bg-elevated px-1.5 py-0.5"
+                title="主分钟源拉不到数据，本帧由分时备用源提供"
+              >
+                备用源 · {minute.data.backup_source}
+              </span>
+            </div>
+          )}
           {minute.data?.source === 'local_partial' && (
             <div className="mb-1 flex items-center gap-2 rounded-btn border border-warning/30 bg-warning/5 px-2 py-1 text-micro text-warning">
               <span>

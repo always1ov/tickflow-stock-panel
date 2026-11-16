@@ -44,6 +44,7 @@ import { CAP_LABELS, TIER_RANK, tierRank, tierStyle, TierTag } from '@/lib/capab
 import { DEFAULT_ROUTING, buildProviderRouting } from '@/lib/provider-routing'
 import { toast } from '@/components/Toast'
 import { PluginMetadata } from '@/components/data/PluginMetadata'
+import { HistMinuteBackupCard } from './HistMinuteBackupCard'
 import { DataSourceEditor } from './DataSourceEditor'
 import { TickFlowKeySection, TierHelpPopover, useInvalidateTierRelated } from './Keys'
 import { buttonClass, TYPE } from '@/components/ui'
@@ -904,6 +905,11 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
 
       </section>
       </AnchorWrap>
+
+      {/* ===== 分时备用接口: 独立于数据源, 全局共用的分钟兜底 ===== */}
+      <div className="mt-4">
+        <HistMinuteBackupCard />
+      </div>
 
       {/* ===== 下方: 选中源的介绍 + 配置 (单一卡片布局) ===== */}
       <AnimatePresence mode="wait">
