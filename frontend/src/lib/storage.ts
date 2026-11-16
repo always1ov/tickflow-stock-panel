@@ -90,8 +90,12 @@ export const storage = {
   /** 信息条指标「默认方案」快照 */
   stockInfoBarFieldsBaseline: kv<unknown[] | null>('stock_info_bar_fields_baseline'),
 
-  /** 个股详情多日分时周期 */
-  stockPreviewIntradayDays: kv<number>('stock_preview_intraday_days'),
+  /**
+   * 个股详情多日分时周期
+   * [R785] 换键: 旧键里可能存着老默认 10, 新默认改为 20 后要让它真正生效
+   * (不换键的话老用户会一直看到 10, 与「没选过就是 20」不一致)。
+   */
+  stockPreviewIntradayDays: kv<number>('stock_preview_intraday_days_v2'),
 
   /** 个股详情外链 URL 模板 (支持 {code}/{market}/{symbol}; 留空关闭) */
   stockExternalTemplate: kv<string>('stock_external_template'),

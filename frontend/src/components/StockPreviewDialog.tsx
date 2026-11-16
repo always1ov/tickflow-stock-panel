@@ -28,7 +28,6 @@ import { useMediaQuery } from '@/lib/useMediaQuery'
 import { storage } from '@/lib/storage'
 import { navItemKey, type NavItem } from '@/lib/listNav'
 import { useListNav } from '@/lib/useListNav'
-import { DEFAULT_INTRADAY_DAYS } from '@/lib/kline'
 import { ExtensionSlot } from '@/extensions/ExtensionSlot'
 
 interface Props {
@@ -105,11 +104,14 @@ const PANEL_MOTION = {
   exit: 'translateY(8px) scale(0.97)',
 } as const
 
+/** 分时默认档位: 没有保存过就选 20 日 (与浅源收窄后的 5 日兜底一致)。 */
+const DEFAULT_PREVIEW_INTRADAY_DAYS = 20
+
 function loadIntradayDays(): number {
-  const saved = storage.stockPreviewIntradayDays.get(DEFAULT_INTRADAY_DAYS)
+  const saved = storage.stockPreviewIntradayDays.get(DEFAULT_PREVIEW_INTRADAY_DAYS)
   return INTRADAY_DAY_OPTIONS.includes(saved as typeof INTRADAY_DAY_OPTIONS[number])
     ? saved
-    : DEFAULT_INTRADAY_DAYS
+    : DEFAULT_PREVIEW_INTRADAY_DAYS
 }
 
 export function StockPreviewDialog({ symbol, name, onClose, navList: navListSource, onNavigate, initialView, onAiAnalyze, aiBusy = false }: Props) {

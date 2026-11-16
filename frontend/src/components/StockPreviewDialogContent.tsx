@@ -21,7 +21,7 @@ import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 import { storage } from '@/lib/storage'
 import { navItemKey, type NavItem } from '@/lib/listNav'
 import { useListNav } from '@/lib/useListNav'
-import { DEFAULT_INTRADAY_DAYS, cnToday, klineDateRange } from '@/lib/kline'
+import { cnToday, klineDateRange } from '@/lib/kline'
 import { useQuoteClock } from '@/lib/useQuoteClock'
 import { ExtensionSlot } from '@/extensions/ExtensionSlot'
 import { ExtensionBoundary } from '@/extensions/ExtensionBoundary'
@@ -65,11 +65,14 @@ interface PriceAlertDraft {
 }
 const INTRADAY_DAY_OPTIONS = [1, 5, 10, 20] as const
 
+/** 分时默认档位: 没有保存过就选 20 日 (与浅源收窄后的 5 日兜底一致)。 */
+const DEFAULT_PREVIEW_INTRADAY_DAYS = 20
+
 function loadIntradayDays(): number {
-  const saved = storage.stockPreviewIntradayDays.get(DEFAULT_INTRADAY_DAYS)
+  const saved = storage.stockPreviewIntradayDays.get(DEFAULT_PREVIEW_INTRADAY_DAYS)
   return INTRADAY_DAY_OPTIONS.includes(saved as typeof INTRADAY_DAY_OPTIONS[number])
     ? saved
-    : DEFAULT_INTRADAY_DAYS
+    : DEFAULT_PREVIEW_INTRADAY_DAYS
 }
 
 function boardTag(symbol: string): { label: string; color: string } | null {
