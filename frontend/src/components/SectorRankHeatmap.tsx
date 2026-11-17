@@ -254,10 +254,10 @@ export function SectorRankHeatmap({
                     首行数据从 y=126 提到 y=92, 多露两行。 */}
                 <th
                   className="sticky left-0 z-30 w-36 border-r border-b border-border/60 bg-surface px-2 py-0.5 text-left text-micro font-normal text-muted"
-                  title={`${label}排名热力图 · 最近 ${dates.length || days} 个交易日 · 格内为当日涨幅名次（悬停看涨幅）· ${showAll ? `全部 ${totalRows} 名` : `前 ${topN} 名`}`}
+                  title={`${label}日线排名热力图 · 最近 ${dates.length || days} 个交易日 · 格内为当日涨幅名次（悬停看涨幅）· ${showAll ? `全部 ${totalRows} 名` : `前 ${topN} 名`}`}
                 >
                   <div className="flex items-center justify-between gap-1">
-                    <span>名称</span>
+                    <span>名称 · 日线</span>
                     <span className="flex items-center gap-px">
                       {RANK_BAND_COLORS.map(color => (
                         <span key={color} className="h-2 w-1.5" style={{ backgroundColor: color }} />

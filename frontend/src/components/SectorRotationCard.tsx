@@ -343,6 +343,23 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
     queryFn: api.extDataSchemaAll,
     staleTime: 300_000,
   })
+  // [R796] 分时覆盖度徽标: 用 /api/data/minute-coverage 这一个产地判断「完整 / 残缺」,
+  // 让残缺走势线有明确标注 (数据仍按作者原逻辑照画, 不拦不换日期)。
+  const coverageQuery = useQuery({
+    queryKey: QK.minuteCoverage,
+    queryFn: api.minuteCoverage,
+    staleTime: 60_000,
+  })
+  const coverage = coverageQuery.data
+  const coverageRatio = coverage?.ratio ?? 0
+  const coverageState: 'full' | 'partial' | 'none' =
+    coverage?.date && (coverage.universe ?? 0) > 0
+      ? (coverageRatio >= 0.95 ? 'full' : 'partial')
+      : 'none'
+  const coverageTitle = coverageState === 'none' || !coverage
+    ? '当前没有分钟分区数据，走势线无法绘制'
+    : `分钟分区 ${coverage.date} 覆盖 ${coverage.covered}/${coverage.universe} 只标的（${(coverageRatio * 100).toFixed(1)}%）`
+      + `${coverageState === 'full' ? '，视为完整覆盖' : '，走势线为残缺版（仅按已覆盖标的计算）'}`
   // 资金流候选: 全部扩展表的数值列 (id.列名), 不写死任何表
   const flowOptions = useMemo(() => {
     const options: { value: string; label: string }[] = []
@@ -991,11 +1008,8 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
   // 左列是否渲染 (走势线无板块 / 热力图无行时缺位, 右列全宽补上)
   const showLeftChart = displayMode === 'heatmap' ? heatRows > 0 : displayNames.length > 0
 
-  // 未开启全量分钟落盘时整卡隐藏 (整卡空态占位过大, 白占首屏);
-  // 其余 reason (当日数据为空/成分缺失) 属"有能力缺数据", 保留引导文案
-  if (data && data.status !== 'ok' && data.reason === 'minute_missing') {
-    return null
-  }
+  // [R794] 分时覆盖不全(含 minute_missing)时不再整卡隐藏: 行业板块页的模块始终在场,
+  // 卡内用紧凑提示说明原因, 有数据就照常画 (走势线含残缺版)。
 
   return (
     <section className="rounded-dialog border border-border bg-surface p-2.5">
@@ -1012,6 +1026,21 @@ export function SectorRotationCard({ kind }: { kind: 'concept' | 'industry' }) {
             <span className="rounded-btn bg-elevated px-1.5 py-0.5 text-micro text-muted">回放 · {data.date}</span>
           )
         )}
+        {/* [R796] 分时覆盖度徽标: 完整 / 残缺 x% / 未覆盖, 悬停看分区明细 */}
+        <span
+          className={
+            coverageState === 'partial'
+              ? 'rounded-btn border border-warning/40 px-1.5 py-0.5 text-micro text-warning'
+              : 'rounded-btn bg-elevated px-1.5 py-0.5 text-micro text-muted'
+          }
+          title={coverageTitle}
+        >
+          {coverageState === 'full'
+            ? '分时完整'
+            : coverageState === 'partial'
+              ? `分时残缺 ${(coverageRatio * 100).toFixed(1)}%`
+              : '分时未覆盖'}
+        </span>
         <span className="text-micro text-muted">
           {data?.status === 'ok' && latest ? (
             <>

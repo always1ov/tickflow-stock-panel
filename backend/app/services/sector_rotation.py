@@ -98,58 +98,20 @@ def _bare(col: str = "symbol") -> pl.Expr:
     return pl.col(col).cast(pl.String).str.strip_chars().str.split(".").list.first()
 
 
-# [R786] 分区覆盖门槛: 按需补齐 (个股弹窗/备用接口) 会往当日分区写几十只零星标的,
-# 直接取「最新分区」会把这一天当全市场, 走势线/热榜要么一片空白要么严重偏差。
-# 用当日日K标的数作分母, 覆盖不足的当天分区跳过, 继续往前找最近的全量日。
-_MIN_PARTITION_COVERAGE = 0.2
-
-
-def _partition_symbols(part: Path) -> int:
-    """分区内去重标的数; 读列失败按 0 (视为不可用) 处理。"""
-    try:
-        return pl.read_parquet(part, columns=["symbol"])["symbol"].n_unique()
-    except Exception:  # noqa: BLE001
-        return 0
-
-
-def _daily_universe_size(data_dir: Path) -> int:
-    """最近一个日K分区的标的数 (分钟分区的覆盖分母); 无日K时 0。"""
-    daily = data_dir / "kline_daily"
-    if not daily.is_dir():
-        return 0
-    parts = sorted(
-        (d / "part.parquet" for d in daily.iterdir()
-         if d.is_dir() and d.name.startswith("date=") and (d / "part.parquet").is_file()),
-        reverse=True,
-    )
-    for part in parts:
-        size = _partition_symbols(part)
-        if size:
-            return size
-    return 0
-
-
 def _latest_minute_partition(minute_dir: Path) -> str | None:
-    """最新一个覆盖达标的全市场分钟分区日期; 都不达标 → None (按无数据处理)。
+    """最新一个有分钟数据的日期; 无分区 → None。
 
-    覆盖分母取日K标的数, 达标线 20% (全量分钟落盘 ~90%+; 零星按需补齐通常 <5%)。
-    没有日K时退化为「有任何标的即达标」, 以免测试/空环境下整卡消失。
+    [R795] 用户要求保留作者原行为: 分时只覆盖部分标的时, 走势线也要按现有数据
+    显示残缺版 —— 不再按覆盖度跳过稀疏分区 (R786 的门槛已撤), 覆盖不足的提示
+    改由 `/api/data/minute-coverage` 显式说明, 不在数据层偷偷换日期。
     """
     if not minute_dir.exists():
         return None
-    parts = sorted(
-        (d / "part.parquet" for d in minute_dir.iterdir()
-         if d.is_dir() and d.name.startswith("date=") and (d / "part.parquet").is_file()),
-        reverse=True,
+    dates = sorted(
+        d.name[5:] for d in minute_dir.iterdir()
+        if d.is_dir() and d.name.startswith("date=") and (d / "part.parquet").is_file()
     )
-    if not parts:
-        return None
-    universe = _daily_universe_size(minute_dir.parent)
-    need = max(1, int(universe * _MIN_PARTITION_COVERAGE)) if universe else 1
-    for part in parts:
-        if _partition_symbols(part) >= need:
-            return part.parent.name[5:]
-    return None
+    return dates[-1] if dates else None
 
 
 def _prev_daily_close(data_dir: Path, target_date: str) -> pl.DataFrame | None:
