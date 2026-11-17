@@ -112,6 +112,8 @@ _EXPECTED_ROUTERS = (
     "stock_analysis.router",
     "market_recap.router",
     "settings_api.router",
+    # [R781] 分时备用接口 (/api/settings/hist-minute-backup/*): 全局唯一配置 + 试拉 + 删除清除
+    "hist_minute_backup.router",
     # [R570 同步上游 v0.3.8] 二次开发升级保护 (/api/upgrade/*): 备份/对比/还原被改过程序文件
     "upgrade_guard_api.router",
     "strategy.router",

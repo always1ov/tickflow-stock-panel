@@ -60,10 +60,12 @@ def test_R504_存档没删_体检仍认得它们():
 
 
 def test_R504_RPS入口回到行业概念两页_弹窗不再自带维度切换():
-    for page, kind in (("custom/industry-analysis/Page.tsx", ' kind="industry"'), ("custom/concept-analysis/Page.tsx", "")):
-        src = code_of(page)
-        assert "onClick={() => setShowRps(true)}" in src and "涨幅RPS轮动分析" in src, f"{page} 没有 RPS 入口"
-        assert f"<RpsRotationDialog onClose={{() => setShowRps(false)}}{kind} />" in src
+    """[R769] 行业页入口已删（与热力图同接口同数据）: 只在概念页保留。"""
+    concept = code_of("custom/concept-analysis/Page.tsx")
+    assert "onClick={() => setShowRps(true)}" in concept and "涨幅RPS轮动分析" in concept
+    assert "<RpsRotationDialog onClose={() => setShowRps(false)} />" in concept
+    industry = code_of("custom/industry-analysis/Page.tsx")
+    assert "onClick={() => setShowRps(true)}" not in industry
     dlg = code_of("components/RpsRotationDialog.tsx")
     assert "allowKindSwitch" not in dlg and "setKind" not in dlg
 
