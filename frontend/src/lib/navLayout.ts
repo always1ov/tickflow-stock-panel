@@ -24,7 +24,7 @@ export const navPageIds = (node: NavNode) => node.type === 'group' ? node.childr
  * 自选(第一入口) → 策略(选股) → 个股分析 → 市场环境 → 连板梯队 → 异动监控 → 复盘 → 数据(配置)
  */
 const DEFAULT_NAV_FLAT: readonly string[] = [
-  '/watchlist', '/screener', '/stock-analysis', '/regime', '/limit-ladder', '/abnormal', '/review', '/data',
+  '/watchlist', '/screener', '/stock-analysis', '/industry-analysis', '/regime', '/limit-ladder', '/abnormal', '/review', '/data',
 ]
 
 /**
@@ -35,7 +35,7 @@ const DEFAULT_NAV_GROUPS: readonly { id: string; label: string; ids: readonly st
   {
     id: BROWSE_GROUP_ID,
     label: BROWSE_GROUP.label,
-    ids: ['/dashboard', '/indices', '/concept-analysis', '/industry-analysis', '/financials', '/signals', '/backtest', '/factors', '/monitor'],
+    ids: ['/dashboard', '/indices', '/concept-analysis', '/financials', '/signals', '/backtest', '/factors', '/monitor'],
   },
 ]
 
@@ -111,6 +111,21 @@ export function resolveNavLayout(
     }
     if (group.children.length) placeGroup()
   }
+  // [R789] 行业分析不再放折叠组 (用户: 「行业页提到菜单外面去，不放折叠了」)。
+  // 默认顺序、旧扁平顺序、已保存布局三种来源统一处理: 只要它还在某个分组里,
+  // 就提出来放到该分组之后, 与分组行平级。
+  let liftAfter: number | null = null
+  items.forEach((node, index) => {
+    if (node.type !== 'group') return
+    const at = node.children.findIndex(child => child.id === '/industry-analysis')
+    if (at < 0) return
+    node.children.splice(at, 1)
+    if (liftAfter == null) liftAfter = index
+  })
+  if (liftAfter != null) {
+    items.splice(liftAfter + 1, 0, { type: 'page', id: '/industry-analysis' })
+  }
+
   const missing = entries.filter(x => !seen.has(x.id)).sort((a, b) => compareByDefaultNav(a.id, b.id))
   for (const entry of missing) {
     if (seen.has(entry.id)) continue

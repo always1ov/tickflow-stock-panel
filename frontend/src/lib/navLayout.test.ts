@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dissolveNavGroup, moveNavPage, navPageIds, resolveNavLayout, visibleNavLayout, type NavLayout } from './navLayout'
+import { dissolveNavGroup, moveNavPage, navPageIds, resolveNavLayout, visibleNavLayout, type NavGroup, type NavLayout } from './navLayout'
 
 const entries = ['/paper', '/watchlist', '/screener', '/analysis/auction'].map(id => ({ id, visible: true }))
 const layout: NavLayout = { v: 1, items: [
@@ -72,9 +72,23 @@ describe('nav layout', () => {
       '/data', '/monitor'].map(id => ({ id, visible: true }))
     const result = resolveNavLayout(null, all)
     expect(result.items[0]).toEqual({ type: 'page', id: '/paper' })
-    expect(result.items.slice(1, 9).map(x => x.type === 'group' ? x.label : x.id))
-      .toEqual(['/watchlist', '/screener', '/stock-analysis', '/regime', '/limit-ladder', '/abnormal', '/review', '/data'])
-    expect(result.items.slice(9).map(x => x.type === 'group' ? x.label : x.id))
+    // [R789] 行业分析提到顶层, 不再收进「闲置功能」
+    expect(result.items.slice(1, 10).map(x => x.type === 'group' ? x.label : x.id))
+      .toEqual(['/watchlist', '/screener', '/stock-analysis', '/industry-analysis', '/regime', '/limit-ladder', '/abnormal', '/review', '/data'])
+    expect(result.items.slice(10).map(x => x.type === 'group' ? x.label : x.id))
       .toEqual(['闲置功能'])
+  })
+  it('lifts the industry page out of a saved group to the root', () => {
+    const saved: NavLayout = { v: 1, items: [
+      { type: 'page', id: '/paper' },
+      { type: 'group', id: 'group:browse', label: '闲置功能', children: [
+        { type: 'page', id: '/concept-analysis' }, { type: 'page', id: '/industry-analysis' },
+      ] },
+    ] }
+    const result = resolveNavLayout(saved, [...entries, { id: '/concept-analysis', visible: true }])
+    // 提出来后紧跟原分组; 未出现在布局里的页面按默认顺序补在末尾
+    expect(result.items.map(x => x.id))
+      .toEqual(['/paper', 'group:browse', '/industry-analysis', '/watchlist', '/screener', '/analysis/auction'])
+    expect((result.items[1] as NavGroup).children.map(c => c.id)).toEqual(['/concept-analysis'])
   })
 })
