@@ -28,6 +28,9 @@ from app.services.screener import ScreenerService
 
 _DIMENSION_SEP = re.compile(r"[、,，;；|/\s]+")
 
+# 榜单条数(涨幅/跌幅/成交额/换手): 看板榜单 Tab 每页 10 条。
+_RANK_LIMIT = 10
+
 
 # ================================================================
 # 通用工具
@@ -599,10 +602,10 @@ def build_market_overview(
         },
         "radar": radar,
         "emotion": {"score": emotion_score, "label": emotion_label},
-        "top_gainers": _top_rows(rows, "change_pct", True),
-        "top_losers": _top_rows(rows, "change_pct", False),
-        "turnover_leaders": _top_rows(rows, "amount", True),
-        "active_leaders": _top_rows(rows, "turnover_rate", True),
+        "top_gainers": _top_rows(rows, "change_pct", True, _RANK_LIMIT),
+        "top_losers": _top_rows(rows, "change_pct", False, _RANK_LIMIT),
+        "turnover_leaders": _top_rows(rows, "amount", True, _RANK_LIMIT),
+        "active_leaders": _top_rows(rows, "turnover_rate", True, _RANK_LIMIT),
         "concept_rank": concept_rank,
         "industry_rank": industry_rank,
     })

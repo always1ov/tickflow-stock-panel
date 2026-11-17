@@ -7,7 +7,7 @@ import threading
 import time
 from concurrent.futures import Future
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 
 import polars as pl
 from fastapi import APIRouter, Request
@@ -339,6 +339,15 @@ def _build_overview(request: Request, as_of: date | None = None) -> dict:
 @router.get("/market")
 def market_overview(request: Request, as_of: date | None = None):
     """总览页单次请求聚合数据，避免前端拉全市场明细后再计算。"""
+    return _get_overview_cached(request, as_of)
+
+
+def _get_overview_cached(request: Request, as_of: date | None = None) -> dict:
+    """带 TTL 缓存与单飞锁的全量装配结果。
+
+    看板的四个子接口共用这一份结果(切片返回), 不重复计算; 缓存键与失效
+    逻辑与拆分前完全一致。
+    """
     global _cache, _cache_key, _cache_ts
     now = time.monotonic()
     cache_key = as_of.isoformat() if as_of else "latest"
@@ -372,3 +381,60 @@ def market_overview(request: Request, as_of: date | None = None):
         _inflight.pop(flight_key, None)
     flight.set_result(data)
     return data
+
+
+# 看板分区接口: 前端按区块并行查询, 各自骨架/降级; 共用 _get_overview_cached。
+_RANK_FIELDS = {
+    "gain": "top_gainers",
+    "loss": "top_losers",
+    "amount": "turnover_leaders",
+    "active": "active_leaders",
+}
+_BREADTH_FIELDS = ("breadth", "amount", "boards", "distribution", "trend", "activity", "radar", "limit")
+
+
+@router.get("/market/core")
+def market_core(request: Request, as_of: date | None = None):
+    """状态带: 指数、行情状态、情绪评分。"""
+    data = _get_overview_cached(request, as_of)
+    return {
+        "as_of": data.get("as_of"),
+        "quote_status": data.get("quote_status"),
+        "indices": data.get("indices") or [],
+        "emotion": data.get("emotion"),
+    }
+
+
+@router.get("/market/breadth")
+def market_breadth(request: Request, as_of: date | None = None):
+    """情绪区: 广度、成交、分布、趋势、活跃度、雷达与涨停生态。"""
+    data = _get_overview_cached(request, as_of)
+    return {"as_of": data.get("as_of"), **{key: data.get(key) for key in _BREADTH_FIELDS}}
+
+
+@router.get("/market/ranks")
+def market_ranks(
+    request: Request,
+    kind: Literal["gain", "loss", "amount", "active"] = "gain",
+    as_of: date | None = None,
+):
+    """标的区: 单个榜单(涨幅/跌幅/成交额/换手)的前 10 条。"""
+    data = _get_overview_cached(request, as_of)
+    return {"as_of": data.get("as_of"), "kind": kind, "rows": data.get(_RANK_FIELDS[kind]) or []}
+
+
+@router.get("/market/heat")
+def market_heat(
+    request: Request,
+    kind: Literal["concept", "industry"] = "concept",
+    as_of: date | None = None,
+):
+    """主线区: 概念/行业热度的领涨、领跌。"""
+    data = _get_overview_cached(request, as_of)
+    rank = data.get(f"{kind}_rank") or {}
+    return {
+        "as_of": data.get("as_of"),
+        "kind": kind,
+        "leading": rank.get("leading") or [],
+        "lagging": rank.get("lagging") or [],
+    }

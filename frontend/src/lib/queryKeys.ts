@@ -41,6 +41,11 @@ export const QK = {
   quoteStatus:    ['quote-status'] as const,
   quoteInterval:  ['quote-interval'] as const,
   overviewMarket: (asOf?: string) => ['overview-market', asOf ?? 'latest'] as const,
+  // [R790] 看板分区查询: kind 进键(切 Tab 各自缓存), asOf 进键(历史复盘)
+  overviewCore:    (asOf?: string) => ['overview-core', asOf ?? 'latest'] as const,
+  overviewBreadth: (asOf?: string) => ['overview-breadth', asOf ?? 'latest'] as const,
+  overviewRanks:   (kind: string, asOf?: string) => ['overview-ranks', kind, asOf ?? 'latest'] as const,
+  overviewHeat:    (kind: string, asOf?: string) => ['overview-heat', kind, asOf ?? 'latest'] as const,
   indexQuotes:    ['index-quotes'] as const,
 
   // Watchlist
@@ -259,6 +264,11 @@ export const SSE_INVALIDATE_PREFIXES = [
   'quote-status',
   'index-quotes',
   'overview-market',
+  // [R790] 看板分区查询; 设置页仍以 'overview-market' 一个开关统管(见 useQuoteStream)
+  'overview-core',
+  'overview-breadth',
+  'overview-ranks',
+  'overview-heat',
   'limit-ladder',
   // 概念/行业分析的全市场快照 (#419): 后端读最新日内缓存, 行情更新后需重取,
   // 否则停留页面时板块聚合数值一直停留旧值。仅两页打开时才实际发请求。

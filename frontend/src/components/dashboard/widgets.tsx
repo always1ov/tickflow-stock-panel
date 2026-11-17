@@ -5,6 +5,7 @@
  * 提供(overview 主查询仍集中在页面层, 避免 widget 各自重复请求)。
  */
 import { Link, useNavigate } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { ArrowDownRight, ArrowUpRight, Flame } from 'lucide-react'
@@ -20,9 +21,9 @@ import { toNavItems, type NavItem } from '@/lib/listNav'
 import { fmtPrice, fmtIndexPct, fmtStockPct, pctClass, scoreColor as scoreColorValue, SectionTitle } from './shared'
 import { TYPE } from '@/components/ui'
 
-// 切股导航列表构建 (与列表展示行一致: StockList 只显示前 8)
-export function stockListNav(rows: MarketSnapshotRow[]): NavItem[] {
-  return toNavItems(rows.slice(0, 8))
+// 切股导航列表构建 (与列表展示行一致: StockList 默认只显示前 8)
+export function stockListNav(rows: MarketSnapshotRow[], limit = 8): NavItem[] {
+  return toNavItems(rows.slice(0, limit))
 }
 export function rankNav(rank?: OverviewMarket['concept_rank']): NavItem[] {
   const leaders = [...(rank?.leading ?? []), ...(rank?.lagging ?? [])]
@@ -203,71 +204,80 @@ export function LadderMini({ limit }: { limit: OverviewMarket['limit'] }) {
 }
 
 // ===== 四大榜单 =====
-export function StockList({ title, rows, mode, onStockClick, activeSymbol }: {
+export function StockList({ title, rows, mode, onStockClick, activeSymbol, limit = 8, embedded = false }: {
   title: string; rows: MarketSnapshotRow[]; mode: 'gain' | 'loss' | 'amount' | 'active';
   onStockClick?: (symbol: string, name?: string) => void;
   activeSymbol?: string;
+  limit?: number;
+  /** 嵌入自带标题/卡片外壳的区块时只渲染行 (看板榜单 Tab), 不再套一层卡片 */
+  embedded?: boolean;
 }) {
+  const list = (
+    <div className="space-y-1">
+      {rows.slice(0, limit).map((r, idx) => (
+        <div
+          key={`${r.symbol}-${idx}`}
+          className={`grid grid-cols-[18px_1fr_auto] items-center gap-1.5 rounded-btn px-1.5 py-1 cursor-pointer transition-colors border ${r.symbol === activeSymbol ? 'bg-accent/10 border-accent/30' : 'bg-elevated/40 border-transparent hover:bg-elevated hover:brightness-110 hover:border-border/60'}`}
+          onClick={() => onStockClick?.(r.symbol, r.name ?? undefined)}
+        >
+          <span className="text-center font-mono text-micro text-muted">{idx + 1}</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1">
+              <span className="truncate text-xs text-foreground">{r.name || r.symbol}</span>
+              {(() => {
+                const board = boardTag(r.symbol)
+                return board ? (
+                  <span className={`shrink-0 inline-flex items-center justify-center h-3 px-1 rounded-btn text-micro font-bold leading-none border ${board.color}`}>
+                    {board.label}
+                  </span>
+                ) : null
+              })()}
+            </div>
+            <span className="font-mono text-micro text-muted">{r.symbol}</span>
+          </div>
+          <div className="text-right">
+            {mode === 'amount' ? (
+              <>
+                <div className="font-mono text-xs text-foreground">{fmtBigNum(r.amount)}</div>
+                <div className={`font-mono text-micro ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
+              </>
+            ) : mode === 'active' ? (
+              <>
+                <div className="font-mono text-xs text-accent">{fmtPrice(r.turnover_rate, 1)}%</div>
+                <div className={`font-mono text-micro ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
+              </>
+            ) : (
+              <>
+                <div className={`font-mono text-xs font-semibold ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
+                <div className="font-mono text-micro text-muted">{fmtPrice(r.close)}</div>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+      {rows.length === 0 && <div className="py-5 text-center text-xs text-muted">暂无数据</div>}
+    </div>
+  )
+  if (embedded) return list
   return (
     <div className="rounded-card border border-border bg-surface p-3">
       <div className="mb-1 flex items-center justify-between">
         <h3 className={TYPE.card}>{title}</h3>
-        <span className="text-micro text-muted">TOP {Math.min(rows.length, 8)}</span>
+        <span className="text-micro text-muted">TOP {Math.min(rows.length, limit)}</span>
       </div>
-      <div className="space-y-1">
-        {rows.slice(0, 8).map((r, idx) => (
-          <div
-            key={`${r.symbol}-${idx}`}
-            className={`grid grid-cols-[18px_1fr_auto] items-center gap-1.5 rounded-btn px-1.5 py-1 cursor-pointer transition-colors border ${r.symbol === activeSymbol ? 'bg-accent/10 border-accent/30' : 'bg-elevated/40 border-transparent hover:bg-elevated hover:brightness-110 hover:border-border/60'}`}
-            onClick={() => onStockClick?.(r.symbol, r.name ?? undefined)}
-          >
-            <span className="text-center font-mono text-micro text-muted">{idx + 1}</span>
-            <div className="min-w-0">
-              <div className="flex items-center gap-1">
-                <span className="truncate text-xs text-foreground">{r.name || r.symbol}</span>
-                {(() => {
-                  const board = boardTag(r.symbol)
-                  return board ? (
-                    <span className={`shrink-0 inline-flex items-center justify-center h-3 px-1 rounded-btn text-micro font-bold leading-none border ${board.color}`}>
-                      {board.label}
-                    </span>
-                  ) : null
-                })()}
-              </div>
-              <span className="font-mono text-micro text-muted">{r.symbol}</span>
-            </div>
-            <div className="text-right">
-              {mode === 'amount' ? (
-                <>
-                  <div className="font-mono text-xs text-foreground">{fmtBigNum(r.amount)}</div>
-                  <div className={`font-mono text-micro ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
-                </>
-              ) : mode === 'active' ? (
-                <>
-                  <div className="font-mono text-xs text-accent">{fmtPrice(r.turnover_rate, 1)}%</div>
-                  <div className={`font-mono text-micro ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
-                </>
-              ) : (
-                <>
-                  <div className={`font-mono text-xs font-semibold ${pctClass(r.change_pct)}`}>{fmtStockPct(r.change_pct)}</div>
-                  <div className="font-mono text-micro text-muted">{fmtPrice(r.close)}</div>
-                </>
-              )}
-            </div>
-          </div>
-        ))}
-        {rows.length === 0 && <div className="py-5 text-center text-xs text-muted">暂无数据</div>}
-      </div>
+      {list}
     </div>
   )
 }
 
 // ===== 概念/行业热度列 =====
-export function RankColumn({ title, rows, tone, onStockClick, onDimensionClick, activeSymbol }: {
+export function RankColumn({ title, rows, tone, onStockClick, onDimensionClick, activeSymbol, renderTrailing }: {
   title: string; rows: OverviewDimensionRankItem[]; tone: 'bull' | 'bear';
   onStockClick?: (symbol: string, name?: string) => void;
   onDimensionClick?: (target: DimensionMembersTarget) => void;
   activeSymbol?: string;
+  /** 第三列(涨跌幅上方)的附加内容, 看板热度榜用于放领涨股迷你走势 */
+  renderTrailing?: (row: OverviewDimensionRankItem) => ReactNode;
 }) {
   return (
     <div className="min-w-0 space-y-1">
@@ -322,7 +332,10 @@ export function RankColumn({ title, rows, tone, onStockClick, onDimensionClick, 
               })()}
             </div>
           </div>
-          <div className={`font-mono text-micro font-semibold ${pctClass(r.avg_pct)}`}>{fmtStockPct(r.avg_pct)}</div>
+          <div className="flex flex-col items-end gap-0.5">
+            {renderTrailing?.(r)}
+            <span className={`font-mono text-micro font-semibold ${pctClass(r.avg_pct)}`}>{fmtStockPct(r.avg_pct)}</span>
+          </div>
         </div>
         )
       })}

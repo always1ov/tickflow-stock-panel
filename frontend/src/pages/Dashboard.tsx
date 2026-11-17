@@ -1,10 +1,13 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowUpRight, Check, Database, Gauge, GripVertical, Info, Loader2, Play, RefreshCw, RotateCcw, Sparkles, Timer } from 'lucide-react'
+import { ArrowUpRight, Database, Gauge, Info, Loader2, Play, RefreshCw, Sparkles, Timer } from 'lucide-react'
 import { DatePicker } from '@/components/DatePicker'
-import { api, type AlertEvent, type DataStatus } from '@/lib/api'
+import {
+  api, MARKET_PHASE_COLORS, MARKET_PHASE_LABELS,
+  type AlertEvent, type DataStatus, type MarketPhase, type OverviewHeatKind, type OverviewRankKind,
+} from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { DimensionMembersDialog, type DimensionMembersTarget } from '@/components/DimensionMembersDialog'
 import { useDataStatus, useCapabilities, useSettings, usePreferences } from '@/lib/useSharedQueries'
@@ -14,11 +17,8 @@ import { SettingsModal } from '@/components/data/SettingsModal'
 import { useAdjFactorSyncGate } from '@/components/AdjFactorSyncGate'
 import { STAGE_LABELS } from '@/components/data/ActiveJobCard'
 import { scoreColor, quoteAge } from '@/components/dashboard/shared'
-import { DashboardGrid } from '@/components/dashboard/DashboardGrid'
-import { AddWidgetPanel } from '@/components/dashboard/AddWidgetPanel'
-import { useDashboardLayout } from '@/components/dashboard/useDashboardLayout'
-import { DEFAULT_LAYOUT, widgetDef, type WidgetCtx } from '@/components/dashboard/registry'
-import { cloneItems, GRID_COLS, type WidgetType } from '@/components/dashboard/layout'
+import { DashboardBoard } from '@/components/dashboard/DashboardBoard'
+import { isMarketSessionNow } from '@/lib/marketSession'
 import { TYPE, buttonClass } from '@/components/ui'
 
 /** 兼容旧后端的预热标志; 同步/自动修复也会使统计暂不可用。 */
@@ -52,25 +52,9 @@ export function Dashboard() {
   } | null>(null)
   // 板块成分股弹窗 (概念/行业热度卡片行点击)
   const [dimensionTarget, setDimensionTarget] = useState<DimensionMembersTarget | null>(null)
-  // 自定义网格布局(持久化 hook: 后端偏好加载 + 本地改动防抖落盘);
-  // 注意必须在早退 return 之前 — Hooks 顺序不可随数据加载状态变化。
-  const { items: dashItems, setItems: setDashItems } = useDashboardLayout()
-  // 布局编辑态: 入口与控制组(添加组件/恢复默认/完成)在头部「重载」右侧
-  const [dashEditing, setDashEditing] = useState(false)
-  const placedTypes = useMemo(() => new Set(dashItems.map(it => it.t)), [dashItems])
-  const resetDashLayout = useCallback(() => {
-    setDashItems(cloneItems(DEFAULT_LAYOUT))
-  }, [setDashItems])
-  /** 追加组件: 放到当前布局最底部; ext-link 用唯一 id 支持多实例 */
-  const addDashWidget = useCallback((t: WidgetType, props?: Record<string, string>) => {
-    const def = widgetDef(t)
-    if (!def) return
-    // 内置组件单实例: 已存在则忽略
-    if (t !== 'ext-link' && dashItems.some(it => it.t === t)) return
-    const maxY = dashItems.reduce((m, it) => Math.max(m, it.y + it.h), 0)
-    const id = t === 'ext-link' ? `ext-link-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}` : t
-    setDashItems([...dashItems, { i: id, t, x: 0, y: maxY, w: Math.min(def.defW, GRID_COLS), h: def.defH, p: props }])
-  }, [dashItems, setDashItems])
+  // [R790] 固定版式: 主线区/标的区的 Tab 状态由页面持有, 查询键随 Tab 变化
+  const [heatKind, setHeatKind] = useState<OverviewHeatKind>('concept')
+  const [rankKind, setRankKind] = useState<OverviewRankKind>('gain')
   // 首次使用(无数据 + 未完成引导)自动弹窗: 同一会话只弹一次
   const [showWelcomeModal, setShowWelcomeModal] = useState(false)
   // 统计暂不可用时持续重查, 同步/自动修复结束后恢复真实统计并停止轮询。
@@ -78,18 +62,63 @@ export function Dashboard() {
     staleTime: 60_000,
     refetchInterval: (q: any) => (isDataStatusPending(q.state.data) ? 5_000 : false),
   })
-  const overview = useQuery({
-    queryKey: QK.overviewMarket(selectedDate),
-    queryFn: () => api.overviewMarket(selectedDate),
+  // [R790] 看板按区块并行查询; 盘中 15s 轮询兜底, SSE quotes_updated 仍会立即失效重取。
+  // 选了历史日期时固定 as_of, 不轮询。
+  const intraday = !selectedDate && isMarketSessionNow()
+  // 每分钟重算一次交易时段: 开盘/午休/收盘到点时自动启停轮询与徽标, 不依赖用户手动刷新
+  const [, tickMinute] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => tickMinute(n => n + 1), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
+  const pollInterval = intraday ? 15_000 : false
+  const coreQ = useQuery({
+    queryKey: QK.overviewCore(selectedDate),
+    queryFn: () => api.overviewCore(selectedDate),
     staleTime: 5_000,
+    refetchInterval: pollInterval,
     placeholderData: (prev) => prev,
   })
-  const data = overview.data
+  const breadthQ = useQuery({
+    queryKey: QK.overviewBreadth(selectedDate),
+    queryFn: () => api.overviewBreadth(selectedDate),
+    staleTime: 5_000,
+    refetchInterval: pollInterval,
+    placeholderData: (prev) => prev,
+  })
+  const ranksQ = useQuery({
+    queryKey: QK.overviewRanks(rankKind, selectedDate),
+    queryFn: () => api.overviewRanks(rankKind, selectedDate),
+    staleTime: 5_000,
+    refetchInterval: pollInterval,
+    placeholderData: (prev) => prev,
+  })
+  const heatQ = useQuery({
+    queryKey: QK.overviewHeat(heatKind, selectedDate),
+    queryFn: () => api.overviewHeat(heatKind, selectedDate),
+    staleTime: 5_000,
+    refetchInterval: pollInterval,
+    placeholderData: (prev) => prev,
+  })
+  // 市场阶段: 盘中优先实时阶段(付费全市场档), 否则回退日线定稿阶段
+  const phaseLiveQ = useQuery({
+    queryKey: QK.regimePhaseLive,
+    queryFn: api.regimePhaseLive,
+    enabled: intraday,
+    staleTime: 25_000,
+    refetchInterval: intraday ? 30_000 : false,
+    retry: false,
+  })
+  const regimeLatestQ = useQuery({
+    queryKey: QK.regimeLatest,
+    queryFn: api.regimeLatest,
+    staleTime: 300_000,
+    retry: false,
+  })
+  const core = coreQ.data
   const caps = useCapabilities()
   const settings = useSettings()
   const hasDepth = !!caps.data?.capabilities?.['depth5.batch']
-  const sealedReady = !!data?.limit?.sealed_ready
-  const isSealedDegrade = !hasDepth || !sealedReady
   // 空态引导文案按当前数据源分流: TickFlow 源提"免费服务器", 其他源提"当前数据源",
   // 弱化与默认 TickFlow 的隐式绑定 (None 档/免费 Key 等 TickFlow 概念仅在其被选中时出现)
   const prefs = usePreferences()
@@ -148,7 +177,7 @@ export function Dashboard() {
   useEffect(() => {
     if (fetchSucceeded) {
       qc.invalidateQueries({ queryKey: QK.dataStatus })
-      qc.invalidateQueries({ queryKey: QK.overviewMarket(undefined) })
+      qc.invalidateQueries({ predicate: q => String(q.queryKey[0] ?? '').startsWith('overview-') })
     }
   }, [fetchSucceeded, qc])
 
@@ -166,17 +195,18 @@ export function Dashboard() {
     }).catch(() => { /* 查询失败不阻塞, 用户仍可手动点击获取 */ })
   }, [hasNoData, fetchJobId])
 
-  // 手动刷新: 先重建后端 Polars 缓存(解决跨天残留), 再重新拉看板数据
+  // 手动刷新: 先重建后端 Polars 缓存(解决跨天残留), 再重新拉看板各分区
   const handleRefresh = () => {
     setManualFetching(true)
     api.refreshCache()
-      .then(() => qc.invalidateQueries({ queryKey: ['overview-market'] }))
+      .then(() => qc.invalidateQueries({ predicate: q => String(q.queryKey[0] ?? '').startsWith('overview-') }))
       .finally(() => {
-        overview.refetch().finally(() => setManualFetching(false))
+        Promise.all([coreQ.refetch(), breadthQ.refetch(), ranksQ.refetch(), heatQ.refetch()])
+          .finally(() => setManualFetching(false))
       })
   }
 
-  if (overview.isLoading && !data) {
+  if (coreQ.isLoading && !core) {
     return (
       <div className="flex h-full items-center justify-center bg-base">
         <div className="flex items-center gap-2 text-sm text-muted">
@@ -186,38 +216,66 @@ export function Dashboard() {
     )
   }
 
-  if (!data) {
+  if (!core) {
     return (
       <div className="flex h-full items-center justify-center bg-base p-6">
         <div className="rounded-card border border-border bg-surface p-6 text-center">
           <div className="text-sm text-danger">看板加载失败</div>
-          <button onClick={() => overview.refetch()} className="mt-3 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-on-accent">重试</button>
+          <button onClick={() => coreQ.refetch()} className="mt-3 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-on-accent">重试</button>
         </div>
       </div>
     )
   }
 
-  const score = data.emotion?.score ?? 50
+  const score = core.emotion?.score ?? 50
   const latestDate = dataStatus.data?.enriched?.latest_date ?? null
-  const currentDate = selectedDate ?? data.as_of ?? ''
-  const quoteRunning = (!selectedDate || selectedDate === latestDate) && data.quote_status?.running
+  const currentDate = selectedDate ?? core.as_of ?? ''
+  const quoteRunning = (!selectedDate || selectedDate === latestDate) && core.quote_status?.running
   // 实时模式: none / watchlist / full_market。
   // watchlist 模式仅自选 ≤5 只实时, 看板呈现的大盘数据实为盘后快照, 需提示避免误读。
-  const quoteMode = data.quote_status?.mode as ('none' | 'watchlist' | 'full_market') | undefined
+  const quoteMode = core.quote_status?.mode as ('none' | 'watchlist' | 'full_market') | undefined
+  const historical = !!selectedDate
+  // 市场阶段: 盘中实时阶段优先, 收盘/免费档回退日线定稿阶段
+  const phaseRaw = (phaseLiveQ.data?.available ? phaseLiveQ.data?.phase : null)
+    ?? regimeLatestQ.data?.row?.phase
+    ?? null
+  const phase = phaseRaw && phaseRaw in MARKET_PHASE_LABELS ? phaseRaw as MarketPhase : null
+  const phaseLabel = phase ? MARKET_PHASE_LABELS[phase] : undefined
+  const phaseColor = phase ? MARKET_PHASE_COLORS[phase] : undefined
+  const phaseIntraday = !!(phaseLiveQ.data?.available && phaseLiveQ.data?.phase)
 
-  // 网格组件渲染上下文: 数据切片 + 交互回调统一由页面层供给
-  const widgetCtx: WidgetCtx = {
-    data,
-    score,
+  // 区块渲染上下文: 数据切片 + 交互回调统一由页面层供给
+  const boardProps = {
+    core,
+    breadth: breadthQ.data,
+    ranks: ranksQ.data,
+    heat: heatQ.data,
+    heatKind,
+    rankKind,
+    onHeatKindChange: setHeatKind,
+    onRankKindChange: setRankKind,
     hasDepth,
-    sealedReady,
-    isSealedDegrade,
-    activeSymbol: source => (previewStock?.source === source ? previewStock.symbol : undefined),
-    openStock: (source, symbol, name, navList) =>
+    intraday,
+    historical,
+    phaseLabel,
+    phaseColor,
+    phaseIntraday,
+    activeSymbol: (source: string) => (previewStock?.source === source ? previewStock.symbol : undefined),
+    openStock: (source: string, symbol: string, name?: string, navList?: NavItem[]) =>
       setPreviewStock({ symbol, name, navList, source: source as PreviewSource }),
     openDimension: setDimensionTarget,
-    openAlert: (event, navList) => {
+    openAlert: (event: AlertEvent, navList?: NavItem[]) => {
       if (event.symbol) setPreviewStock({ symbol: event.symbol, name: event.name ?? undefined, alert: event, source: 'alert', navList })
+    },
+    errors: {
+      core: coreQ.isError,
+      breadth: breadthQ.isError,
+      ranks: ranksQ.isError,
+      heat: heatQ.isError,
+    },
+    onRetry: (section: 'core' | 'breadth' | 'ranks' | 'heat') => {
+      const query = { core: coreQ, breadth: breadthQ, ranks: ranksQ, heat: heatQ }[section]
+      void query.refetch()
     },
   }
 
@@ -256,7 +314,7 @@ export function Dashboard() {
               background: `${scoreColor(score)}14`,
             }}
           >
-            {data.emotion.label} · {score}
+            {core.emotion?.label ?? '—'} · {score}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
@@ -271,7 +329,7 @@ export function Dashboard() {
           ) : (
             <span className="font-mono text-secondary">—</span>
           )}
-          <span className="flex items-center gap-1"><Timer className="h-3 w-3" />{quoteAge(data.quote_status?.quote_age_ms)}</span>
+          <span className="flex items-center gap-1"><Timer className="h-3 w-3" />{quoteAge(core.quote_status?.quote_age_ms)}</span>
           <span className={quoteRunning ? 'text-accent' : 'text-warning'}>{quoteRunning ? '实时' : '非实时'}</span>
           <button
             onClick={handleRefresh}
@@ -280,26 +338,6 @@ export function Dashboard() {
           >
             <RefreshCw className={`h-3.5 w-3.5 ${manualFetching ? 'animate-spin' : ''}`} />重载
           </button>
-          {/* [R561 同步上游] 上游 v0.3.2 看板自定义布局的入口, 按钮换成全站共用的 buttonClass */}
-          {!dashEditing ? (
-            <button
-              onClick={() => setDashEditing(true)}
-              title="拖拽调整组件位置与宽高"
-              className={buttonClass({}, 'gap-1')}
-            >
-              <GripVertical className="h-3.5 w-3.5" />自定义布局
-            </button>
-          ) : (
-            <>
-              <AddWidgetPanel placedTypes={placedTypes} onAdd={addDashWidget} />
-              <button onClick={resetDashLayout} className={buttonClass({}, 'gap-1')}>
-                <RotateCcw className="h-3.5 w-3.5" />恢复默认
-              </button>
-              <button onClick={() => setDashEditing(false)} className={buttonClass({ variant: 'primary' }, 'gap-1')}>
-                <Check className="h-3.5 w-3.5" />完成
-              </button>
-            </>
-          )}
         </div>
       </div>
       </div>{/* [R402] 粘住那一层的收尾 */}
@@ -340,13 +378,13 @@ export function Dashboard() {
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
           <div className="min-w-0 flex-1 text-secondary">
             当前为「自选实时」模式,看板展示的大盘数据为<strong className="text-foreground">盘后快照</strong>(最新有数据日),并非盘中实时;
-            仅自选({data.quote_status?.watchlist_symbol_count ?? 0} 只)支持实时监控。
+            仅自选({core.quote_status?.watchlist_symbol_count ?? 0} 只)支持实时监控。
             <span className="ml-1 text-accent">全市场实时依赖数据源支持</span>
           </div>
         </div>
       )}
 
-      <DashboardGrid ctx={widgetCtx} items={dashItems} onItemsChange={setDashItems} editing={dashEditing} />
+      <DashboardBoard {...boardProps} />
 
       <StockPreviewDialog
         symbol={previewStock?.symbol ?? null}

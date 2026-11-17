@@ -1,7 +1,7 @@
 /**
  * URL 嵌入型扩展页面 — 整页内嵌外部 http(s) 页面。
  *
- * 安全约定与看板 ExternalLinkWidget 一致 (配合 dashboard/layout.ts sanitizeExtUrl):
+ * 安全约定与看板 ExternalLinkWidget 一致 (配合 lib/safeUrl.ts sanitizeExtUrl):
  * - URL 仅 http(s) 且拒绝与本站同源 — 同源内容配 allow-scripts+allow-same-origin
  *   等于绕过 sandbox, 一律不嵌;
  * - sandbox 显式放行 脚本/同源(目标站自身存储)/弹窗/表单, 其余默认禁;
@@ -9,7 +9,7 @@
  *   白屏兜底: 常驻「新窗口打开」+ 提示文案。
  */
 import { ExternalLink, Link2, ShieldAlert } from 'lucide-react'
-import { sanitizeExtUrl } from '@/components/dashboard/layout'
+import { sanitizeExtUrl } from '@/lib/safeUrl'
 
 export function ExtUrlEmbed({ label, url }: { label: string; url: string }) {
   const safeUrl = sanitizeExtUrl(url)

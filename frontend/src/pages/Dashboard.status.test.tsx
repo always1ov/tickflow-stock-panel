@@ -9,7 +9,17 @@ import { api, type DataStatus } from '@/lib/api'
 
 vi.mock('@/lib/api', () => ({ api: {
   dataStatus: vi.fn(),
-  overviewMarket: vi.fn(async () => ({ emotion: { score: 50, label: '中性' } })),
+  overviewCore: vi.fn(async () => ({
+    as_of: '2026-01-05',
+    quote_status: { running: false, mode: 'none' },
+    indices: [],
+    emotion: { score: 50, label: '中性' },
+  })),
+  overviewBreadth: vi.fn(async () => ({ as_of: '2026-01-05' })),
+  overviewRanks: vi.fn(async () => ({ as_of: '2026-01-05', kind: 'gain', rows: [] })),
+  overviewHeat: vi.fn(async () => ({ as_of: '2026-01-05', kind: 'concept', leading: [], lagging: [] })),
+  regimeLatest: vi.fn(async () => ({ row: null })),
+  regimePhaseLive: vi.fn(async () => ({ available: false })),
   dataSources: vi.fn(async () => ({})),
   settings: vi.fn(async () => ({ onboarding_completed: true })),
   preferences: vi.fn(async () => ({})),
@@ -18,10 +28,7 @@ vi.mock('@/lib/api', () => ({ api: {
   pipelineJob: vi.fn(),
   pipelineRun: vi.fn(),
 } }))
-vi.mock('@/components/dashboard/useDashboardLayout', () => ({
-  useDashboardLayout: () => ({ items: [], setItems: () => {} }),
-}))
-vi.mock('@/components/dashboard/DashboardGrid', () => ({ DashboardGrid: () => null }))
+vi.mock('@/components/dashboard/DashboardBoard', () => ({ DashboardBoard: () => null }))
 vi.mock('@/components/StockPreviewDialog', () => ({ StockPreviewDialog: () => null }))
 vi.mock('@/components/DimensionMembersDialog', () => ({ DimensionMembersDialog: () => null }))
 vi.mock('@/components/AdjFactorSyncGate', () => ({

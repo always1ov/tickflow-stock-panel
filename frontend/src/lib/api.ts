@@ -1752,6 +1752,42 @@ export interface OverviewMarket {
   industry_rank: { leading: OverviewDimensionRankItem[]; lagging: OverviewDimensionRankItem[] }
 }
 
+// ===== [R790] 看板分区接口: 同一份聚合结果的切片, 前端按区块并行查询 =====
+export type OverviewHeatKind = 'concept' | 'industry'
+export type OverviewRankKind = 'gain' | 'loss' | 'amount' | 'active'
+
+export interface OverviewCore {
+  as_of: string | null
+  quote_status: OverviewMarket['quote_status']
+  indices: IndexQuote[]
+  emotion: OverviewMarket['emotion']
+}
+
+export interface OverviewBreadth {
+  as_of: string | null
+  breadth: OverviewMarket['breadth']
+  amount: OverviewMarket['amount']
+  boards: OverviewMarket['boards']
+  distribution: OverviewMarket['distribution']
+  trend: OverviewMarket['trend']
+  activity: OverviewMarket['activity']
+  radar: OverviewMarket['radar']
+  limit: OverviewMarket['limit']
+}
+
+export interface OverviewRanks {
+  as_of: string | null
+  kind: OverviewRankKind
+  rows: MarketSnapshotRow[]
+}
+
+export interface OverviewHeat {
+  as_of: string | null
+  kind: OverviewHeatKind
+  leading: OverviewDimensionRankItem[]
+  lagging: OverviewDimensionRankItem[]
+}
+
 // ===== 概念涨幅轮动矩阵 =====
 // dates: 日期字符串列表(最新在最前); columns: {日期: [[概念名, 涨幅小数], ...]} 每列各自降序
 export interface RpsRotationData {
@@ -5313,6 +5349,21 @@ export const api = {
   marketSnapshot: () =>
     request<{ as_of: string | null; rows: MarketSnapshotRow[] }>('/api/screener/market-snapshot'),
   overviewMarket: (asOf?: string) => request<OverviewMarket>(`/api/overview/market${asOf ? `?as_of=${asOf}` : ''}`),
+  // [R790] 看板分区查询: 后端切片自同一份聚合缓存, 可并行且各自独立降级
+  overviewCore: (asOf?: string) =>
+    request<OverviewCore>(`/api/overview/market/core${asOf ? `?as_of=${asOf}` : ''}`),
+  overviewBreadth: (asOf?: string) =>
+    request<OverviewBreadth>(`/api/overview/market/breadth${asOf ? `?as_of=${asOf}` : ''}`),
+  overviewRanks: (kind: OverviewRankKind, asOf?: string) => {
+    const params = new URLSearchParams({ kind })
+    if (asOf) params.set('as_of', asOf)
+    return request<OverviewRanks>(`/api/overview/market/ranks?${params.toString()}`)
+  },
+  overviewHeat: (kind: OverviewHeatKind, asOf?: string) => {
+    const params = new URLSearchParams({ kind })
+    if (asOf) params.set('as_of', asOf)
+    return request<OverviewHeat>(`/api/overview/market/heat?${params.toString()}`)
+  },
 
   // 概念涨幅轮动矩阵: 每列(日期)各自把所有概念按当天涨幅从高到低排序
   rpsRotation: (days: number, kind?: 'concept' | 'industry', level?: number) =>

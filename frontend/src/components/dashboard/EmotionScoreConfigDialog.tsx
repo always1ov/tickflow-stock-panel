@@ -27,9 +27,9 @@ const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v))
  *   2. 可编辑项 (维度权重 / 子项权重 / 归一化区间 / 档位阈值)
  *   3. 恢复出厂口径
  *
- * 必须走 portal 挂到 body: 本对话框由看板卡片内部触发, 而 react-grid-layout 给
- * 每张卡片设了 transform (拖拽定位), 会创建新的层叠上下文 —— 卡片内的 fixed/z-50
- * 被限制在卡片内, 遮罩盖不住旁边的卡片。
+ * 必须走 portal 挂到 body: 本对话框由看板卡片内部触发, 卡片祖先链上的
+ * transform/filter 会创建新的层叠上下文 —— 卡片内的 fixed/z-50 被限制在卡片内,
+ * 遮罩盖不住旁边的卡片。
  */
 export function EmotionScoreConfigDialog({ onClose }: { onClose: () => void }) {
   const backdrop = useDialogBackdrop(onClose)

@@ -22,6 +22,7 @@ import { api, type SectorRotationSector } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { useChartTheme } from '@/lib/theme'
 import { cn } from '@/lib/cn'
+import { beijingDateParts, isMarketSessionNow } from '@/lib/marketSession'
 import { toast } from '@/components/Toast'
 import { CORE_INDEXES } from '@/components/Layout'
 import { TYPE } from '@/components/ui'
@@ -179,25 +180,6 @@ interface HeatEventParams {
   name?: string
   /** ECharts 事件原始 value (按 series 类型不同结构不同), 使用侧自行收窄 */
   value?: unknown
-}
-
-function beijingDateParts(): { date: string; minutes: number } {
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(new Date())
-  const get = (type: string) => parts.find(p => p.type === type)?.value ?? '00'
-  return {
-    date: `${get('year')}-${get('month')}-${get('day')}`,
-    minutes: Number(get('hour')) * 60 + Number(get('minute')),
-  }
-}
-
-/** 此刻是否处于 A 股连续竞价时段 (9:30-11:30 / 13:00-15:00, 北京时间)。 */
-function isMarketSessionNow(): boolean {
-  const { minutes } = beijingDateParts()
-  return (minutes >= 570 && minutes < 690) || (minutes >= 780 && minutes < 900)
 }
 
 function useEChart(

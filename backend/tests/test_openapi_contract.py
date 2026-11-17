@@ -45,6 +45,11 @@ EXPECTED_OPEN_ENDPOINTS: set[str] = {
     "GET /api/kline/minute",
     "GET /api/kline/minute-range",
     "GET /api/overview/market",
+    # [R790] 看板分区接口: 前端按区块并行查询, 共用同一份聚合缓存
+    "GET /api/overview/market/breadth",
+    "GET /api/overview/market/core",
+    "GET /api/overview/market/heat",
+    "GET /api/overview/market/ranks",
     "DELETE /api/paper/account",
     "GET /api/paper/account",
     "POST /api/paper/account",

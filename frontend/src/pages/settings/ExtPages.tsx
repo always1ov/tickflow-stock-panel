@@ -9,7 +9,7 @@ import {
 } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { Skeleton } from '@/components/data/Skeleton'
-import { sanitizeExtUrl } from '@/components/dashboard/layout'
+import { sanitizeExtUrl } from '@/lib/safeUrl'
 import { SettingsCard } from './SettingsCard'
 
 function dtypeToColumnType(dtype: string): AnalysisColumn['type'] {
