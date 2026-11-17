@@ -47,8 +47,6 @@ import {
   X,
   WifiOff,
   Menu,
-  PanelLeft,
-  PanelLeftClose,
   PanelLeftOpen,
   CalendarClock,   // [R127] 实时行情自动开关
   HelpCircle,      // [R323] 名词说明的全局入口
@@ -711,10 +709,6 @@ export function Layout() {
   // 开启实时行情时若存在排队中的挖掘任务 → 确认弹窗 (实时落盘会让排队任务开跑即失败)
   const [miningQueuedWarning, setMiningQueuedWarning] = useState<number | null>(null)
   const miningWarnBackdrop = useDialogBackdrop(() => setMiningQueuedWarning(null))
-  // 三态循环切换 (仅桌面): 展开 → 图标条 → 隐藏 → 展开
-  const toggleNavCollapsed = () => {
-    setNavStatePersist(navState === 'expanded' ? 'rail' : navState === 'rail' ? 'hidden' : 'expanded')
-  }
   // [同步上游 3c6ed99] 指数条固定核心四只(产品契约, 不再可配置), 常驻显示 ——
   // indices_nav_pinned / sidebar_index_symbols 两个偏好随作者一并下线。
   const sidebarIndexes = CORE_INDEXES
@@ -1020,8 +1014,8 @@ export function Layout() {
           aria-hidden="true"
         />
       )}
-      {/* 移动端汉堡按钮 / 桌面 hidden 态左缘悬浮按钮 (hover 1s overlay 预览, 点击固定展开) */}
-      {(!isDesktop || navState === 'hidden') && !overlayPreview && (
+      {/* 移动端汉堡按钮 / 桌面非展开态的左缘悬浮按钮 (hover 1s overlay 预览, 点击固定展开) */}
+      {(!isDesktop || navState !== 'expanded') && !overlayPreview && (
         <button
           onClick={() => {
             window.clearTimeout(overlayTimer.current)
@@ -1038,7 +1032,9 @@ export function Layout() {
           className={cn(
             'fixed z-30 rounded-btn border border-border bg-surface/90 text-secondary shadow-lg backdrop-blur-sm',
             'hover:text-foreground hover:bg-elevated transition-colors duration-150 ease-smooth',
-            isDesktop ? 'left-1.5 top-1/2 -translate-y-1/2 p-2' : 'left-3 top-3 p-2',
+            isDesktop
+              ? cn('top-1/2 -translate-y-1/2 p-2', railMode ? 'left-[3.75rem]' : 'left-1.5')
+              : 'left-3 top-3 p-2',
           )}
           title={isDesktop ? '展开菜单' : '打开菜单'}
         >
@@ -1076,22 +1072,8 @@ export function Layout() {
                 牛来
               </div>
             )}
-            {/* 收起/展开 按钮 (桌面三态循环) / 移动端抽屉关闭按钮 */}
-            {isDesktop ? (
-              <button
-                onClick={toggleNavCollapsed}
-                className={cn(
-                  'flex items-center rounded-btn text-secondary hover:text-foreground hover:bg-elevated/60 transition-colors duration-150 ease-smooth',
-                  railMode ? 'justify-center p-1.5' : 'ml-auto p-1.5',
-                )}
-                title={railMode ? '隐藏菜单 (再点击左缘按钮可唤出)' : '收起菜单'}
-              >
-                {railMode
-                  ? <PanelLeft className="h-3.5 w-3.5 shrink-0" />
-                  : <PanelLeftClose className="h-3.5 w-3.5 shrink-0" />
-                }
-              </button>
-            ) : (
+            {/* [R806] 桌面「收起菜单」按钮按用户要求永久删除; 移动端抽屉关闭按钮保留 */}
+            {!isDesktop && (
               <button
                 onClick={() => setDrawerOpen(false)}
                 className="ml-auto flex items-center rounded-btn p-1.5 text-secondary hover:text-foreground hover:bg-elevated/60 transition-colors duration-150 ease-smooth"
