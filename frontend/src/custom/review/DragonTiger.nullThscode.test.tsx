@@ -2,12 +2,13 @@
 // 回归: fuyao 龙虎榜对退市整理期股/B股返回 thscode=null (ticker 有值),
 // 复盘页龙虎榜卡片渲染/点击该行不得崩溃 (用户反馈: 展开龙虎榜即崩)。
 // 真实数据样本 (2026-10-29 榜单): 萃华退 002731 / 宁通信B 200468 / 动力B股 900920。
+// [R791] 组件已从 Page.tsx 搬到 DragonTigerPanel.tsx(证据带「资金」Tab), import 同步。
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { DragonTigerCard } from './Page'
+import { DragonTigerCard } from './DragonTigerPanel'
 import type { DragonTigerStockItem } from '@/lib/api'
 
 const _items: DragonTigerStockItem[] = [

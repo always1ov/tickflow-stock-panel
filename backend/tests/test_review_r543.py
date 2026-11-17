@@ -18,21 +18,30 @@ def test_R543_页头与菜单同名():
 
 
 def test_R543_空状态不用_emoji_方块():
-    page = code_of(PAGE)
+    # [R791] 空态从 Page.tsx 拆到 ReportReader.tsx(收敛成一行引导, 不再占 28rem)
+    page = code_of("custom/review/ReportReader.tsx")
     assert "报告包含: 一句话定调" in page
     assert not re.search(r"icon: '[\U0001F300-\U0001FAFF☀-➿]", page), "空状态又用回 emoji 图标"
 
 
 def test_R543_奖牌三色收成一种_不写死调色板():
-    page = code_of(PAGE)
+    # [R791] 龙虎榜卡搬到 DragonTigerPanel.tsx(证据带「资金」Tab)
+    page = code_of("custom/review/DragonTigerPanel.tsx")
     rank = page[page.index("function _rankCls"):page.index("function _DtPill")]
     for hue in ("amber", "zinc", "orange"):
         assert hue not in rank
     assert "emerald" not in page
 
 
-def test_R543_历史栏放宽_页面铺满():
+def test_R791_右栏历史改底部档案带_页面仍铺满():
+    """[R791] 用户「复盘部分需要出个方案大刀阔斧的改」: 21rem 常驻历史栏 → 档案带。
+
+    旧的 R543 守卫钉的是「历史栏放宽到 21rem」, 本版整栏取消, 守卫改为钉新结构:
+    四段纵轴各就各位, 且没有回到双栏。
+    """
     page = code_of(PAGE)
-    assert "lg:grid-cols-[1fr_21rem]" in page
+    assert "lg:grid-cols-[1fr_21rem]" not in page, "右栏历史又回来了"
+    for block in ("ReviewStatusBar", "FactsBar", "EvidenceTabs", "ReportReader", "ArchiveStrip"):
+        assert block in page, f"复盘页缺少 {block}"
     assert "max-w-[1600px]" not in page
     assert "bg-gradient-to-r" not in page

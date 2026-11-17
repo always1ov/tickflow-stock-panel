@@ -26,6 +26,10 @@ from app.services.json_report_store import JsonReportStore
 
 MAX_REPORTS = 20
 
+# 档案带(时间轴)只需要索引信息。正文动辄几十 KB, 列表里带上会让首屏体积
+# 随篇数 × 篇幅膨胀; meta 只留这几项, 点开某篇时再按 id 拉全文。
+META_FIELDS = ("id", "as_of", "summary", "emotion_score", "emotion_label", "focus", "created_at")
+
 _store = JsonReportStore(
     "ai_market_recaps.json", MAX_REPORTS, id_prefix="mkr", id_with_symbol=False,
 )
@@ -34,6 +38,19 @@ _store = JsonReportStore(
 def list_reports() -> list[dict]:
     """返回全部报告(按 created_at 降序)。"""
     return _store.list_reports()
+
+
+def list_reports_meta() -> list[dict]:
+    """返回全部报告的档案摘要(按 created_at 降序), 不含正文。"""
+    return [{k: r.get(k) for k in META_FIELDS} for r in _store.list_reports()]
+
+
+def get_report(report_id: str) -> dict | None:
+    """按 id 取单篇报告全文; 不存在返回 None。"""
+    for r in _store.list_reports():
+        if r.get("id") == report_id:
+            return r
+    return None
 
 
 def save_report(report: dict) -> dict:

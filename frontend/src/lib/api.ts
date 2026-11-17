@@ -2105,6 +2105,11 @@ export interface AiReviewReport {
   created_at: string
 }
 
+/** 档案带摘要: 与 AiReviewReport 同源, 只是不带正文(首屏体积与篇幅解耦)。 */
+export type AiReviewReportMeta = Pick<
+  AiReviewReport, 'id' | 'as_of' | 'summary' | 'emotion_score' | 'emotion_label' | 'focus' | 'created_at'
+>
+
 // ===== 龙虎榜 (fuyao 专有, 复盘页) =====
 export interface DragonTigerStockItem {
   /** 后端已归一 (缺失时由 ticker 推导); 旧缓存/异常数据源可能为 null, 消费方需兜底 */
@@ -6452,8 +6457,15 @@ export const api = {
   },
 
   // ===== 大盘复盘 =====
-  reviewReportsList: () =>
-    request<{ reports: AiReviewReport[] }>('/api/market-recap/reports'),
+  /** 复盘档案带: 只取摘要(不含正文), 点开某篇时再拉详情 */
+  reviewReportsListMeta: () =>
+    request<{ reports: AiReviewReportMeta[] }>('/api/market-recap/reports?meta=1'),
+
+  /** 单篇复盘全文 (档案带按需拉取) */
+  reviewReportDetail: (reportId: string) =>
+    request<{ report: AiReviewReport }>(
+      `/api/market-recap/reports/${encodeURIComponent(reportId)}`,
+    ),
 
   /** 龙虎榜三榜 (fuyao 专有; 历史日按服务端缓存, 当日未发布自动回退上一期) */
   dragonTiger: (date?: string) =>

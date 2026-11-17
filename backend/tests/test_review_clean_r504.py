@@ -18,7 +18,8 @@ REMINDER = ROOT / ".scratch" / "review-page-rework" / "issues" / "01-ladder-ai-a
 
 
 def test_R504_复盘页页头只剩作者那一排():
-    r = code_of("custom/review/Page.tsx")
+    # [R791] 三个主按钮搬到状态带 ReviewStatusBar.tsx, 仍是同一排、同一组能力
+    r = code_of("custom/review/Page.tsx") + code_of("custom/review/ReviewStatusBar.tsx")
     for gone in ("LadderAiReview", "RpsRotationDialog", "recapMode", "MODE_LABEL", "连读昨日", "板块RPS轮动"):
         assert gone not in r, f"复盘页还留着 {gone}"
     for kept in ("刷新", "定时", "生成复盘"):

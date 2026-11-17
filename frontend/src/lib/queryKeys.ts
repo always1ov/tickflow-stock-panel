@@ -193,6 +193,10 @@ export const QK = {
 
   // AI 大盘复盘
   reviewReports:        ['review-reports'] as const,
+  // [R791] 复盘档案带只取摘要(不含正文); 全文按 id 单独缓存。
+  // 两个新键都挂在 'review-reports' 前缀下, 已有的 invalidateQueries(QK.reviewReports) 一并生效。
+  reviewReportsMeta:    ['review-reports', 'meta'] as const,
+  reviewReportDetail:   (id: string) => ['review-reports', 'detail', id] as const,
 
   // 概念涨幅轮动矩阵
   rpsRotation:          (days: number) => ['rps-rotation', days] as const,

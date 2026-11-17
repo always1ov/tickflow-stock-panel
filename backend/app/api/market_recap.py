@@ -4,7 +4,8 @@
 
 端点:
   POST /analyze                AI 流式大盘复盘(NDJSON)
-  GET  /reports                历史复盘列表
+  GET  /reports                历史复盘列表(meta=true 只返档案摘要)
+  GET  /reports/{report_id}    单篇复盘全文
   POST /reports                保存一条复盘报告
   DELETE /reports/{report_id}  删除一条复盘报告
   GET  /dragon-tiger           龙虎榜三榜 (fuyao 专有, 历史按日缓存)
@@ -129,9 +130,24 @@ class SaveReportRequest(BaseModel):
 
 
 @router.get("/reports")
-def list_reports(request: Request):
-    """获取全部历史复盘(按时间降序,后端已裁剪到上限)。"""
+def list_reports(request: Request, meta: bool = False):
+    """获取历史复盘(按时间降序,后端已裁剪到上限)。
+
+    meta=true 时不带 content —— 档案带只需要日期/情绪/摘要, 首屏体积与正文大小解耦。
+    默认(false)保持旧行为, 兼容其它调用方。
+    """
+    if meta:
+        return {"reports": market_recap_reports.list_reports_meta()}
     return {"reports": market_recap_reports.list_reports()}
+
+
+@router.get("/reports/{report_id}")
+def get_report(request: Request, report_id: str):
+    """获取单篇复盘全文(档案带点开时按需拉取)。"""
+    report = market_recap_reports.get_report(report_id)
+    if report is None:
+        raise HTTPException(404, f"复盘报告不存在: {report_id}")
+    return {"report": report}
 
 
 @router.post("/reports")

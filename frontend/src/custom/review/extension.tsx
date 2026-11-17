@@ -4,7 +4,7 @@ import { IconReview } from '@/components/BrandIcons'
 
 export const ReviewPage = lazy(() => import('./Page').then(m => ({ default: m.ReviewPage })))
 
-export const DragonTigerCard = lazy(() => import('./Page').then(m => ({ default: m.DragonTigerCard })))
+export const DragonTigerCard = lazy(() => import('./DragonTigerPanel').then(m => ({ default: m.DragonTigerCard })))
 
 const extension: FrontendExtension = {
   id: 'official.review',
