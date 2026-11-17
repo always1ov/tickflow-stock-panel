@@ -354,3 +354,22 @@ def test_is_session_complete_uses_local_rows():
     # 没有分区的日期按 0 行处理
     assert backup.is_session_complete(SYMBOL, date(2026, 11, 9)) is False
 
+
+def test_throttle_caps_requests_per_minute(monkeypatch):
+    """上游 30 次/分: 窗口内额度用完后的请求要阻塞到窗口释放。"""
+    clock = [0.0]
+    sleeps: list[float] = []
+    monkeypatch.setattr(backup.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(backup.time, "sleep", lambda s: (sleeps.append(s), clock.__setitem__(0, clock[0] + s)))
+    monkeypatch.setattr(backup, "_RATE_LIMIT_PER_MIN", 2)
+    backup._rate_stamps.clear()
+
+    backup._throttle_request()
+    backup._throttle_request()
+    assert sleeps == []  # 额度内直接放行
+
+    backup._throttle_request()  # 第 3 次等满 60s 窗口
+    assert sleeps == [60.0]
+    assert len(backup._rate_stamps) == 1
+    backup._rate_stamps.clear()
+

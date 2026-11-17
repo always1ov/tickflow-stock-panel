@@ -322,6 +322,17 @@ export function Screener() {
     () => visiblePool.filter(id => strategyMap.get(id)?.timeframes?.includes('1m') ?? false),
     [visiblePool, strategyMap],
   )
+  // [R788] 分钟策略只读本地分钟分区: 分区多由个股按需补齐写入时, 未覆盖标的不会命中,
+  // 命中数会静默偏少。只在切到「分钟」页签时查覆盖度并显式提示, 不改结果本身,
+  // 也不让「全部」页签凭空多发请求。
+  const { data: minuteCoverage } = useQuery({
+    queryKey: QK.minuteCoverage,
+    queryFn: api.minuteCoverage,
+    enabled: assetType === 'stock' && tfFilter === '1m',
+    staleTime: 300_000,
+  })
+  const minuteCoverageLow = (minuteCoverage?.ratio ?? 1) < 0.95
+    && minuteCoverage?.date != null && (minuteCoverage?.universe ?? 0) > 0
 
   // 策略列表加载后,自动清除池中失效的自定义策略(如本地开发残留的、
   // 当前后端已不存在的策略 ID),避免"策略池"对话框持续显示失效项。
@@ -1158,6 +1169,16 @@ export function Screener() {
                   {tab.name}<span className="ml-1 tabular-nums text-muted">{tab.ids.length}</span>
                 </button>
               ))}
+            </div>
+          )}
+          {minuteCoverageLow && (
+            <div className="mb-2 flex items-start gap-1.5 rounded-btn border border-warning/30 bg-warning/5 px-2 py-1.5">
+              <Clock className="mt-px h-3 w-3 shrink-0 text-warning" />
+              <div className="text-micro leading-snug text-warning">
+                <span className="font-medium">分钟覆盖不足</span>
+                ：分钟分区 {minuteCoverage!.date} 仅覆盖 {minuteCoverage!.covered}/{minuteCoverage!.universe} 只标的（{((minuteCoverage!.ratio ?? 0) * 100).toFixed(1)}%）。
+                分钟策略只会命中已覆盖标的，命中数不代表全市场；可在 数据 → 分钟K 补齐。
+              </div>
             </div>
           )}
           <div className={cardWrapCls(cardSize)}>{renderPoolCards(activePoolIds)}</div>

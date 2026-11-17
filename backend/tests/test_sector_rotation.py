@@ -109,6 +109,33 @@ def repo(tmp_path: Path):
     _reset_caches()
 
 
+def test_latest_minute_partition_skips_sparse_newest(tmp_path):
+    """[R786] 最新分区只有零星按需补齐的标的时, 回退到最近的全量日。"""
+    minute = tmp_path / "kline_minute"
+    daily = tmp_path / "kline_daily" / f"date={PREV}"
+    daily.mkdir(parents=True)
+    pl.DataFrame({"symbol": [f"{i:06d}.SZ" for i in range(100)]}).write_parquet(daily / "part.parquet")
+    for day, count in [("2026-09-14", 5), (DAY, 100)]:
+        out = minute / f"date={day}"
+        out.mkdir(parents=True)
+        pl.DataFrame({"symbol": [f"{i:06d}.SZ" for i in range(count)]}).write_parquet(out / "part.parquet")
+
+    assert sector_rotation._latest_minute_partition(minute) == DAY
+
+
+def test_latest_minute_partition_none_when_all_sparse(tmp_path):
+    """[R786] 所有分区覆盖都不足时按无数据处理, 不拿稀疏数据冒充全市场。"""
+    minute = tmp_path / "kline_minute"
+    daily = tmp_path / "kline_daily" / f"date={PREV}"
+    daily.mkdir(parents=True)
+    pl.DataFrame({"symbol": [f"{i:06d}.SZ" for i in range(100)]}).write_parquet(daily / "part.parquet")
+    out = minute / f"date={DAY}"
+    out.mkdir(parents=True)
+    pl.DataFrame({"symbol": ["000001.SZ", "000002.SZ"]}).write_parquet(out / "part.parquet")
+
+    assert sector_rotation._latest_minute_partition(minute) is None
+
+
 def test_rotation_switch_direction_and_timeline(repo):
     """核心口径: 领涨从 A 切到 B → B rank_change>0 (切入), A <0 (退潮);
     末桶相对 1 小时前 top 换血 → rotation 高; 早期桶 rotation 低。"""

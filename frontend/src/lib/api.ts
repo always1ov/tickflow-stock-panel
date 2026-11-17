@@ -5720,6 +5720,7 @@ export const api = {
     ),
 
   dataStatus: () => request<DataStatus>('/api/data/status'),
+  minuteCoverage: () => request<MinuteCoverage>('/api/data/minute-coverage'),
   dataIntegrity: () => request<{
     report: IntegrityReport | null
     blocking_assets?: IntegrityAsset[]
@@ -7119,6 +7120,14 @@ interface InstrumentsStats {
   symbols_covered: number
   latest_as_of: string | null
   named: number
+}
+
+/** 分钟分区最新交易日的标的覆盖 (分母取最新日K标的数); ratio=null 表示无日K可比。 */
+export interface MinuteCoverage {
+  date: string | null
+  covered: number
+  universe: number
+  ratio: number | null
 }
 
 export interface DataStatus {

@@ -1600,6 +1600,18 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
     enabled: isMinuteStrategy,
     staleTime: 60_000,
   })
+  // [R788] 分钟覆盖提示: 分钟数据多为个股按需补齐时, 未覆盖标的没有分钟信号/成交,
+  // 只在真正用到分钟数据 (分钟策略 或 分钟成交) 时查询, 避免无谓读分区。
+  const { data: minuteCoverage } = useQuery({
+    queryKey: QK.minuteCoverage,
+    queryFn: api.minuteCoverage,
+    enabled: (isMinuteStrategy || highGranularity) && assetType === 'stock',
+    staleTime: 300_000,
+  })
+  const minuteCoverageLow = (minuteCoverage?.ratio ?? 1) < 0.95
+  const minuteCoverageText = minuteCoverage?.date && minuteCoverage.universe > 0
+    ? `分钟分区 ${minuteCoverage.date} 仅覆盖 ${minuteCoverage.covered}/${minuteCoverage.universe} 只标的（${((minuteCoverage.ratio ?? 0) * 100).toFixed(1)}%）`
+    : ''
   // 分钟回测窗口守卫: 开始日期早于本地分钟K起点会被后端拒绝, 前置警示
   const minuteEarliest = minuteDataStatus?.minute?.earliest_date
   const minuteStartMismatch = isMinuteStrategy && !!minuteEarliest && start < minuteEarliest
@@ -1777,6 +1789,11 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                     当前开始日期 {start} 早于分钟数据起点 {minuteEarliest}，运行会被拒绝 — 请把开始日期调整到 {minuteEarliest} 之后，或先用「扩展分钟K历史」拉取。
                   </span>
                 )}
+                {minuteCoverageLow && minuteCoverageText && (
+                  <span className="mt-0.5 block text-warning">
+                    分钟覆盖不足：{minuteCoverageText}，未覆盖标的不会产生分钟信号，结果可能偏少。
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -1787,6 +1804,11 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               <div className="text-micro leading-snug text-warning">
                 <span className="font-medium">分钟K成交价</span>
                 ：默认在成交日细化穿越价/VWAP；选择“信号触发卖出”时，会对兼容的卖出信号做分钟回放。需本地有足够的分钟K历史。
+                {minuteCoverageLow && minuteCoverageText && (
+                  <span className="mt-0.5 block">
+                    分钟覆盖不足：{minuteCoverageText}，未覆盖的标的/日期按日线价格成交。
+                  </span>
+                )}
               </div>
             </div>
           )}

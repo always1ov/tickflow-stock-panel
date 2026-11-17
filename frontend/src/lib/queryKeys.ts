@@ -112,6 +112,7 @@ export const QK = {
 
   // Data / Pipeline
   dataStatus:           ['data-status'] as const,
+  minuteCoverage:       ['minute-coverage'] as const,
   dataIntegrity:        ['data-integrity'] as const,
   /** 分钟数据缺口体检 (发现本地分区中不完整的 标的×交易日) */
   minuteGaps:           ['minute-gaps'] as const,

@@ -22,6 +22,7 @@ import contextlib
 import logging
 import threading
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, time as dtime
 from pathlib import Path
@@ -66,8 +67,28 @@ _ledger_lock = threading.Lock()
 _config_lock = threading.Lock()
 _config_state: tuple[tuple, dict | None] | None = None
 
-# 逐日补齐的并发度: 上游限速 30 次/分, 20 个交易日按 5 并发约 4 轮, 约 3~5s
+# 逐日补齐的并发度: 上游每分钟限 30 次、每天 1000 次, 并发只为压满单分钟窗口,
+# 实际吞吐受 _throttle_request 的滚动限速约束 (20 日一次补齐 20 次可立即发完)
 _FETCH_WORKERS = 5
+
+# [R787] 客户端限速: 上游 30 次/分, 留 2 次余量给「测试连接」等手动请求。
+# 不限速时 5 并发会瞬间打满 30 次/分, 第二只票起就被上游拒绝 (失败缓存 5 分钟)。
+_RATE_LIMIT_PER_MIN = 28
+_rate_stamps: deque[float] = deque()
+_rate_lock = threading.Lock()
+
+
+def _throttle_request() -> None:
+    """滚动 60s 窗口内最多 _RATE_LIMIT_PER_MIN 次请求, 超限阻塞到窗口释放。"""
+    with _rate_lock:
+        while True:
+            now = time.monotonic()
+            while _rate_stamps and now - _rate_stamps[0] >= 60.0:
+                _rate_stamps.popleft()
+            if len(_rate_stamps) < _RATE_LIMIT_PER_MIN:
+                _rate_stamps.append(now)
+                return
+            time.sleep(max(0.05, 60.0 - (now - _rate_stamps[0])))
 
 
 def config_path() -> Path:
@@ -323,6 +344,7 @@ def _rows_frame(payload, cfg: dict, trade_date: date) -> pl.DataFrame:
 def request_frame(cfg: dict, symbol: str, trade_date: date) -> pl.DataFrame:
     """按配置请求单只单日分钟数据 (不落盘)。"""
     url, body = _build_url(cfg, symbol, trade_date)
+    _throttle_request()
     with httpx.Client(timeout=cfg["timeout"], follow_redirects=True) as client:
         if cfg["method"] == "POST":
             resp = client.post(url, json=body)

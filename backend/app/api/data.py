@@ -477,6 +477,46 @@ def _safe_aggregate_minute(repo) -> dict | None:
     }
 
 
+@router.get("/minute-coverage")
+def minute_coverage(request: Request) -> dict:
+    """分钟分区「最新交易日」的标的覆盖 — 供分钟策略/分钟成交给显式提示。
+
+    覆盖分母取最新日K分区标的数 (全市场)。分钟数据可由全量落盘或个股按需
+    补齐写入: 覆盖不足时, 分钟策略命中与分钟成交只能落在有数据的标的上。
+    """
+    import polars as pl
+
+    data_dir = request.app.state.repo.store.data_dir
+
+    def _symbols(part: Path) -> int:
+        try:
+            return pl.read_parquet(part, columns=["symbol"])["symbol"].n_unique()
+        except Exception:  # noqa: BLE001
+            return 0
+
+    minute_dir = data_dir / "kline_minute"
+    minute_parts = (
+        sorted(minute_dir.glob("date=*/part.parquet"), reverse=True)
+        if minute_dir.is_dir() else []
+    )
+    if not minute_parts:
+        return {"date": None, "covered": 0, "universe": 0, "ratio": None}
+
+    daily_dir = data_dir / "kline_daily"
+    daily_parts = (
+        sorted(daily_dir.glob("date=*/part.parquet"), reverse=True)
+        if daily_dir.is_dir() else []
+    )
+    covered = _symbols(minute_parts[0])
+    universe = _symbols(daily_parts[0]) if daily_parts else 0
+    return {
+        "date": minute_parts[0].parent.name[5:],
+        "covered": covered,
+        "universe": universe,
+        "ratio": round(covered / universe, 4) if universe else None,
+    }
+
+
 def _safe_aggregate_financials(repo) -> dict | None:
     """财务数据统计 — 检查各表文件是否存在及行数。"""
     data_dir = repo.store.data_dir
