@@ -44,6 +44,11 @@ _CALENDAR_RATIO = 1.7
 # 一周左右正好是这些位置结论该兑现的尺度。
 FORWARD_DAYS = 5
 
+#: [R830] 历史表现表里, 次级档并不单独成行 —— 用户: 「次级回升算是一种自然回升、
+#: 次级回撤也算是一种自然回撤」。合并放在**统计之前**(段先加总再求平均),
+#: 这样平均值是按段加权的, 不是两个平均数再平均。
+MERGED_STATES = {"SR": "NR", "SREA": "NREA"}
+
 # [R287] `open` 是给「按转折买卖」那一栏用的 —— 信号收盘才定, 最早只能次日开盘
 # 执行。它与 `close` 同为前复权(原始价另存 raw_close/raw_high/raw_low), 所以
 # 开盘→开盘 的收益率与这里其余读数同一个口径。
@@ -250,16 +255,22 @@ def _state_history(rows: list[dict], closes: list[float], offset: int) -> list[d
     走完后 —— 它还没走完。窗口开头那段可能是从窗口外延续进来的, 天数与涨跌
     只算窗口内那一截, 与 R177 同样处理。
 
-    六个状态**都占一行**, 按梯子顺序(`STATE_LABELS` 的顺序), 没出现过的也在 ——
+    四个状态**都占一行**, 按梯子顺序(`STATE_LABELS` 的顺序), 没出现过的也在 ——
     表上缺一行, 读的人分不清是"没出现过"还是"漏了"。
+
+    [R830] 用户: 「次级回升算是一种自然回升、次级回撤也算是一种自然回撤, 我的系统
+    已经算是统计过了」—— 合并**在这一层**做, 不是显示层藏两行: SR 的段并进 NR,
+    SREA 的段并进 NREA, 次数/天数/涨跌/走完后的读数都是**先把段加起来再平均**
+    (不是两个平均数再平均), 于是「自然回升」那行才是真的"所有回升"。
+    逐日、六态动作、回测仍按六态走, 各自的分档没变。
     """
     eps = _episodes(rows, lambda r: (r.get("trend") or {}).get("state"),
                     closes, offset, FORWARD_DAYS)
     acc = {k: {"n": 0, "days": 0, "done": 0, "ret_sum": 0.0, "ret_win": 0,
                "after_scored": 0, "after_sum": 0.0, "current": False}
-           for k in STATE_LABELS}
+           for k in STATE_LABELS if k not in MERGED_STATES}
     for e in eps:
-        a = acc.get(e["key"])
+        a = acc.get(MERGED_STATES.get(e["key"], e["key"]))
         if a is None:
             continue
         a["n"] += 1

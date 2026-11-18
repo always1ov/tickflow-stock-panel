@@ -6,10 +6,11 @@
 [R759] 用户: 「保持现在四列排版不变了, 里面内容布局先恢复最开始的样子, 复盘内部的排版
 要排好显示出所有信息, 我还没想好怎么重做」—— 弹窗四栏不动, 复盘内部回到 R431 最初那版
 三块(逐日 / 两套对比 / 六态历史); 窄列摊不开八列, 每天拆两行摊开八样信息。
+[R827] 用户: 「两套买卖的对比这部分我不想要了，删了」—— 现在两块(逐日 / 六态历史)。
 
 这里守的是内容口径与三条不变式, 不再守某一种排版的具体写法:
 
-  1. 页头仍是旧「趋势状态」页那一句;
+  1. 页头仍给旧「趋势状态」页的区间与天数(R826 起阈值进悬停);
   2. 口径说明只有 `StockReviewDialog` 里那一份原文;
   3. 只摆数, 不下结论。
 """
@@ -51,33 +52,42 @@ def test_R431_只摆数不下结论():
 
 
 def test_R431_口径与四个数的说明只有一个产地():
+    """[R827] 用户: 「两套买卖的对比这部分我不想要了，删了」—— 那一块连同它引用的
+    口径原文一起撤掉。口径与四个数的说明仍各只有一处产地(`StockReviewDialog` /
+    `FlipTradesPanel`), 复盘栏里不该再出现第二份。"""
     old, sec, ft = code_of(OLD), code_of(SEC), code_of(FT)
-    for const, text in (("FLIP_BASIS", "转折次日开盘进出"), ("VERDICT_BASIS", "换档次日开盘进出")):
-        assert old.count(text) == 1 and text not in sec, f"{const} 的原文又写了第二份"
-        assert f"basis: {const}" in sec, f"{const} 没引用那一份原文"
-    assert ft.count("按信号进出的复利") == 1 and "按信号进出的复利" not in sec
-    assert "tip={TRADE_STAT_TIPS.follow}" in sec
+    for text in ("转折次日开盘进出", "换档次日开盘进出"):
+        assert old.count(text) == 1, f"原文在旧页里不止一份: {text}"
+        assert text not in sec, f"复盘栏里又写了一份: {text}"
+    assert "按信号进出的复利" not in sec
+    assert ft.count("按信号进出的复利") == 1
 
 
 def test_R444_页头那句与旧趋势状态页一致():
-    """页头仍是旧「趋势状态」页那一句, 转折配对仍用同一份 `legsByFlipDate`。"""
+    """[R826] 用户: 「文字内容描述也要整理, 精简抓重点…用悬浮字来解释含义」——
+    页头只留区间与天数, 阈值与来源搬进悬停。**信息一条没删**, 只是不再常驻。
+    转折配对仍用同一份 `legsByFlipDate`。"""
     old, new = code_of(OLD), code_of(SEC)
-    for t in ("{d.start} ~ {d.end} · {d.days} 个交易日",
-              "` · 六态阈值 ${(d.threshold * 100).toFixed(0)}%${d.threshold_source !== 'default' ? `(${d.threshold_source})` : ''}`"):
-        assert t in old and t in new, f"页头那一句与旧页对不上: {t}"
+    assert "{d.start} ~ {d.end} · {d.days} 个交易日" in old, "旧页那一句被改掉了"
+    assert "{d.start} ~ {d.end} · {d.days} 日" in new, "页头不再显示区间与天数"
+    assert '"六态阈值 ${(d.threshold * 100).toFixed(0)}%' in new or \
+           "`六态阈值 ${(d.threshold * 100).toFixed(0)}%" in new, "阈值连悬停里都没有了"
     assert "legsByFlipDate(d.flip_trades)" in new
 
 
-def test_R759_复盘回到最初三块_页签与三视图都撤了():
-    """用户: 「里面内容布局先恢复最开始的样子」—— 逐日 / 两套对比 / 六态历史。
-    R749 的结论条、六态规律、权益曲线都不回来了。"""
+def test_R827_复盘回到两块_两套对比已删():
+    """[R827] 用户: 「两套买卖的对比这部分我不想要了，删了」。
+    现在复盘只有 逐日 / 六个状态(+ 通道证据) 两块, 对比块与它的卡片一起撤掉;
+    R749 的结论条、六态规律、权益曲线也不回来。"""
     sec = code_of(SEC)
-    for fn in ("function DailyCard", "function DayRow", "function SummaryCard", "function StateHistory"):
-        assert fn in sec, f"三块里少了 {fn}"
-    for gone in ("setView(", "ReviewCalendar", "DistPanel", "TradeBars",
+    for fn in ("function DailyCard", "function DayRow", "function HistoryCard", "function StateHistory"):
+        assert fn in sec, f"复盘少了一块: {fn}"
+    for gone in ("function SummaryCard", "function SystemCard", "两套买卖的对比",
+                 "按转折买卖 · 六态", "按档位买卖 · 通道",
+                 "setView(", "ReviewCalendar", "DistPanel", "TradeBars",
                  "NowCondition", "FlipStats", "HeatCell", "MiniBox", "VerdictStrip",
                  "function Conclusion", "function EquityChart", "function DailyTable"):
-        assert gone not in sec, f"「{gone}」—— 页签/三视图/后来那两版又回来了"
+        assert gone not in sec, f"「{gone}」—— 删掉的块 / 页签 / 三视图又回来了"
 
 
 def test_R759_每天两行摆齐八样信息():
@@ -91,12 +101,12 @@ def test_R759_每天两行摆齐八样信息():
 
 
 def test_R759_两套口径都在_六态与通道():
-    """[R441] 曾按用户要求删掉「按档位买卖 · 通道」那一行; [R759] 用户要最初版
-    「显示出所有信息」, 那一行与逐日里通道那笔动作一起回来。"""
+    """[R441] 曾按用户要求删掉「按档位买卖 · 通道」; [R759] 那一行与逐日里通道那笔
+    动作一起回来; [R827] 用户把「两套对比」整块删了, **但逐日里两套动作都还在** ——
+    复盘要能看见这一天六态做了什么、通道做了什么。"""
     sec = code_of(SEC)
-    assert "按转折买卖 · 六态" in sec and "basis: FLIP_BASIS" in sec
-    assert "按档位买卖 · 通道" in sec and "basis: VERDICT_BASIS" in sec
     assert "legsByFlipDate(d.verdict_trades)" in sec, "逐日里通道那笔动作没接上"
+    assert "legsByFlipDate(d.flip_trades)" in sec, "逐日里六态那笔动作没接上"
     for word in ("只看有事的日子", "只看换档的日子"):
         assert word in sec, f"筛选少了「{word}」"
 

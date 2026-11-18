@@ -56,9 +56,13 @@ export function StatusSection({ symbol, days }: {
           [R707] 用户: 「恢复左中右布局, 左里面放『趋势状态 · 六态』和『通道阶段』」，
           随后补一句「上中下轨也放到左里面」—— 本组件整块回到左栏, 三格齐全,
           右栏回到只放价位阶梯。 */}
-      <div className="grid grid-cols-1 items-start gap-y-5">
-        <TrendCell symbol={symbol} />
-        <ChannelCell d={d} />
+      {/* [R840] 左栏排版重排: 两格读数(趋势 / 通道)并排一行, 三档位置单独一条并加分隔线 ——
+          原来三段竖排 gap-y-5, 左栏宽只有 300~520 时大片空白被竖着浪费掉。 */}
+      <div className="grid grid-cols-1 gap-y-3">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4">
+          <TrendCell symbol={symbol} />
+          <ChannelCell d={d} />
+        </div>
         <BandsCell d={d} />
       </div>
     </section>
@@ -122,7 +126,7 @@ function BandsCell({ d }: { d?: StockReview }) {
   if (!bands) return null
   return (
     // [R448] 不要小标题 —— 用户: 「删掉三档位置这四个字」。上轨 / 中轨 / 下轨与短中长期已经说清楚了
-    <div className="min-w-0">
+    <div className="min-w-0 border-t border-border/40 pt-3">
       <div className="flex items-start gap-2">
         <div className="flex flex-col gap-1 pt-px text-micro leading-none text-muted" aria-hidden="true">
           <span className="flex h-2.5 items-center">上轨</span>

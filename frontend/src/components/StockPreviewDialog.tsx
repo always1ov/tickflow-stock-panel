@@ -451,20 +451,25 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                 [R682] 用户: 「跌破转弱站上转强都不要了, 剩下的趋势六态和通道阶段内容合并到
                 右里面, 从此左中右布局变成左右布局」—— 左栏撤掉, 现状整块并进右栏顶部,
                 图上方的宽度全给图。 */}
-            <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)_minmax(250px,300px)] xl:overflow-hidden 2xl:grid-cols-[minmax(420px,460px)_minmax(220px,250px)_minmax(0,1fr)_minmax(250px,290px)]">
-              {/* [R732] 用户: 「左里面划分多一列, 把复盘的内容都放进去」「弹窗还不是全屏, 可以用完长度」——
-                  宽屏时最左常驻一整列复盘(自己滚), 中栏从此只画图。窄屏这一列不挂载,
-                  复盘仍走顶部标签 —— 也避免没开复盘时白跑一次 250 日回算。 */}
-              {showReviewWide && (
-                <div className="border-border/60 px-4 py-4 sm:px-6 2xl:min-h-0 2xl:overflow-y-auto 2xl:border-r">
-                  <ReviewSection key={symbol} symbol={symbol} days={reviewDays} compact />
-                </div>
-              )}
-              {/* [R707] 用户: 「恢复左中右布局, 左里面放『趋势状态 · 六态』和『通道阶段』」，
-                  随后又补一句「上中下轨也放到左里面」—— 左栏三格齐全, 右栏只留价位阶梯。
-                  宽度沿用 R672–R681 那版 240~290。 */}
-              <div className="border-b border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-b-0 xl:border-r">
+            <div className="min-h-0 flex-1 overflow-y-auto xl:grid xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)_minmax(250px,300px)] xl:overflow-hidden 2xl:grid-cols-[minmax(300px,26%)_minmax(0,1fr)_minmax(230px,18%)]">
+              {/* [R837] 用户: 「个股弹窗左边的两列合并成一列显示」——
+                 2xl 下原本是「复盘」与「现状」两列并排, 现在并成一列: 复盘在上、现状在下,
+                 同列一起滚。窄屏这一列里没有复盘(复盘走顶部标签), 内容与合并前一致。
+                 [R838] 用户: 「主图区域的宽度不能这么宽, 但比原来大」—— 合并后图吃掉了
+                 让出来的 250px 变成 850。这里给它封顶 760(原来约 590), 多出来的空白
+                 交给整行居中, 不再继续喂给图。
+                 [R839] 用户: 「合理分配左中右比例, 主图区域才是主体」—— 封顶是死数, 换成分比例:
+                 左 24% / 中 1fr(约 58%) / 右 18%, 下限 300 / 0 / 230。图在任何宽度下都是最宽的那栏,
+                 两侧随窗口一起收放, 不会再出现「图 850、左边 520 显得差不多宽」。 */}
+              <div className="border-border/60 px-4 py-4 sm:px-6 xl:min-h-0 xl:overflow-y-auto xl:border-r">
+                {/* [R840] 左栏顺序: 现状(趋势/通道/三档) → 一条线 → 复盘(历史表现 → 逐日复盘)。
+                    原来复盘挂在最上面, 读完 120 天明细才看到「现在在哪一天」。 */}
                 <StatusSection symbol={symbol} days={reviewDays} />
+                {showReviewWide && (
+                  <div className="mt-5 border-t border-border/60 pt-4">
+                    <ReviewSection key={symbol} symbol={symbol} days={reviewDays} compact />
+                  </div>
+                )}
               </div>
 
               {/* 中(原左): 一张图 / 复盘([R658] 只有提示文字与四个视图标签搬进头部) */}
