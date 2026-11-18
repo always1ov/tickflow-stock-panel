@@ -741,8 +741,7 @@ export function WatchlistDecisionBoard({ currentSymbol, onSelect, onPreview, loc
                         那十档判定在复盘的「通道档位」页。 */}
                     <TrendPositionCell
                       trend={r.trend} trendCls={r.trend ? trendBadgeCls(r.trend.state) : undefined}
-                      geo={r.kc?.geo} runs={r.kc?.runs} ph={r.ph} kc={r.kc} close={r.close}
-                      ev={r.ev} energy={r.kc?.energy} stateRun={r.kc?.state_run}
+                      ph={r.ph} kc={r.kc} close={r.close} stateRun={r.kc?.state_run}
                       onOpen={() => (onPreview
                         ? onPreview(r.symbol, r.name, 'review')
                         : onSelect(r.symbol, r.name))} />

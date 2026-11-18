@@ -29,7 +29,7 @@
  * 复盘那份要"回算", 只为了头部一行字就每次开弹窗都回算一遍不划算。
  */
 import type { ReactNode } from 'react'
-import { Loader2, RadioTower, RefreshCw, Sparkles, Star } from 'lucide-react'
+import { Loader2, RadioTower, RefreshCw, Sparkles, Star, X } from 'lucide-react'
 import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
 import { useAnalysisKline } from '@/components/stock-analysis/StockLevelsPanel'
 import { PILL, PILL_IDLE, PILL_ON, SQUARE } from './pill'
@@ -40,7 +40,7 @@ export const HERO_DAYS_DEFAULT = 120
 
 export function PreviewHero({
   symbol, name, days, onDaysChange, inWatchlist, watchBusy, onWatchAdd, onWatchRemove,
-  onAiAnalyze, aiBusy = false, onRefresh, onAddMonitor, viewControls, stats,
+  onAiAnalyze, aiBusy = false, onRefresh, onAddMonitor, onClose, viewControls, stats,
 }: {
   symbol: string
   name?: string
@@ -56,6 +56,8 @@ export function PreviewHero({
   onRefresh: () => void
   /** 打开「加监控」规则编辑器(编辑器挂在弹窗那一层) */
   onAddMonitor?: () => void
+  /** [R812] 右上角的关闭叉 —— 弹窗右上角要有明确的退出入口(ESC / 点遮罩之外) */
+  onClose: () => void
   /** [R658] 视图切换那一行(区间提示 / 分时天数 + 日K / 分时 / 关键价位 / 复盘), 排在天数左边 */
   viewControls?: ReactNode
   /**
@@ -139,6 +141,11 @@ export function PreviewHero({
           <button type="button" onClick={onRefresh} title="刷新" aria-label={`刷新 ${name || symbol} 的数据`}
                   className={`${SQUARE} text-secondary hover:text-foreground`}>
             <RefreshCw className="h-4 w-4" />
+          </button>
+          {/* [R812] 关闭叉: 弹窗右上角的明确退出入口 */}
+          <button type="button" onClick={onClose} title="关闭 (Esc)" aria-label="关闭个股详情"
+                  className={`${SQUARE} text-secondary hover:text-foreground`}>
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>

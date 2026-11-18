@@ -114,7 +114,15 @@ def main() -> int:
         return 1
     top = (pl.read_parquet(files[-1]).sort('amount', descending=True)
            .head(args.symbols)['symbol'].to_list())
-    frame = (pl.scan_parquet(str(kline / '*/*.parquet'))
+    frame = (pl.scan_parquet(
+                 str(kline / '*/*.parquet'),
+                 # [R814] 各分区 parquet 的 volume 落盘类型不一(有的 Int64、有的 Float64),
+                 # 新版 polars 默认严格, 扫全库直接 schema mismatch。这里只是拿它对拍,
+                 # 允许整数列按浮点读即可 —— 不改数据本身。
+                 cast_options=pl.ScanCastOptions(integer_cast='allow-float'),
+                 # [R814] 新落盘的分区多了 `quote_ts` 一列(老分区没有), 扫全库时
+                 # 新版 polars 也按严格处理 —— 对拍只取 OHLCV, 多余列忽略即可。
+                 extra_columns='ignore')
              .filter(pl.col('symbol').is_in(top))
              .select(['symbol', 'date', 'open', 'high', 'low', 'close', 'volume'])
              .collect().sort(['symbol', 'date']))

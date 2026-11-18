@@ -4,7 +4,7 @@
  * [R167] 从 WatchlistDecisionBoard.tsx 拆出。各自带着自己的配色表 —— 配色表是
  * 实现细节, 不该摆在 933 行主文件的顶部让人以为是全局约定。
  */
-import type { BandEnergy, ChannelEvent, ChannelGeometry, ChannelPhase, ChannelRuns, KeltnerBand } from '@/lib/api'
+import type { ChannelPhase, KeltnerBand } from '@/lib/api'
 import { POS_TEXT } from '@/lib/reviewTimeline'
 
 /**
@@ -66,83 +66,13 @@ export const NUM = 'font-mono tabular-nums'
 //
 // **判定层一个字没动**: `services/stock_playbook.py` 与它那 36 条测试照旧,
 // 接口也照旧返回 `playbook`, 只是前端不再取用。
-/** 几何量摊成悬停里的几行 —— 速度/加速度/压缩/排列, 外加 27 组合的补充注记。 */
-/**
- * [R298] 「现在处在哪一段 · 该盯什么」——**全系统这一处产地。**
- *
- * 用户问「结论列和走势列有必要合并吗」, 查下来两列不该合(两套判定, 打架时要
- * 上下对得出来), **但它们的悬停里确实各印了一份这两句话**: 走势列写
- * `【通道】上升中 —— why`, 结论列写 `【上升中】why` —— 同两句、两个格式、
- * 两个产地。这是本仓库反复清的那一类(R296 `LiveStrip` vs `EvidencePanel`、
- * R249 天数印两遍), 这次借这个问题一并收成一处。
- *
- * 阶段是**通道层**的读数(`phase(geo, runs)`), 所以格式跟着「结论」列那一份走。
- */
-function phaseLines(ph?: ChannelPhase | null): string[] {
-  if (!ph) return []
-  return ['', `【${ph.cn}】${ph.why}`, `该盯什么:${ph.watch}`]
-}
+// [R812] 这里原来有 phaseLines / geoLines: 阶段 + why + 该盯什么, 再加位置 / 间距 /
+// 重合 / 快慢 / 起伏 / 在轨外 / 事件 / 组合补充, 一停十几行。用户: 「走势列里面的每个
+// 走势标签的悬浮显示都要精简描述」—— 通道几何整套不再上悬停, 每个标签只说自己的那
+// 一件事(见下面各 `tip`)。
 
 
-function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
-                  runs?: ChannelRuns | null, energy?: BandEnergy | null,
-                  ph?: ChannelPhase | null): string {
-  if (!geo) return ''
-  const L: string[] = []
-  // [R200] 阶段摆在最前面。悬停这一片本来全是测量 —— 先给一句"现在处在哪一段、
-  // 该盯什么", 后面那些数才有落点。这句话之前只有复盘弹窗里有。
-  L.push(...phaseLines(ph))
 
-  // [R219] **一个话题一行, 不许拆到上下两处。** 用户: 「每一列的内容应该就是
-  // 一部分, 而不是内容上面一部分下面一部分」。
-  //
-  // 原来这段是流水账: 快慢在最上面, 「三条线还有 X% 重合」在第三行, 而同属
-  // 重合这个话题的「已经这样 N 天」「这季平均 Y%」掉到第五、六行, 中间隔着
-  // 「价格离各自中线」。读的人得自己把同一件事从两处捡回来拼上。
-  //
-  // 现在每行以 [话题] 开头, 同一话题的数全在那一行里, 顺序也按"先看什么"排:
-  // 位置 → 间距 → 重合 → 快慢 → 起伏 → 在轨外。
-  L.push('', '—— 量化波动通道 ——')
-  const at2 = (x: number) => `${x >= 0 ? '' : '-'}${Math.abs(x).toFixed(1)}`
-  L.push(`[位置] 价格离各自中线:短期 ${at2(geo.d.s)} / 中期 ${at2(geo.d.m)} / 长期 ${at2(geo.d.l)} 倍日常波动(正的偏贵、负的偏便宜)`)
-  L.push('[间距] ' + (geo.torn
-    ? `短线和长线离得太远(差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动),已经没有共同认可的合理价`
-    : geo.nested
-      ? `三条线几乎挤在一块,只差 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动`
-      : geo.spread >= 0
-        ? `短线高出长线 ${geo.spread.toFixed(1)} 倍日常波动`
-        : `短线低于长线 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动`))
-  // 重合的三个数原来散在三处 —— 它们回答的是同一个问题, 并成一行
-  if (geo.compress != null || runs?.compress_days || runs?.compress_avg != null) {
-    L.push('[重合] ' + [
-      geo.compress != null ? `三条线还有 ${(geo.compress * 100).toFixed(0)}% 重合` : '',
-      runs?.compress_days ? `已经这样 ${runs.compress_days} 天` : '',
-      runs?.compress_avg != null ? `整个季度平均 ${(runs.compress_avg * 100).toFixed(0)}%` : '',
-    ].filter(Boolean).join(' · '))
-  }
-  const a = geo.accel
-  if (a?.level_cn) {
-    L.push(`[快慢] 最近这十天比前一段${a.gain_atr >= 0 ? '多' : '少'}走了 ${Math.abs(a.gain_atr).toFixed(1)} 倍日常波动(${a.level_cn})`)
-  }
-  if (energy) {
-    const sh = energy.share
-    // [R219] 尾注跟着 R217 改基准一起更正 —— 原来写「各 33% 是一路匀速走的
-    // 样子」, 那是**老基准**的说法。现在的零假设是"这只票什么也没发生"。
-    L.push(`[起伏] 主要来自${energy.dominant_cn}${energy.lead_cn ? `(${energy.lead_cn})` : ''}`
-      + ` —— 短波动 ${(sh.s * 100).toFixed(0)}% / 行情主体 ${(sh.m * 100).toFixed(0)}%`
-      + ` / 老趋势 ${(sh.l * 100).toFixed(0)}%(和纯噪声比,各 33% 是不偏不倚)`)
-  }
-  if (runs?.above_run || runs?.below_run) {
-    L.push('[在轨外] ' + (runs.above_run
-      ? `连着 ${runs.above_run} 天站在短线上沿之外`
-      : `连着 ${runs.below_run} 天掉在短线下沿之外`))
-  }
-  if (ev?.why) L.push('', `【事件】${ev.cn} —— ${ev.why}`)
-  if (ev?.combo_note) {
-    L.push('', `【组合补充】「${ev.combo_note.combo}」· ${ev.combo_note.title}`, ev.combo_note.detail)
-  }
-  return L.join('\n')
-}
 
 
 
@@ -255,52 +185,28 @@ function geoLines(geo?: ChannelGeometry | null, ev?: ChannelEvent | null,
  * 于是两列并成一格, 按钮搬到外壳 `TrendPositionCell` 上, 这里退成左半边的内容
  * (名字也从 `ChannelStateCell` 改成 `TrendSegment` —— 它已经不是一个格子了)。
  */
-export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
+export function TrendSegment({ trend, trendCls, ph }: {
   /** [R211] 六态趋势 —— 合过来的那一列。作者的判定, 只读不改 */
   trend?: { state: string; state_cn: string; duration: number; since?: string
             action?: string; intraday?: boolean
             /** [R286] 今天就是转折日 —— 后端给的读数, 不在这里推 */
             flipped?: boolean } | null
-  geo?: ChannelGeometry | null
-  runs?: ChannelRuns | null
-  ph?: ChannelPhase | null
-  kc?: { s?: KeltnerBand; m?: KeltnerBand; l?: KeltnerBand } | null
-  close?: number | null
   /** 六态徽标的配色(由 TrendStateBar 那套给, 两处必须同色) */
   trendCls?: string
+  /** [R270/R812] 三个尺度对齐到第几步 —— 外面不印, 降进悬停当依据 */
+  ph?: ChannelPhase | null
 }) {
-  // 三档位置只在悬停里给 —— 「贵不贵」列已经把它翻成一句结论了
-  const at = ([['短期', kc?.s], ['中期', kc?.m], ['长期', kc?.l]] as const)
-    .filter(([, b]) => b && b.pos !== 'inside')
-  const gap = !geo ? '' : geo.spread >= 0
-    ? `短线高出长线 ${geo.spread.toFixed(1)} 倍日常波动`
-    : `短线低于长线 ${Math.abs(geo.spread).toFixed(1)} 倍日常波动`
-  // [R228] 一份悬停, 按「六态怎么说 → 通道怎么说 → 依据」排。
-  // 原来是两半各一份: 鼠标从徽标挪到阶段, 提示整个换掉一份, 而这一格
-  // 讲的本来就是同一只票的方向。末尾那句从「点这两行…」改成整格的去处。
-  const tip = [
-    trend ? `【六态】${trend.state_cn} · 已${trend.duration}天`
-      + (trend.since ? `,自 ${trend.since}` : '')
-      // [R286] 转折日在悬停里也说一句 —— 可见行只放得下两个字
-      + (trend.flipped ? ',今天就是转折日' : '') : '',
-    trend?.action ?? '',
-    // [R298] 原来这里另写了一份(`【通道】阶段名 —— why`), 与「结论」列 `geoLines()`
-    // 里那份**是同两句话、两个格式、两个产地**。走同一个 `phaseLines`。
-    ...phaseLines(ph),
-    // 第三行那句(三个尺度对齐到第几步)原来自带一份悬停, 一并收进来
-    // [R277] 悬停里那个 `: 快慢:${ph.pace_cn}` 回退也去掉了 —— 与可见行同一个理由:
-    // 它几乎轮不上(align 基本永远非空), 而快慢现在有自己的列。
-    ph?.align ? `【${ph.align.cn}】${ph.align.why}` : '',
-    '', gap,
-    at.length ? '现在到边的:' + at.map(([t, b]) => `${t}${b!.pos_cn}`).join('、') : '三档都在通道中部',
-    runs?.compress_days ? `三条线已经这样挤在一起 ${runs.compress_days} 天` : '',
-    '',
-    ...([['短期', kc?.s], ['中期', kc?.m], ['长期', kc?.l]] as const)
-      .filter(([, b]) => b)
-      .map(([t, b]) => `${t}通道 ${b!.lower.toFixed(2)} ~ ${b!.upper.toFixed(2)}`
-        + `,现在${b!.pos_cn}(位置 ${Math.round(b!.pct * 100)}/100)`),
-    close != null ? `收盘 ${close.toFixed(2)}` : '',
-    '', OPEN_HINT].filter(Boolean).join('\n')
+  // [R812] 悬停只说这一格自己的事: 六态是什么、多久了、该怎么办。
+  // [R814] 三尺度对齐按 R270「收起来, 不删」放回来 —— R812 精简时把它删掉了,
+  // 那是删信息, 不是收信息。它仍然只在悬停里, 不占外面那一行。
+  const tip = trend
+    ? `六态：${trend.state_cn} · 已${trend.duration}天`
+      + (trend.since ? `（自 ${trend.since}）` : '')
+      + (trend.flipped ? ' · 今天就是转折日' : '')
+      + (trend.intraday ? ' · 盘中口径' : '')
+      + (ph && ph.align ? `\n三尺度：${ph.align.cn}` : '')
+      + (trend.action ? `\n操作建议：${trend.action}` : '')
+    : ''
   return (
     // [R217] **固定两行**, 高度对齐, 行与行不再糊在一起。
     //   行 1: 六态徽标
@@ -309,7 +215,7 @@ export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
     // 那一个按钮里, 这里只交出左半边的两行(fragment, 由外壳的 2×2 网格排位,
     // 左右同一行共用行高, 两条基线才齐)。悬停仍各半一份: 左半讲方向的依据。
     <>
-        <span title={tip} className="flex shrink-0 items-center gap-1">
+        <span title={tip || undefined} className="flex shrink-0 items-center gap-1">
           {trend ? (
             <span className={`inline-flex whitespace-nowrap rounded-btn border px-1.5 py-0.5 text-xs ${trendCls ?? ''}`}>
               {/* [R290] 天数从徽标上**搬到了第二行**, 换成「转折后第 N 天」——
@@ -362,8 +268,8 @@ export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
               ? 'border-warning/45 bg-warning/10 font-medium text-warning'
               : 'border-transparent text-muted'}`}
                 title={trend.flipped
-                  ? '今天六态状态发生了翻转 —— 昨天还不是这个状态'
-                  : '从六态转折那天算起, 到今天第几个交易日'}>
+                  ? '六态状态今天转折'
+                  : `六态转折后的第 ${trend.duration} 个交易日`}>
             {trend.flipped ? '今天转折' : <>转折后第 {trend.duration} 天</>}
           </span>
         ) : (
@@ -413,53 +319,44 @@ export function TrendSegment({ trend, geo, runs, ph, kc, close, trendCls }: {
  *
  * ## 三档组合去哪了
  *
- * 进悬停 —— 用户选的就是「只说短期」。悬停里三档各自一行, 带位置名、
- * 价格距离与轨价, 外加 27 格那个组合码(它的用处是去速查表查行号,
- * 那是点开之后的事)。
+ * 进悬停 —— 用户选的就是「只说短期」。悬停里三档压成一行(短中长 + 位置名),
+ * 组合码本身不再印; 27 格速查表在点开之后的复盘弹窗里。
  */
-export function PositionSegment({ kc, geo, ev, runs, energy, ph, stateRun, close }: {
+/**
+ * [R298] 阶段那两句的**唯一产地**: 是什么 + 该盯什么。
+ *
+ * [R425] 走势与位置并成一格之后只剩一个消费方, 但仍然只有这一处产出 ——
+ * 留着它, 免得哪天又有人在别处手抄一份(R298 当年就是两列各写各的格式)。
+ */
+function phaseLines(ph: ChannelPhase) {
+  return `【${ph.cn}】${ph.why}` + (ph.watch ? `\n该盯什么：${ph.watch}` : '')
+}
+
+export function PositionSegment({ kc, ph, stateRun, close }: {
   kc?: { s?: KeltnerBand; m?: KeltnerBand; l?: KeltnerBand } | null
-  geo?: ChannelGeometry | null
-  ev?: ChannelEvent | null
-  runs?: ChannelRuns | null
-  energy?: BandEnergy | null
   ph?: ChannelPhase | null
-  /** [R246 → R308] 这个三档组合连着多久 —— 后端按 `state_key(bands)` 数的。
-      不占正文的行, 只进悬停; 不印的话就是把一个后端还在算的数悄悄丢掉。 */
+  /** [R246 → R308] 这个三档组合连着多久 —— 后端按 `state_key(bands)` 数的。 */
   stateRun?: { days: number; since?: string; capped?: boolean } | null
   /** [R316] 算价格距离要用它。**不拿 `pct` 反推** —— `pct` 后端只留三位小数,
       反推出来的收盘价会和真实值差几分钱, 而这一列印的是要拿去下单的数。 */
   close?: number | null
 }) {
   const s = kc?.s
-  const combo = geo?.combo ?? null
   const near = railGap(s, close)
+  // [R812] 三行: 短期在哪 · 通道阶段 · 三档 —— 每行只说一件事。
+  // [R814] 「该盯什么」与「三档组合码」按 R270「收起来, 不删」补回悬停:
+  // R812 精简时连着删了, 而用户要的是精简描述, 不是把依据删掉。
+  const bands = (['s', 'm', 'l'] as const)
+    .map((k, i) => kc?.[k] ? `${'短中长'[i]} ${kc[k]!.pos_cn}` : '')
+    .filter(Boolean).join(' · ')
   const tip = [
-    s ? `短期通道 ${s.pos_cn} —— ${near ? near.full : '离轨距离算不出来(缺现价)'}`
-      : '短期通道这一档今天算不出来',
-    '',
-    '距离口径: (轨价 − 现价) / 现价 —— 与出场线、六态翻转距离**同一个算法**,',
-    '也就是"现价还要动多少个百分点才碰到那条轨"。',
-    '',
-    '三档各自的位置:',
-    ...(['s', 'm', 'l'] as const)
-      .map((k, i2) => {
-        const b = kc?.[k]
-        if (!b) return `  ${'短中长'[i2]}期 —— 算不出来`
-        const g = railGap(b, close)
-        return `  ${'短中长'[i2]}期 ${b.pos_cn}`
-          + (g ? ` · ${g.full}` : '')
-          + `(轨 ${b.lower.toFixed(2)} ~ ${b.upper.toFixed(2)})`
-      }),
-    '',
-    combo
-      ? `三档组合码「${combo}」—— 27 格速查表的行号`
-        + (stateRun ? `, 已连着 ${stateRun.days} 天${stateRun.capped ? '以上' : ''}`
-                      + (stateRun.since ? `(自 ${stateRun.since} 起)` : '') : '')
-      : '三档里缺了一档, 这个组合今天定不了(不是"罕见组合", 是算不出来)',
-    '',
-    OPEN_HINT,
-  ].filter(Boolean).join('\n') + geoLines(geo, ev, runs, energy, ph)
+    s ? `短期通道：${s.pos_cn}${near ? ` · ${near.full}（轨价 − 现价）` : ''}` : '短期通道位置今天算不出来',
+    ph ? phaseLines(ph) : '',
+    bands
+      ? `三档组合码：${bands}`
+        + (stateRun ? `（连续 ${stateRun.days} 天${stateRun.capped ? '以上' : ''}）` : '')
+      : '',
+  ].filter(Boolean).join('\n')
 
   return (
     // [R425] 右半边的两行(fragment)。按钮在外壳 `TrendPositionCell` 上, 这里只画内容。
@@ -475,7 +372,7 @@ export function PositionSegment({ kc, geo, ev, runs, energy, ph, stateRun, close
             它是这一格真正能拿去下单的那个数, 所以数字用等宽 + tabular-nums,
             整列小数点上下对齐; 措辞压暗, 不跟第一行抢。 */}
         {near ? (
-          <span title={tip} className="text-micro text-muted">
+          <span title={`${near.label} ${near.pct}% · 按现价算`} className="text-micro text-muted">
             {near.label}
             <span className="ml-1 font-mono tabular-nums text-secondary">{near.pct}%</span>
           </span>
@@ -486,11 +383,7 @@ export function PositionSegment({ kc, geo, ev, runs, energy, ph, stateRun, close
   )
 }
 
-/** [R425] 两半共用的去处说明 —— 一个按钮只有一个去处, 两份悬停就得说同一句。 */
-const OPEN_HINT = '点开:复盘(逐日趋势 / 通道档位 / 27 种组合速查, 在弹窗顶上切)'
-
-/**
- * [R425] 「走势/位置」—— 原来的「走势」「位置」两列并成**一格、一个按钮**。
+/** [R425] 「走势/位置」—— 原来的「走势」「位置」两列并成**一格、一个按钮**。
  *
  * 用户: 「个股分析页面的走势列和通道列合并成一个按钮入口」。
  *
@@ -504,22 +397,17 @@ const OPEN_HINT = '点开:复盘(逐日趋势 / 通道档位 / 27 种组合速�
  * - **一个按钮**, 边界与格子重合, 悬停整格一起亮; 点开落在「趋势」页签
  *   (方向是先读的那件事), 通道档位在弹窗顶上切。
  * - 两半各自保留自己的悬停 —— 讲的是两件事(方向的依据 / 位置的依据),
- *   鼠标停在哪半就说哪半; 去处那句两半一样(`OPEN_HINT`)。
+ *   鼠标停在哪半就说哪半。
  * - 行对齐: 两半各交出固定两行, 外壳是 2 行 × 2 列的网格(按列排), 左右同一行
  *   共用行高、垂直居中 —— 左边的徽标带边框比右边的位置名高, 各自竖排时第一行
  *   会一高一低(出图看到的), 网格里就齐了。
  */
-export function TrendPositionCell({ trend, trendCls, geo, runs, ph, kc, close, ev, energy,
-                                    stateRun, onOpen }: {
+export function TrendPositionCell({ trend, trendCls, ph, kc, close, stateRun, onOpen }: {
   trend?: Parameters<typeof TrendSegment>[0]['trend']
   trendCls?: string
-  geo?: ChannelGeometry | null
-  runs?: ChannelRuns | null
   ph?: ChannelPhase | null
   kc?: { s?: KeltnerBand; m?: KeltnerBand; l?: KeltnerBand } | null
   close?: number | null
-  ev?: ChannelEvent | null
-  energy?: BandEnergy | null
   stateRun?: { days: number; since?: string; capped?: boolean } | null
   onOpen: () => void
 }) {
@@ -531,9 +419,8 @@ export function TrendPositionCell({ trend, trendCls, geo, runs, ph, kc, close, e
           两行是全表行高 80px 的另一半根源; 一行放得下(1440 宽这一格有 500px, 四段加起来不到 300)。 */}
       <button type="button" onClick={onOpen}
               className="flex w-full cursor-pointer items-center gap-x-2 rounded-btn px-1 py-0.5 text-left leading-snug transition-colors duration-hover hover:bg-elevated/40 max-sm:flex-wrap max-sm:gap-y-1 max-sm:px-0">
-        <TrendSegment trend={trend} trendCls={trendCls} geo={geo} runs={runs} ph={ph} kc={kc} close={close} />
-        <PositionSegment kc={kc} geo={geo} ev={ev} runs={runs} energy={energy} ph={ph}
-                         stateRun={stateRun} close={close} />
+        <TrendSegment trend={trend} trendCls={trendCls} ph={ph} />
+        <PositionSegment kc={kc} ph={ph} stateRun={stateRun} close={close} />
       </button>
     </td>
   )

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Activity, Settings } from 'lucide-react'
 import { Skeleton } from './Skeleton'
-import { TYPE, buttonClass } from '@/components/ui'
+import { TYPE, buttonClass, Switch } from '@/components/ui'
 
 export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, intervalS, intervalMin, intervalMax, loading, onToggle, toggling, showIntervalEdit, onShowIntervalEdit, onIntervalChange }: {
   enabled: boolean
@@ -44,19 +44,12 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
           <Activity className="h-4 w-4 text-secondary" />
           <h3 className={TYPE.card}>实时行情</h3>
         </div>
-        <button
-          onClick={() => onToggle(!enabled)}
+        <Switch
+          size="sm"
+          checked={enabled}
           disabled={toggling}
-          className={`relative inline-flex h-4 w-7 items-center rounded-full shrink-0 transition-colors duration-expand ${
-            enabled
-              ? 'bg-accent'
-              : 'bg-surface border border-border'
-          } ${toggling ? 'opacity-50' : 'cursor-pointer'}`}
-        >
-          <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-expand ${
-            enabled ? 'translate-x-[14px]' : 'translate-x-0.5'
-          }`} />
-        </button>
+          onChange={next => onToggle(next)}
+        />
       </div>
 
       {loading ? (

@@ -7,7 +7,7 @@
  * 星星方框就这样被 `px-3` 挤成了 6px 宽。
  */
 export const BOX = 'inline-flex h-8 items-center justify-center rounded-btn border text-xs '
-  + 'transition-colors duration-hover disabled:opacity-40'
+  + 'transition-colors duration-hover disabled:opacity-50'
 export const PILL = `${BOX} px-3`
 export const SQUARE = `${BOX} w-8 border-border bg-surface hover:bg-elevated`
 // [R449] 两种状态的配色挪进了全站按钮(`components/ui/Button.tsx`), 这里直接用那一份

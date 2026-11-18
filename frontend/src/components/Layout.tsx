@@ -14,6 +14,7 @@ import { DailyDataHealthNotice } from '@/components/data/DailyDataHealthNotice'
 import { StockAnalysisHost } from '@/components/stock-analysis/StockAnalysisHost'
 import { StockPreviewHost } from '@/components/StockPreviewHost'
 import { StockAnalysisBubble } from '@/components/stock-analysis/StockAnalysisBubble'
+import { Switch } from '@/components/ui'
 import {
   useCapabilityMatrix,
   useSettings,
@@ -52,7 +53,7 @@ import {
   HelpCircle,      // [R323] 名词说明的全局入口
 } from 'lucide-react'
 import { Logo } from './Logo'
-import { api, type CapabilityMatrix, type IndexQuote } from '@/lib/api'
+import { api, type CapabilityMatrix } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { useIsDesktop } from '@/lib/useMediaQuery'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
@@ -74,8 +75,6 @@ export const CORE_INDEXES = [
   { symbol: '000680.SH', name: '科创综指' },
 ] as const
 
-type CoreIndex = (typeof CORE_INDEXES)[number]
-
 /** 亮/暗主题切换 — 状态存 localStorage, 生效见 lib/theme.ts */
 function ThemeToggle() {
   const theme = useTheme()
@@ -89,23 +88,6 @@ function ThemeToggle() {
       {dark ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
     </button>
   )
-}
-
-function fmtIndexValue(v: number | null | undefined) {
-  if (v == null || Number.isNaN(Number(v))) return '--'
-  return Number(v).toFixed(2)
-}
-
-function fmtIndexPct(v: number | null | undefined) {
-  if (v == null || Number.isNaN(Number(v))) return '--'
-  return `${Number(v) >= 0 ? '+' : ''}${Number(v).toFixed(2)}%`
-}
-
-function indexPctClass(v: number | null | undefined) {
-  if (v == null || Number.isNaN(Number(v))) return 'text-muted'
-  const n = Number(v)
-  if (n === 0) return 'text-foreground'
-  return n > 0 ? 'text-bull' : 'text-bear'
 }
 
 /** 监控中心未读徽标 — 仅在非监控页且有未读时显示。 */
@@ -123,70 +105,8 @@ function MonitorBadge({ active }: { active: boolean }) {
   )
 }
 
-function SidebarIndexQuotes({ rows, items, cnLive }: {
-  rows: IndexQuote[] | undefined
-  // [同步上游 3c6ed99] 作者把展示层指数收敛为固定核心四只(readonly 常量)
-  items: readonly CoreIndex[]
-  /** [R119] A 股这几张卡此刻是不是真在跳(交易时段 + 数据来自实时缓存) */
-  cnLive?: boolean
-}) {
-  // [R369] 全球指数整个特性下线(用户: 「删除这部分, 不需要了」), 这里只剩 A 股
-  if (items.length === 0) return null
-  const quoteBySymbol = new Map((rows ?? []).map(q => [q.symbol, q]))
-  // [R151] 用户定案:「都不显示延时, 能实时就行了」。卡面回到两态(在跳 / 静止),
-  // 「延迟N分」徽标与黄点一并去掉 —— 那个标签本来是 R148 为了让"冻住的数看起来
-  // 像刚更新的"这件事现形而加的, 而 R148~R150 已经从**选源**上解决了它: 现在
-  // 盘中按行情自带时刻挑最新的源, 卡面不动的概率本来就低了。
-  //
-  // **后端一行没动**: quote_at / stale / 时区补正全部保留 —— 它们不是为了显示,
-  // 是选源的依据, 拆了就等于把"能实时"一起拆了。行情时刻退到 title 里(悬停可见,
-  // 零视觉重量), 真要重新亮出来只是把徽标那几行加回来。
-  //
-  // 代价说清楚: 万一某天源真的又冻住, 卡面看起来会一切正常 —— 那时用悬停的
-  // 行情时刻来判断。([R369] 原来这儿还提了 /api/global-indices/debug,
-  // 那个端点随全球指数特性一起下线了。)
-  return (
-    <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-border/60 pt-2">
-      {items.map(item => {
-        const q = quoteBySymbol.get(item.symbol)
-        const value = q?.last_price ?? q?.close
-        const pct = q?.change_pct
-        // [R151] 行情自己的时刻只进 title, 不占卡面。timestamp 是毫秒 epoch;
-        // 日线回退那条路没有它, 那时 cnLive 本就是 false。
-        const ageMin = cnLive && q?.timestamp
-          ? (Date.now() - Number(q.timestamp)) / 60000
-          : null
-        return (
-          <NavLink
-            key={item.symbol}
-            to={`/indices?symbol=${encodeURIComponent(item.symbol)}`}
-            className={cn('block rounded-btn bg-elevated/60 px-2 py-1.5 transition-colors hover:bg-elevated',
-              !cnLive && 'opacity-70')}
-            title={`${item.name} ${item.symbol} — ${
-              cnLive ? '交易中, 实时刷新' : '非实时(休市或实时行情未开), 显示最后收盘/缓存值'
-            }${ageMin != null
-              ? ` · 行情时刻: ${ageMin < 1 ? '1 分钟内' : `${Math.round(ageMin)} 分钟前`}`
-              : ''}`}
-          >
-            <div className="flex items-center justify-between gap-1">
-              <span className="flex min-w-0 items-center gap-1 text-micro text-secondary">
-                {/* [R119] 与全球卡同一套语义: 绿点脉冲=在跳, 灰点=静止 */}
-                <span className={cn('h-1 w-1 shrink-0 rounded-full',
-                  cnLive ? 'bg-bull animate-pulse' : 'bg-muted/40')} />
-                <span className="truncate">{item.name}</span>
-              </span>
-              <span className={`text-micro font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
-            </div>
-            <div className={`mt-0.5 truncate font-mono text-micro ${indexPctClass(pct)}`}>
-              {fmtIndexValue(value)}
-            </div>
-          </NavLink>
-        )
-      })}
-      {/* [R369] 全球指数那一组卡整块删掉 —— 特性下线, 见 FORK_NOTES R369 */}
-    </div>
-  )
-}
+// [R807] 侧栏「核心四只指数」卡按用户要求整块删除(含轮询与悬停语义);
+// CORE_INDEXES 常量保留, 板块切换卡的指数下拉仍在用。
 
 // ===== 数据源能力健康卡 =====
 // 能力路由架构下的侧栏状态: 不再展示「主数据源 + TickFlow 档位」(单源时代遗留 —
@@ -613,8 +533,6 @@ export function Layout() {
   }
   // 图标条形态仅桌面 rail 态成立 (移动端抽屉与 overlay 预览恒为完整形态)
   const railMode = isDesktop && navState === 'rail'
-  // [R164] fork 里 R102/R148/R154 的状态卡与指数卡沿用旧名: 收起 = 只剩图标的 rail 态
-  const navCollapsed = railMode
   // 路由跳转/切回桌面时关抽屉; ESC 同样关闭
   useEffect(() => { setDrawerOpen(false) }, [location.pathname, location.search, isDesktop])
   useEffect(() => {
@@ -709,23 +627,6 @@ export function Layout() {
   // 开启实时行情时若存在排队中的挖掘任务 → 确认弹窗 (实时落盘会让排队任务开跑即失败)
   const [miningQueuedWarning, setMiningQueuedWarning] = useState<number | null>(null)
   const miningWarnBackdrop = useDialogBackdrop(() => setMiningQueuedWarning(null))
-  // [同步上游 3c6ed99] 指数条固定核心四只(产品契约, 不再可配置), 常驻显示 ——
-  // indices_nav_pinned / sidebar_index_symbols 两个偏好随作者一并下线。
-  const sidebarIndexes = CORE_INDEXES
-  // [R119] A 股指数卡也走自主轮询, 不再只靠 SSE 推 —— SSE 断线或实时开关关着时
-  // 卡片就彻底静止了, 用户看不出是"没变"还是"没在更新"。端点只读行情缓存/日线
-  // 回退, **不触发 TickFlow 请求**, 所以这里多问几次不烧配额。
-  const { data: sidebarIndexQuotes } = useQuery({
-    queryKey: [...QK.indexQuotes, 'sidebar', 'core'] as const,
-    queryFn: () => api.indexQuotes(sidebarIndexes.map(p => p.symbol)),
-    enabled: sidebarIndexes.length > 0,
-    placeholderData: (prev) => prev,
-    // 交易时段 + 轮询在跑 → 6s(与行情轮询同频); 交易时段但没开实时 → 30s
-    // (读到的是日线回退, 不会变, 只为开关一打开就跟上); 休市 → 60s
-    refetchInterval: !(quoteStatus?.is_trading_hours ?? false)
-      ? 60000
-      : (quoteStatus?.running ?? false) ? 6000 : 30000,
-  })
 
   // SSE: 行情更新时自动刷新相关 queries + 告警通知
   useQuoteStream(realtimeEnabled, prefs?.sse_refresh_pages)
@@ -747,8 +648,6 @@ export function Layout() {
   const realtimeProviderName = realtimeProvider && realtimeProvider !== 'tickflow'
     ? (findDataSource(dataSources, realtimeProvider)?.display_name || realtimeProvider)
     : null
-  // [R102] A 股卡自身的可用性条件(全球卡不受其影响)
-  const cnQuotesOk = !isWatchlistMode && (!realtimeUnavailable || !!realtimeProviderName)
   const realtimeToggleDisabled = toggleQuote.isPending || isPaused
   const realtimeActive = realtimeEnabled && isRunning && isTrading
   const realtimeStatusLabel = toggleQuote.isPending
@@ -1095,16 +994,6 @@ export function Layout() {
               />
             </div>
           )}
-          {/* [R102 → R369] 指数报价。全球指数那一半已随特性下线整个删掉,
-              这里只剩 A 股, 数据来自行情主链。常驻显示(上游口径) */}
-          {!navCollapsed && (
-            <SidebarIndexQuotes
-              rows={cnQuotesOk ? sidebarIndexQuotes?.rows : undefined}
-              items={cnQuotesOk ? sidebarIndexes : []}
-              // [R119] 真在跳 = A 股交易时段 + 轮询在跑 + 数据确实来自实时缓存
-              cnLive={isTrading && isRunning && sidebarIndexQuotes?.source === 'realtime'}
-            />
-          )}
         </div>
 
         <nav className="tf-nav-scroll flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-0.5">
@@ -1227,28 +1116,14 @@ export function Layout() {
                 >
                   <Settings className="h-3.5 w-3.5" />
                 </button>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={realtimeEnabled}
-                  aria-label={realtimeToggleTitle}
-                  aria-busy={toggleQuote.isPending}
-                  onClick={() => handleToggle(!realtimeEnabled)}
+                <Switch
+                  checked={realtimeEnabled}
+                  onChange={next => handleToggle(next)}
                   disabled={realtimeToggleDisabled}
+                  label={realtimeToggleTitle}
                   title={realtimeToggleTitle}
-                  className={cn(
-                    'relative inline-flex h-5 w-9 items-center rounded-full border transition-ui duration-expand focus-visible:outline-none focus-ring-custom focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
-                    realtimeEnabled
-                      ? 'border-accent/50 bg-accent'
-                      : 'border-border bg-surface hover:border-muted',
-                    realtimeToggleDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
-                  )}
-                >
-                  <span className={cn(
-                    'inline-block h-3.5 w-3.5 rounded-full border border-black/5 bg-white shadow-sm transition-transform duration-expand',
-                    realtimeEnabled ? 'translate-x-[18px]' : 'translate-x-0.5',
-                  )} />
-                </button>
+                  className="focus-visible:outline-none focus-ring-custom focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1 focus-visible:ring-offset-surface"
+                />
               </div>
             </div>
           )}
@@ -1276,8 +1151,6 @@ export function Layout() {
                 )}
               </div>
             )}
-          {/* [R102] 指数卡的渲染点在上面 —— 作者这里新增的裸调用会重复渲染
-              一遍, 故不采纳; A 股可用性判据 cnQuotesOk 与作者同口径。 */}
         </div>
         )}
 

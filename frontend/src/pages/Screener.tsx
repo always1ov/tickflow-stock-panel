@@ -14,6 +14,7 @@ import { pendingStrategyIds, pollingInterval, useDocumentVisible } from '@/lib/r
 import { storage } from '@/lib/storage'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
+import { Button } from '@/components/ui'
 import { DatePicker } from '@/components/DatePicker'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { type NavItem } from '@/lib/listNav'
@@ -1007,18 +1008,16 @@ export function Screener() {
               ))}
             </div>
             {/* 重新运行策略：重载策略文件并重跑全部策略，更新命中个股 */}
-            <button
+            <Button
+              size="xs"
               onClick={() => reloadStrategies.mutate()}
               disabled={reloadStrategies.isPending}
               title="重新加载策略并运行全部策略，刷新当前符合条件的个股"
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-btn
-                border border-border bg-surface text-xs font-medium text-secondary
-                hover:text-accent hover:border-accent/50 transition-colors cursor-pointer
-                disabled:opacity-50 disabled:cursor-wait"
+              className="gap-1.5 hover:text-accent hover:border-accent/50 disabled:cursor-wait"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${reloadStrategies.isPending ? 'animate-spin' : ''}`} />
               重载
-            </button>
+            </Button>
             {asOf && (
               <DatePicker
                 value={asOf}
@@ -1056,62 +1055,58 @@ export function Screener() {
               ))}
             </div>
             {/* 策略库按钮 */}
-            <button
+            <Button
+              size="xs"
               onClick={() => setShowPoolDialog(true)}
-              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-btn
-                border border-border bg-surface text-xs font-medium text-secondary
-                hover:text-accent hover:border-accent/50 transition-colors cursor-pointer"
+              className="gap-1.5 hover:text-accent hover:border-accent/50"
             >
               <Layers className="h-3.5 w-3.5" />
               策略库
               <span className="ml-0.5 min-w-[28px] h-4 flex items-center justify-center rounded-full bg-accent/15 text-accent text-micro font-bold">
                 {visiblePool.length}/{strategyPresets.length}
               </span>
-            </button>
+            </Button>
             {/* 创建叠加策略 */}
-            <button
+            <Button
+              size="xs"
               onClick={() => setShowComposite(true)}
-              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-btn
-                text-xs font-medium text-foreground border border-border bg-surface
-                hover:bg-elevated transition-colors cursor-pointer"
+              className="gap-1.5"
             >
               <Layers className="h-3.5 w-3.5" />
               叠加策略
-            </button>
+            </Button>
             {/* 创建策略 */}
-            <button
+            <Button
+              size="xs"
               onClick={() => { setBuilderMode('create'); setShowBuilder(true) }}
-              className="inline-flex items-center gap-1.5 h-7 px-3 rounded-btn
-                text-xs font-medium text-warning border border-warning/20 bg-warning/5
-                hover:bg-warning/15 transition-colors cursor-pointer"
+              className="gap-1.5 border-warning/20 bg-warning/5 text-warning hover:bg-warning/15"
             >
               <Sparkles className="h-3.5 w-3.5" />
               创建策略 · AI
-            </button>
+            </Button>
             {/* 获取策略（占位，敬请期待）— 暂时隐藏 */}
             {SHOW_STRATEGY_STORE && (
-              <button
+              <Button
+                size="xs"
                 onClick={() => setShowStore(true)}
-                className="inline-flex items-center gap-1.5 h-7 px-3 rounded-btn
-                  border border-border bg-surface text-xs font-medium text-secondary
-                  hover:text-accent hover:border-accent/50 transition-colors cursor-pointer"
+                className="gap-1.5 hover:text-accent hover:border-accent/50"
               >
                 <Store className="h-3.5 w-3.5" />
                 获取策略
-              </button>
+              </Button>
             )}
             {/* 默认基础参数: 之后新建策略默认使用的基础过滤配置 */}
             <div className="flex shrink-0 items-center gap-1.5">
               <ResourceTransferButton kind="strategy" />
-              <button
+              <Button
+                size="xs"
+                icon
                 onClick={() => setShowDefaultParams(true)}
                 title="默认基础参数 — 新建策略默认使用的基础过滤配置"
-                className="inline-flex items-center justify-center h-7 w-7 rounded-btn
-                  border border-border bg-surface text-secondary
-                  hover:text-accent hover:border-accent/50 transition-colors cursor-pointer"
+                className="hover:text-accent hover:border-accent/50"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
-              </button>
+              </Button>
             </div>
           </div>
         }
@@ -1125,14 +1120,15 @@ export function Screener() {
           {!strategies.isLoading && strategies.isError && (
             <div className="flex flex-col items-center gap-2 py-4 text-center border border-dashed border-danger/40 rounded-btn">
               <span className="text-sm text-secondary">策略列表加载失败，请重试；策略池配置本身不受影响。</span>
-              <button
+              <Button
+                size="xs"
                 type="button"
                 onClick={() => strategies.refetch()}
                 disabled={strategies.isFetching}
-                className="inline-flex items-center gap-1.5 rounded-btn border border-border px-2.5 py-1 text-xs text-accent transition-colors hover:bg-elevated disabled:opacity-50"
+                className="text-accent"
               >
                 重试
-              </button>
+              </Button>
             </div>
           )}
           {!strategies.isLoading && !strategies.isError && displayPool.length === 0 && (
@@ -1245,17 +1241,19 @@ export function Screener() {
                       {filterActive(filter) && (
                         <>
                           <span className="w-px self-stretch my-1 bg-border" />
-                          <button
+                          <Button
+                            size="xs"
+                            icon
+                            variant="ghost"
                             onClick={() => {
                               setFilter(defaultFilter)
                               if (activeStrategy) filterMap.current.delete(activeStrategy)
                             }}
                             title="清空筛选条件"
-                            className="inline-flex items-center gap-1 px-2 text-secondary
-                              hover:bg-danger/10 hover:text-danger transition-colors duration-150 cursor-pointer"
+                            className="hover:bg-danger/10 hover:text-danger"
                           >
                             <RotateCcw className="h-3 w-3" />
-                          </button>
+                          </Button>
                         </>
                       )}
                     </div>

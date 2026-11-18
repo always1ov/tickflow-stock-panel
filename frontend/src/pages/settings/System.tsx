@@ -25,7 +25,7 @@ import {
   listZhVoices, previewVoice, activateVoice,
 } from '@/lib/voiceBroadcast'
 import { loadStockExternalTemplate, saveStockExternalTemplate } from '@/lib/stock-external-link'
-import { buttonClass } from '@/components/ui'
+import { Button } from '@/components/ui'
 import { ExtensionSlot } from '@/extensions/ExtensionSlot'
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_STEP, getPageZoom, setPageZoom } from '@/lib/pageZoom'
 import { SettingsCard, SettingRow } from './SettingsCard'
@@ -137,46 +137,50 @@ export function SettingsSystemPanel() {
         <SettingRow label="界面缩放" desc="整个界面等比缩放, 立即生效并记忆 (80%–150%)">
           <div className="flex shrink-0 items-center gap-2">
             {pageZoom !== 1 && (
-              <button
-                onClick={() => setPageZoomState(setPageZoom(1))}
-                className={buttonClass({ size: 'sm', variant: 'ghost' })}
-              >
+              <Button variant="ghost" onClick={() => setPageZoomState(setPageZoom(1))}>
                 重置
-              </button>
+              </Button>
             )}
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
+              icon
               onClick={() => changeZoom(-ZOOM_STEP)}
               disabled={pageZoom <= ZOOM_MIN}
               aria-label="缩小界面"
-              className={buttonClass({ size: 'sm', variant: 'secondary' }, 'h-7 w-7 !px-0')}
+              className="h-7 w-7"
             >
               <Minus className="h-3.5 w-3.5" />
-            </button>
+            </Button>
             <span className="w-11 select-none text-center font-mono text-xs text-secondary">
               {Math.round(pageZoom * 100)}%
             </span>
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
+              icon
               onClick={() => changeZoom(ZOOM_STEP)}
               disabled={pageZoom >= ZOOM_MAX}
               aria-label="放大界面"
-              className={buttonClass({ size: 'sm', variant: 'secondary' }, 'h-7 w-7 !px-0')}
+              className="h-7 w-7"
             >
               <Plus className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
         </SettingRow>
       </SettingsCard>
 
       <SettingsCard icon={Wrench} title="维护">
         <SettingRow label="刷新前端缓存" desc="清除页面缓存并强制重新加载 (不影响个人配置和本地股票数据)">
-          <button
+          <Button
+            variant="secondary"
             onClick={handleClearCache}
             disabled={clearing}
-            className={buttonClass({ size: 'sm', variant: 'secondary' }, 'shrink-0 gap-1.5')}
+            className="shrink-0 gap-1.5"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${clearing ? 'animate-spin' : ''}`} />
             {clearing ? '清理中…' : '清理并刷新'}
-          </button>
+          </Button>
         </SettingRow>
         <DataDoctorSection />
 
@@ -407,13 +411,13 @@ export function AlertPopupSettings() {
             >
               {soundOptions.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
-            <button
+            <Button
               onClick={() => previewSound(soundType)}
               disabled={!toastEnabled || !soundEnabled || soundType === 'none'}
-              className="px-2 h-8 rounded-btn border border-border bg-base text-xs text-secondary hover:text-foreground hover:border-accent/30 disabled:opacity-50 transition-colors cursor-pointer"
+              className="px-2 text-secondary hover:border-accent/30"
             >
               试听
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -432,14 +436,14 @@ export function AlertPopupSettings() {
             className="hidden"
             onChange={onSoundFilePicked}
           />
-          <button
+          <Button
             onClick={() => soundFileRef.current?.click()}
             disabled={uploadSoundPack.isPending}
-            className={buttonClass({}, 'h-8 shrink-0 gap-1.5')}
+            className="shrink-0 gap-1.5"
           >
             <Upload className="h-3.5 w-3.5" />
             {uploadSoundPack.isPending ? '上传中…' : '上传'}
-          </button>
+          </Button>
         </div>
         {soundPacks.length > 0 && (
           <div className="mt-1 space-y-1">
@@ -450,19 +454,19 @@ export function AlertPopupSettings() {
                   <span className="text-muted ml-1.5">{p.size >= 1024 * 1024 ? `${(p.size / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(p.size / 1024))}KB`}</span>
                 </span>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button
+                  <Button
+                    size="xs"
                     onClick={() => previewSound(CUSTOM_SOUND_PREFIX + p.name)}
-                    className={buttonClass({ size: 'xs' })}
                   >
                     试听
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    size="xs"
                     onClick={() => deleteSoundPack.mutate(p.name)}
                     disabled={deleteSoundPack.isPending && deleteSoundPack.variables === p.name}
-                    className={buttonClass({ size: 'xs' })}
                   >
                     {deleteSoundPack.isPending && deleteSoundPack.variables === p.name ? '删除中' : '删除'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -520,13 +524,15 @@ export function AlertPopupSettings() {
                 <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>
               ))}
             </select>
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => previewVoice()}
               disabled={!toastEnabled || !voiceEnabled}
-              className="px-2 h-8 rounded-btn border border-border bg-base text-xs text-secondary hover:text-foreground hover:border-accent/30 disabled:opacity-50 transition-colors cursor-pointer"
+              className="px-2 text-secondary hover:border-accent/30"
             >
               试听
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -611,14 +617,15 @@ function DataDoctorSection() {
         这类缺失<b className="text-secondary">不会报错</b>,只会被当成「你没设过」静默处理。
         体检只读不改;补齐前会先备份,并且<b className="text-secondary">一条记录都不删</b>。
       </>}>
-        <button
+        <Button
+          variant="secondary"
           onClick={() => void run()}
           disabled={busy}
-          className={buttonClass({ size: 'sm', variant: 'secondary' }, 'shrink-0 gap-1.5')}
+          className="shrink-0 gap-1.5"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Stethoscope className="h-3.5 w-3.5" />}
           {busy ? '体检中…' : '开始体检'}
-        </button>
+        </Button>
       </SettingRow>
 
       {report && (
@@ -647,15 +654,16 @@ function DataDoctorSection() {
                 )}
                 {/* 补齐只对用户数据、且只补声明过默认值的那些 */}
                 {s.kind === 'user' && Object.keys(s.missing).length > 0 && (
-                  <button
+                  <Button
+                    size="xs"
                     onClick={() => void heal(s.rel, s.cn)}
                     disabled={healing === s.rel}
                     title="按默认值补上缺的字段。已有的值一个都不动,改动前先备份。"
-                    className={buttonClass({ size: 'xs' }, 'ml-auto gap-1')}
+                    className="ml-auto gap-1"
                   >
                     {healing === s.rel ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wrench className="h-3 w-3" />}
                     补齐
-                  </button>
+                  </Button>
                 )}
               </div>
               {!!s.error && <p className="mt-1 text-micro text-danger">{s.error}</p>}
@@ -811,12 +819,12 @@ function UpgradeGuardCard() {
         {st?.enabled && (
           <div className="flex shrink-0 items-center gap-2">
             <span className="text-micro text-muted">清单 {st?.manifest_version ?? '—'} · 当前 {st?.current_version}</span>
-            <button onClick={scan} disabled={busy === 'scan' || !!st?.scanning}
+            <Button variant="ghost" size="xs" onClick={scan} disabled={busy === 'scan' || !!st?.scanning}
               title="重新扫描程序目录, 刷新常备备份 (修改程序文件后可手动执行)"
-              className="inline-flex items-center gap-1.5 rounded-card px-2.5 py-1 text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground disabled:opacity-50">
+              className="gap-1.5 px-2.5 text-secondary">
               <RefreshCw className={`h-3 w-3 ${busy === 'scan' || st?.scanning ? 'animate-spin' : ''}`} />
               {busy === 'scan' || st?.scanning ? '扫描中' : '重新扫描'}
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -856,16 +864,16 @@ function UpgradeGuardCard() {
             </div>
             <div className="flex shrink-0 gap-2">
               {restorableFiles.length > 0 && (
-                <button onClick={() => restoreAll(report.id, restorableFiles)} disabled={!!busy}
-                  className="inline-flex items-center gap-1.5 rounded-card bg-accent px-2.5 py-1 text-micro text-on-accent hover:bg-accent/90 disabled:opacity-50">
+                <Button variant="primary" size="xs" onClick={() => restoreAll(report.id, restorableFiles)} disabled={!!busy}
+                  className="gap-1.5 px-2.5 text-micro">
                   <RotateCcw className="h-3 w-3" />
                   恢复可恢复项 ({restorableFiles.length})
-                </button>
+                </Button>
               )}
-              <button onClick={dismiss} disabled={busy === 'dismiss'}
-                className="rounded-card px-2.5 py-1 text-micro text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-50">
+              <Button variant="ghost" size="xs" onClick={dismiss} disabled={busy === 'dismiss'}
+                className="px-2.5 text-micro text-secondary">
                 知道了
-              </button>
+              </Button>
             </div>
           </div>
           <div className="mt-2 max-h-56 overflow-y-auto rounded-btn border border-border/40 bg-base/40 p-2">
@@ -973,30 +981,28 @@ function BatchSymbolsRow({
               className="w-24 h-8 px-2 rounded-btn border border-border bg-base text-right font-mono text-xs
                          text-foreground tabular-nums focus:border-accent/50 focus:outline-none"
             />
-            <button
+            <Button
               onClick={commit}
               disabled={saving}
-              className="px-2.5 py-1.5 rounded-btn text-xs bg-surface border border-border text-foreground
-                         hover:bg-elevated transition-colors disabled:opacity-50"
+              className="px-2.5"
             >
               {saving ? '…' : '保存'}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => { setEditing(false); setHint(null) }}
-              className="px-2 py-1.5 rounded-btn text-xs bg-surface border border-border text-foreground hover:text-foreground transition-colors"
             >
               取消
-            </button>
+            </Button>
           </div>
         ) : (
-          <button
+          <Button
+            size="xs"
             onClick={() => setEditing(true)}
-            className="shrink-0 px-2.5 py-1 rounded-btn border border-border bg-surface font-mono text-xs
-                       text-foreground tabular-nums hover:border-accent/50 transition-colors"
+            className="shrink-0 px-2.5 font-mono tabular-nums hover:border-accent/50"
             title="点击修改"
           >
             {value} {unit}
-          </button>
+          </Button>
         )}
       </div>
       {hint && <div className="mt-1.5 text-micro text-warning">{hint}</div>}

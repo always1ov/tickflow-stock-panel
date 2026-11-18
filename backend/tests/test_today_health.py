@@ -377,14 +377,16 @@ def test_R319_市场时钟只有一处产地():
     # 而这条规矩本来就是"**谁都不许自己换时区**"。
     from tests.frontend_source import SRC
 
-    # **两处已知欠账**, 早于 R319 就存在(那一轮只修了卡片与今日总览):
-    #   · SectorRotationCard.beijingDateParts()  自己算 {date, minutes}
+    # **一处已知欠账**, 早于 R319 就存在(那一轮只修了卡片与今日总览):
     #   · lib/kline.ts 的 cnToday() / cnNowHHMM() 配 MARKET_ALL_OVER='15:30'
-    # 两个都**真的在判时段**, 不是格式化时间戳 —— 立论说的就是它们。没有当场修:
-    # `marketClock` 现在只出 `{day, mins}`, 要接这两处得先给它加日期字符串的出口,
-    # 那是另一件事。**记在这儿而不是让守卫绕开它们** —— 名单摆在明面上, 才不会
-    # 被下一个人当成"本来就允许"。
-    KNOWN_DEBT = {"components/SectorRotationCard.tsx", "lib/kline.ts"}
+    # 它**真的在判时段**, 不是格式化时间戳 —— 立论说的就是它。没有当场修:
+    # `marketClock` 现在只出 `{day, mins}`(和 R814 补的日期串), 要接这处得先确认
+    # 它与 `MARKET_ALL_OVER` 的口径一致, 那是另一件事。**记在这儿而不是让守卫绕开
+    # 它** —— 名单摆在明面上, 才不会被下一个人当成"本来就允许"。
+    #
+    # [R814] 原名单里的 `components/SectorRotationCard.tsx` 已删: 它现在从
+    # `lib/marketSession.ts` 取 `beijingDateParts`, 自己不再换时区了。
+    KNOWN_DEBT = {"lib/kline.ts"}
 
     # [R371] 上游新增了 `lib/format.ts` 的 cnDateFromUtc/cnDateTimeFromUtc: 把
     # **调用方传进来的**时间戳按北京时间渲染, 自己从不取"现在"。上面那句立论说的是

@@ -47,7 +47,7 @@ import { PluginMetadata } from '@/components/data/PluginMetadata'
 import { HistMinuteBackupCard } from './HistMinuteBackupCard'
 import { DataSourceEditor } from './DataSourceEditor'
 import { TickFlowKeySection, TierHelpPopover, useInvalidateTierRelated } from './Keys'
-import { buttonClass, TYPE } from '@/components/ui'
+import { Button, TYPE } from '@/components/ui'
 import { cn } from '@/lib/cn'
 
 const DATASET_LABEL: Record<string, string> = {
@@ -324,14 +324,16 @@ function CapabilityRoutingSection() {
           <span className="text-micro text-muted/60 shrink-0">{list.length} 个能力</span>
         </div>
         {anyCustom && (
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={() => resetMut.mutate()}
             disabled={resetMut.isPending}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn text-xs text-secondary hover:text-foreground hover:bg-elevated transition-colors disabled:opacity-50 shrink-0"
+            className="gap-1.5 px-2.5 shrink-0"
           >
             <RefreshCw className={`h-3 w-3 ${resetMut.isPending ? 'animate-spin' : ''}`} />
             恢复默认
-          </button>
+          </Button>
         )}
       </div>
       <p className="text-xs text-muted mb-4">
@@ -345,12 +347,12 @@ function CapabilityRoutingSection() {
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">能力矩阵加载失败: {(matrix.error as Error)?.message || '未知错误'}</span>
           </div>
-          <button
+          <Button
             onClick={() => matrix.refetch()}
-            className="text-xs text-secondary hover:text-foreground shrink-0"
+            className="shrink-0"
           >
             重试
-          </button>
+          </Button>
         </div>
       ) : matrix.isLoading || list.length === 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
@@ -468,14 +470,16 @@ export function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
           </div>
         </div>
         {plugin.available && (
-          <button
+          <Button
+            variant="danger"
+            size="xs"
             onClick={() => clear.mutate()}
             disabled={clear.isPending}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-btn bg-surface border border-border text-foreground hover:text-danger text-xs transition-colors duration-hover ease-smooth disabled:opacity-50 shrink-0"
+            className="gap-1.5 px-2.5 shrink-0"
           >
             <Trash2 className="h-3 w-3" />
             清除
-          </button>
+          </Button>
         )}
       </div>
 
@@ -504,14 +508,15 @@ export function PluginKeyConfig({ plugin }: { plugin: PluginDataSourceItem }) {
             {revealing ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
-        <button
+        <Button
           type="submit"
+          variant="primary"
           disabled={save.isPending || (!keyInput.trim() && !saved)}
-          className={buttonClass({ variant: 'primary' }, 'w-full justify-center gap-2')}
+          className="w-full justify-center gap-2"
         >
           {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
           {save.isPending ? '验证中...' : saved ? '已保存' : '保存并检测'}
-        </button>
+        </Button>
       </form>
 
       {/* 无效 Key —— 先探后存: 探测失败时不存储 */}
@@ -718,15 +723,14 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <ExtensionSlot name="settings.data-sources.toolbar" context={{ refresh: invalidateSources, selectSource: setSelected }} compact />
-            <button
-              type="button"
+            <Button
               onClick={() => reload.mutate()}
               disabled={reload.isPending}
-              className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-btn border border-border/70 bg-surface px-3 text-xs font-medium text-secondary transition-colors hover:border-border hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:pointer-events-none disabled:opacity-50"
+              className="shrink-0 gap-1.5 whitespace-nowrap"
             >
               <RefreshCw aria-hidden="true" className={`h-3.5 w-3.5 ${reload.isPending ? 'animate-spin' : ''}`} />
               重新加载
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -976,19 +980,21 @@ export function SettingsDataSourcesPanel({ highlight }: { highlight?: string } =
               确认删除「{customList.find(s => s.name === confirmDelete)?.display_name || confirmDelete}」? 该数据源的配置文件将被移除,此操作不可撤销。
             </p>
             <div className="flex items-center justify-end gap-2">
-              <button
+              <Button
+                size="md"
                 onClick={() => setConfirmDelete(null)}
-                className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground hover:bg-elevated/80 text-sm transition-colors"
               >
                 取消
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
+                size="md"
                 onClick={() => remove.mutate(confirmDelete)}
                 disabled={remove.isPending}
-                className="px-3 py-1.5 rounded-btn bg-danger/15 text-danger hover:bg-danger/25 text-sm font-medium transition-colors disabled:opacity-50"
+                className="bg-danger/15 text-danger hover:bg-danger/25"
               >
                 {remove.isPending ? '删除中...' : '确认删除'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

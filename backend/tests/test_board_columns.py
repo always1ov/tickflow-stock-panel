@@ -813,8 +813,11 @@ def test_R257_阶段的说明必须留在悬停里():
     assert "该盯什么" in cells, "「该盯什么」没了"
     from tests.frontend_source import code_of
     code = code_of("components/stock-analysis/decision-board/cells.tsx")
-    assert code.count("phaseLines(ph)") == 2, (
-        f"用到 phaseLines 的地方有 {code.count('phaseLines(ph)')} 处 —— 该是走势列与结论列各一"
+    # [R814] 数字从 2 调到 1: R425 把「走势」「位置」并成一格之后, 阶段的说明
+    # 只剩这一个消费方。规矩没变 —— 仍然只有 `phaseLines` 一处产地;
+    # R812 精简悬停时把它连根删了, 这一批补回来。
+    assert code.count("phaseLines(ph)") == 1, (
+        f"用到 phaseLines 的地方有 {code.count('phaseLines(ph)')} 处 —— 该是这一格一处"
     )
     assert "【通道】" not in code, "又有人另写了一份阶段文案"
 

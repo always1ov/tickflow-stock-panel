@@ -21,7 +21,7 @@ import { SettingsCard, SettingsHighlight } from './SettingsCard'
 import { Switch } from '@/components/ui/Switch'
 import { toast } from '@/components/Toast'
 import { DepthConfigContent } from '@/components/data/DepthConfigCard'
-import { buttonClass } from '@/components/ui'
+import { Button } from '@/components/ui'
 
 // 卡片定位锚点: highlight=<anchor> 时该卡片滚动到视口中央并闪烁高亮。
 // 其他页面用 /settings?tab=monitoring&highlight=<anchor> 精确引导用户到某张卡片。
@@ -343,16 +343,15 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
           anchor="depth-fix"
           badge={!hasDepth ? '五档盘口不可用' : undefined}
           right={hasDepth ? (
-            <button
+            <Button
+              size="xs"
               onClick={() => runFix.mutate()}
               disabled={runFix.isPending}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-xs
-                         bg-surface border border-border text-foreground hover:bg-elevated transition-colors
-                         disabled:opacity-50 disabled:cursor-not-allowed"
+              className="gap-1 px-2"
             >
               <Zap className="h-3 w-3" />
               {runFix.isPending ? '修正中…' : '立即修正'}
-            </button>
+            </Button>
           ) : undefined}
         >
           {hasDepth ? (
@@ -742,24 +741,25 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
                   )}
 
                   <div className="mt-2 flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={submitFeishu}
                       disabled={saveFeishuWebhook.isPending || (!feishuDraft.trim() && !feishuSecretDraft.trim())}
-                      className={buttonClass({ variant: 'primary' })}
                     >
                       {saveFeishuWebhook.isPending ? '保存中…' : '保存'}
-                    </button>
+                    </Button>
                     <TestSendButton test={testFeishu} configured={feishuWebhookUrlSet} />
                     {feishuWebhookUrlSet && (
                       <>
                         <span className="text-micro text-bear">● 已配置</span>
-                        <button
+                        <Button
+                          variant="danger"
+                          size="xs"
                           onClick={clearFeishu}
                           disabled={saveFeishuWebhook.isPending}
-                          className={buttonClass({ variant: 'danger', size: 'xs' })}
                         >
                           清除
-                        </button>
+                        </Button>
                       </>
                     )}
                     <TestResult test={testFeishu} />
@@ -827,24 +827,25 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
                   )}
 
                   <div className="mt-2 flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={submitWecom}
                       disabled={saveWecomWebhook.isPending || !wecomDraft.trim()}
-                      className={buttonClass({ variant: 'primary' })}
                     >
                       {saveWecomWebhook.isPending ? '保存中…' : '保存'}
-                    </button>
+                    </Button>
                     <TestSendButton test={testWecom} configured={wecomWebhookUrlSet} />
                     {wecomWebhookUrlSet && (
                       <>
                         <span className="text-micro text-bear">● 已配置</span>
-                        <button
+                        <Button
+                          variant="danger"
+                          size="xs"
                           onClick={clearWecom}
                           disabled={saveWecomWebhook.isPending}
-                          className={buttonClass({ variant: 'danger', size: 'xs' })}
                         >
                           清除
-                        </button>
+                        </Button>
                       </>
                     )}
                     <TestResult test={testWecom} />
@@ -922,31 +923,32 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
                   )}
 
                   <div className="mt-2 flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={submitDingtalk}
                       disabled={saveDingtalkWebhook.isPending || (!dingtalkDraft.trim() && dingtalkKeywordDraft.trim() === dingtalkKeyword)}
-                      className={buttonClass({ variant: 'primary' })}
                     >
                       {saveDingtalkWebhook.isPending ? '保存中…' : '保存'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => testDingtalk.mutate()}
                       disabled={!dingtalkWebhookUrlSet || testDingtalk.isPending}
                       title={dingtalkWebhookUrlSet ? '用已保存的配置发一条测试消息' : '请先保存配置'}
-                      className="px-3 py-1.5 rounded-btn border border-border bg-surface text-xs text-secondary hover:text-accent hover:border-accent/30 disabled:opacity-50 cursor-pointer transition-colors"
+                      className="text-secondary hover:border-accent/30 hover:text-accent"
                     >
                       {testDingtalk.isPending ? '发送中…' : '测试'}
-                    </button>
+                    </Button>
                     {dingtalkWebhookUrlSet && (
                       <>
                         <span className="text-micro text-bear">● 已配置</span>
-                        <button
+                        <Button
+                          variant="danger"
+                          size="xs"
                           onClick={clearDingtalk}
                           disabled={saveDingtalkWebhook.isPending}
-                          className={buttonClass({ variant: 'danger', size: 'xs' })}
                         >
                           清除
-                        </button>
+                        </Button>
                       </>
                     )}
                   </div>
@@ -1019,13 +1021,13 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
                   </label>
                   {customError && <div className="mt-2 text-xs text-danger">{customError}</div>}
                   <div className="mt-2 flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={submitCustom}
                       disabled={saveCustomWebhook.isPending || (customDraft.trim() === customWebhookUrl && !customSecretDraft)}
-                      className={buttonClass({ variant: 'primary' })}
                     >
                       {saveCustomWebhook.isPending ? '保存中…' : '保存'}
-                    </button>
+                    </Button>
                     <TestSendButton test={testCustom} configured={!!customWebhookUrl} />
                     <TestResult test={testCustom} />
                   </div>
@@ -1105,9 +1107,9 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
                   </div>
                   {emailError && <div className="mt-2 text-xs text-danger">{emailError}</div>}
                   <div className="mt-2 flex items-center gap-2">
-                    <button onClick={submitEmail} disabled={saveEmailSmtp.isPending} className={buttonClass({ variant: 'primary' })}>
+                    <Button variant="primary" onClick={submitEmail} disabled={saveEmailSmtp.isPending}>
                       {saveEmailSmtp.isPending ? '保存中…' : '保存'}
-                    </button>
+                    </Button>
                     <TestSendButton test={testEmail} configured={emailConfigured} />
                     <TestResult test={testEmail} />
                   </div>
@@ -1173,13 +1175,13 @@ export function PushChannelsCard({ highlight }: { highlight?: string } = {}) {
                   )}
 
                   <div className="mt-2 flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="primary"
                       onClick={submitBot}
                       disabled={saveWecomBot.isPending || (botIdDraft.trim() === wecomBotId && !botSecretDraft.trim())}
-                      className={buttonClass({ variant: 'primary' })}
                     >
                       {saveWecomBot.isPending ? '保存中…' : '保存并连接'}
-                    </button>
+                    </Button>
                     {wecomBotId && (
                       <span className="text-micro text-bear">● 已配置</span>
                     )}
@@ -1222,14 +1224,14 @@ function TestSendButton({ test, configured }: {
   configured: boolean
 }) {
   return (
-    <button
+    <Button
       onClick={() => test.mutate()}
       disabled={test.isPending || !configured}
       title={!configured ? '请先完成该渠道配置' : '发送测试消息'}
-      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground hover:text-foreground text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      className="gap-1"
     >
       {test.isPending ? '测试中…' : '测试'}
-    </button>
+    </Button>
   )
 }
 

@@ -8,6 +8,7 @@ import {
   type GroupStatsConfig,
   type GroupStatsConfigPatch,
 } from '@/lib/watchlistGroupStats'
+import { Switch } from '@/components/ui'
 
 /**
  * 分组「指标 + 排序」设置弹层 — 分组统计条与分组卡片共用。
@@ -121,41 +122,21 @@ export function GroupStatsSettings({
               <div className="mt-2 space-y-1.5">
                 <div className="flex items-center justify-between" title="分组卡片头部是否显示分组颜色底条">
                   <span className="text-micro text-secondary">头部颜色</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={config.cardColorBar}
-                    aria-label="切换卡片头部颜色"
-                    onClick={() => onChange({ cardColorBar: !config.cardColorBar })}
-                    className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
-                      config.cardColorBar ? 'bg-accent/60' : 'bg-surface border border-border hover:bg-elevated/80'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 h-3 w-3 rounded-full transition-all ${
-                        config.cardColorBar ? 'left-[14px] bg-white' : 'left-0.5 bg-muted'
-                      }`}
-                    />
-                  </button>
+                  <Switch
+                    size="sm"
+                    checked={config.cardColorBar}
+                    onChange={next => onChange({ cardColorBar: next })}
+                    label="切换卡片头部颜色"
+                  />
                 </div>
                 <div className="flex items-center justify-between" title="成员行左侧是否显示排名序号">
                   <span className="text-micro text-secondary">序号</span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={config.cardRank}
-                    aria-label="切换卡片序号显示"
-                    onClick={() => onChange({ cardRank: !config.cardRank })}
-                    className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
-                      config.cardRank ? 'bg-accent/60' : 'bg-surface border border-border hover:bg-elevated/80'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 h-3 w-3 rounded-full transition-all ${
-                        config.cardRank ? 'left-[14px] bg-white' : 'left-0.5 bg-muted'
-                      }`}
-                    />
-                  </button>
+                  <Switch
+                    size="sm"
+                    checked={config.cardRank}
+                    onChange={next => onChange({ cardRank: next })}
+                    label="切换卡片序号显示"
+                  />
                 </div>
               </div>
             </>

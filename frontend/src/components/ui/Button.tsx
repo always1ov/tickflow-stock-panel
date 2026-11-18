@@ -75,6 +75,11 @@ export const SELECTED = 'border border-foreground bg-foreground font-medium text
  */
 // [R449] 定高, 与个股弹窗同一套: 默认一档 32px 高、13px 字(弹窗的 PILL)。
 // 同一排按钮高度一致, 不再随字号、边框各自长高。
+//
+// [R814] **实际只有两档高度: 28 / 32。** `tailwind.config.ts` 把 `spacing.9`
+// 改写成 `2rem`, 所以 `h-9 === h-8 === 32px` —— `md` 不是更高的按钮, 而是
+// 同一高度上字更大(15px)、横向更宽(px-4)的那一档, 只给弹窗里的主操作。
+// 要真的加一档高度, 得先改 config 里的 `spacing`, 不要在这里写任意值。
 const SIZE: Record<ButtonSize, string> = {
   // 小号只是矮一点(28px), 字仍是正文级 13px —— 按钮一律正文级, 不落到标签级
   xs: 'h-7 gap-g2 px-2 text-xs',

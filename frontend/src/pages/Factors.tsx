@@ -15,7 +15,7 @@ import { FactorComposite } from './factors/FactorComposite'
 import { FactorEditor } from './factors/FactorEditor'
 import { FactorLibrary } from './factors/FactorLibrary'
 import { ResearchCandidatesDialog } from './backtest/ResearchCandidatesDialog'
-import { buttonClass } from '@/components/ui'
+import { Button, ToolbarDivider } from '@/components/ui'
 import { PageTabs, type PageTabDef } from '@/components/PageTabs'
 
 type Tab = 'discover' | 'create' | 'library'
@@ -87,17 +87,16 @@ export function Factors() {
         className="shrink-0 flex-wrap gap-x-4 gap-y-2 bg-base/95 px-3 lg:flex-nowrap lg:px-5"
         right={(
           <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:gap-2 lg:w-auto lg:flex-nowrap">
-            <button
-              type="button"
+            <Button
               onClick={() => setCandidatesOpen(true)}
               aria-label="打开候选方案"
               title="候选方案"
-              className={buttonClass({}, 'shrink-0 gap-1.5')}
+              className="shrink-0 gap-1.5"
             >
               <BookmarkCheck className="h-3.5 w-3.5" />
               <span>候选方案</span>
-            </button>
-            <span className="h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+            </Button>
+            <ToolbarDivider />
             {/* [R537] 分栏条走共用件 —— 长相不变, 产地一个 */}
             <div className="min-w-0 flex-1 lg:flex-none">
               <PageTabs tabs={TABS} active={activeTab} onChange={changeTab} label="因子视图" />
@@ -115,20 +114,17 @@ export function Factors() {
         {activeTab === 'create' && (
           <div className="flex h-full min-h-0 flex-col gap-3">
             <div className="flex shrink-0 items-center px-1">
-              <div className="inline-flex rounded-btn border border-border bg-surface/80 p-0.5">
+              <div className="flex items-center gap-g2">
                 {CREATE_MODES.map(({ id, label }) => (
-                  <button
+                  <Button
                     key={id}
-                    type="button"
+                    size="sm"
+                    selected={createMode === id}
                     onClick={() => patchParams({ mode: id, edit: null })}
                     aria-current={createMode === id ? 'true' : undefined}
-                    className={`inline-flex h-7 items-center gap-1.5 rounded-[5px] px-3 text-xs font-medium transition-colors ${createMode === id
-                      ? 'bg-accent text-on-accent shadow-sm'
-                      : 'text-secondary hover:bg-elevated hover:text-foreground'
-                    }`}
                   >
                     {label}
-                  </button>
+                  </Button>
                 ))}
               </div>
               {createMode === 'editor' && editId && (

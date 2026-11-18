@@ -8,7 +8,7 @@ import { klineMinuteQueryOptions, klineMinuteRangeQueryOptions, minuteRefetchInt
 import { minuteEmptyText, minuteFetchErrorText } from '@/lib/intraday-chart'
 import { toast } from '@/components/Toast'
 import type { ChartRenderer } from '@/lib/chart-types'
-import { buttonClass } from '@/components/ui'
+import { buttonClass, Button } from '@/components/ui'
 
 const EChartsMultiDayIntraday = lazy(() => import('./EChartsMultiDayIntraday').then(m => ({ default: m.EChartsMultiDayIntraday })))
 const LightweightIntraday = lazy(() => import('./charts/LightweightIntraday').then(m => ({ default: m.LightweightIntraday })))
@@ -141,14 +141,14 @@ export function StockMultiDayIntradayChart({
     return (
       <div className="flex flex-col items-center justify-center gap-3 text-xs" style={{ height }}>
         <span className="text-danger">{minuteFetchErrorText(queryError)}</span>
-        <button
+        <Button
           type="button"
           onClick={() => { void history.refetch(); void latest.refetch() }}
-          className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-1.5 text-foreground hover:text-foreground"
+          className="gap-1.5"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           重新加载
-        </button>
+        </Button>
       </div>
     )
   }

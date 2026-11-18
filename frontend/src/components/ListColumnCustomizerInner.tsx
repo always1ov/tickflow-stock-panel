@@ -25,6 +25,7 @@ import type { ColumnConfig, ColumnGroup, ExtColumnDisplayConfig, CandleColumnCon
 import { resolveCandleConfig, resolveIntradayConfig, hasAuctionVolumeField, isAuctionActive, AUCTION_WIDTH_RATIOS, resolveChartLink, LINK_HEIGHT_BOUNDS, restoreColumnsFromBaseline } from '@/lib/list-columns'
 import { MiniIntraday } from '@/components/stock-table/MiniIntraday'
 import { MiniCandlestick } from '@/components/stock-table/MiniCandlestick'
+import { Switch } from '@/components/ui'
 import type { MinuteKlineRow, KlineRow } from '@/lib/api'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 
@@ -768,18 +769,11 @@ function extGranularityOf(
             <div className="border-t border-border/40 pt-2 mt-1 text-micro text-muted">数字格式</div>
             <label className="flex items-center gap-2 text-xs">
               <span className="text-secondary w-16 shrink-0">千分位</span>
-              <button
-                type="button"
-                onClick={() => updateExtDisplay(col.id, { thousandSeparator: !col.extDisplay?.thousandSeparator })}
-                className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-                  col.extDisplay?.thousandSeparator ? 'bg-accent' : 'bg-surface border border-border'
-                }`}
-                aria-pressed={!!col.extDisplay?.thousandSeparator}
-              >
-                <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                  col.extDisplay?.thousandSeparator ? 'translate-x-[14px]' : 'translate-x-0.5'
-                }`} />
-              </button>
+              <Switch
+                size="sm"
+                checked={!!col.extDisplay?.thousandSeparator}
+                onChange={next => updateExtDisplay(col.id, { thousandSeparator: next })}
+              />
               <span className="text-micro text-muted">如 1,234,567</span>
             </label>
             <label className="flex items-center gap-2 text-xs">
@@ -916,13 +910,6 @@ function extGranularityOf(
       ? Math.min(LINK_HEIGHT_BOUNDS.max, Math.max(LINK_HEIGHT_BOUNDS.min, link.height))
       : seedHeight
 
-    const toggleCls = (on: boolean) => `relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-      on ? 'bg-accent' : 'bg-elevated'
-    }`
-    const knobCls = (on: boolean) => `inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-      on ? 'translate-x-[14px]' : 'translate-x-0.5'
-    }`
-
     return (
       <>
         <div className="border-t border-border/40 pt-2 mt-1 text-micro text-muted">
@@ -930,15 +917,12 @@ function extGranularityOf(
         </div>
         <div className="flex items-center justify-between">
           <div className="text-micro text-muted">统一高度</div>
-          <button
-            type="button"
-            onClick={() => updateChartLink(linkOn ? { linkHeight: false } : { linkHeight: true, height: seedHeight })}
-            className={toggleCls(linkOn)}
-            aria-pressed={linkOn}
-            aria-label="统一日k与分时的展开高度"
-          >
-            <span className={knobCls(linkOn)} />
-          </button>
+          <Switch
+            size="sm"
+            checked={linkOn}
+            onChange={next => updateChartLink(next ? { linkHeight: true, height: seedHeight } : { linkHeight: false })}
+            label="统一日k与分时的展开高度"
+          />
         </div>
         {linkOn ? (
           <>
@@ -1030,15 +1014,12 @@ function extGranularityOf(
           {/* 成交量副图: 本列自管 (与分时各自独立) */}
           <div className="border-t border-border/40 pt-2 mt-1 flex items-center justify-between">
             <div className="text-micro text-muted">成交量副图</div>
-            <button
-              type="button"
-              onClick={() => updateCandleConfig(col.id, { volume: !cfg.volume })}
-              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${cfg.volume ? 'bg-accent' : 'bg-surface border border-border'}`}
-              aria-pressed={cfg.volume}
-              aria-label="显示成交量副图"
-            >
-              <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${cfg.volume ? 'translate-x-[14px]' : 'translate-x-0.5'}`} />
-            </button>
+            <Switch
+              size="sm"
+              checked={cfg.volume}
+              onChange={next => updateCandleConfig(col.id, { volume: next })}
+              label="显示成交量副图"
+            />
           </div>
           <div className="text-micro text-muted leading-relaxed">
             开启后在价格区下方显示成交量柱；分时副图在分时列单独设置。
@@ -1186,15 +1167,12 @@ function extGranularityOf(
               恒显示 — 开关只控制分钟量柱, 不禁用 */}
           <div className="border-t border-border/40 pt-2 mt-1 flex items-center justify-between">
             <div className="text-micro text-muted">成交量副图</div>
-            <button
-              type="button"
-              onClick={() => updateIntradayConfig(col.id, { volume: !cfg.volume })}
-              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${cfg.volume ? 'bg-accent' : 'bg-surface border border-border'}`}
-              aria-pressed={cfg.volume}
-              aria-label="显示成交量副图"
-            >
-              <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${cfg.volume ? 'translate-x-[14px]' : 'translate-x-0.5'}`} />
-            </button>
+            <Switch
+              size="sm"
+              checked={cfg.volume}
+              onChange={next => updateIntradayConfig(col.id, { volume: next })}
+              label="显示成交量副图"
+            />
           </div>
           <div className="text-micro text-muted leading-relaxed">
             开启后在价格区下方显示分钟成交量柱；日k量带在日k列单独设置。
@@ -1203,19 +1181,12 @@ function extGranularityOf(
 
           <div className="border-t border-border/40 pt-2 mt-1 flex items-center justify-between">
             <div className="text-micro text-muted">集合竞价叠加</div>
-            <button
-              type="button"
-              onClick={() => updateAuction({ enabled: !auction?.enabled })}
-              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-                auction?.enabled ? 'bg-accent' : 'bg-surface border border-border'
-              }`}
-              aria-pressed={!!auction?.enabled}
-              aria-label="显示集合竞价窄栏"
-            >
-              <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                auction?.enabled ? 'translate-x-[14px]' : 'translate-x-0.5'
-              }`} />
-            </button>
+            <Switch
+              size="sm"
+              checked={!!auction?.enabled}
+              onChange={next => updateAuction({ enabled: next })}
+              label="显示集合竞价窄栏"
+            />
           </div>
           {auction?.enabled && (
             <>

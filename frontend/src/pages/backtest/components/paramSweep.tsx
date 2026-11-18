@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react'
 import type { StrategyDetail, StrategyParamDef } from '@/lib/api'
 import { paramDisplayLabel, visibleParams } from '@/lib/strategyParams'
 import { StrategyOptions } from '@/components/StrategyOptions'
+import { Checkbox, fieldInput, fieldSelect } from '@/components/ui'
 
 /** 参数扫描配置的共享逻辑与 UI — 优化器与 walk-forward 复用。 */
 
-export const INPUT_CLS =
-  'w-full px-2.5 py-1.5 rounded-input bg-surface border border-border text-xs focus:outline-none focus:border-accent'
+export const INPUT_CLS = `${fieldInput} w-full text-xs`
 
 // 可选优化目标 (对齐后端 VALID_OBJECTIVES) + 中文标签
 export const OBJECTIVES: { id: string; label: string }[] = [
@@ -140,7 +140,7 @@ export function StrategySelect({ strategies, value, onChange }: {
   onChange: (id: string) => void
 }) {
   return (
-    <select aria-label="选择策略" value={value} onChange={e => onChange(e.target.value)} className={INPUT_CLS}>
+    <select aria-label="选择策略" value={value} onChange={e => onChange(e.target.value)} className={`${fieldSelect} w-full`}>
       <option value="">选择策略…</option>
       <StrategyOptions strategies={strategies} selected={[value]} />
     </select>
@@ -171,7 +171,7 @@ export function SweepParamList({ params, sweeps, updateSweep, hiddenLabels = [] 
           return (
             <div key={p.id} className="rounded-input border border-border/60 p-2">
               <label className="flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={s.enabled} onChange={e => updateSweep(p.id, { enabled: e.target.checked })} />
+                <Checkbox checked={s.enabled} onChange={e => updateSweep(p.id, { enabled: e.target.checked })} />
                 <span className="font-medium text-foreground">{paramDisplayLabel(p)}</span>
                 <span className="text-secondary">({p.type})</span>
               </label>
@@ -200,7 +200,7 @@ export function CombosHint({ show, combos, gridError }: { show: boolean; combos:
   if (!show) return null
   const bad = combos > GRID_MAX_COMBINATIONS || !!gridError
   return (
-    <div className={`text-xs ${bad ? 'text-red-400' : 'text-secondary'}`}>
+    <div className={`text-xs ${bad ? 'text-danger' : 'text-secondary'}`}>
       {gridError
         ? gridError
         : combos === 0

@@ -5,12 +5,13 @@ import { api, type GuardianCombinationSuggestion, type GuardianConfig, type Guar
 import { QK } from '@/lib/queryKeys'
 import { EmptyState } from '@/components/EmptyState'
 import { INPUT_CLS, PRIMARY_OBJECTIVES, StrategySelect } from './components/paramSweep'
+import { Badge, Button, Card, Checkbox, fieldSelect, type BadgeTone } from '@/components/ui'
 
-const STATUS_META: Record<GuardianProfile['status'], { label: string; cls: string }> = {
-  pending: { label: '未复验', cls: 'bg-elevated text-secondary' },
-  healthy: { label: '健康', cls: 'bg-emerald-500/15 text-emerald-400' },
-  watch: { label: '观察', cls: 'bg-warning/15 text-warning' },
-  retired: { label: '已退役', cls: 'bg-red-500/15 text-red-400' },
+const STATUS_META: Record<GuardianProfile['status'], { label: string; tone: BadgeTone }> = {
+  pending: { label: '未复验', tone: 'neutral' },
+  healthy: { label: '健康', tone: 'accent' },
+  watch: { label: '观察', tone: 'warning' },
+  retired: { label: '已退役', tone: 'danger' },
 }
 
 const BASELINE_KIND_LABEL: Record<string, string> = {
@@ -29,10 +30,10 @@ function fmtNum(v: number | null | undefined, digits = 2): string {
 function StatusBadge({ status }: { status: GuardianProfile['status'] }) {
   const meta = STATUS_META[status]
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-micro font-medium ${meta.cls}`}>
-      {status === 'healthy' && <ShieldCheck className="mr-0.5 h-3 w-3" />}
+    <Badge tone={meta.tone}>
+      {status === 'healthy' && <ShieldCheck className="h-3 w-3" />}
       {meta.label}
-    </span>
+    </Badge>
   )
 }
 
@@ -50,15 +51,13 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
     patch.mutate(body)
   }
   return (
-    <div className="rounded-card border border-border bg-surface p-3">
+    <Card>
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium">守护设置</div>
         <label className="flex cursor-pointer items-center gap-1.5 text-xs text-secondary">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={config.guardian_schedule_enabled}
             onChange={e => update({ guardian_schedule_enabled: e.target.checked })}
-            className="h-3.5 w-3.5 accent-[var(--color-accent)]"
           />
           每日自动复验 (收盘数据更新后)
         </label>
@@ -106,8 +105,8 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
         </label>
         <div className="text-micro text-secondary">基线后退化为百分比; 段回测失败只降级到观察, 不会直接退役</div>
       </div>
-      {error && <div className="mt-2 text-micro text-red-400">{error}</div>}
-    </div>
+      {error && <div className="mt-2 text-micro text-danger">{error}</div>}
+    </Card>
   )
 }
 
@@ -124,28 +123,30 @@ function AdoptCard({ onChanged }: { onChanged: () => void }) {
     onError: (e: Error) => setError(e.message),
   })
   return (
-    <div className="rounded-card border border-border bg-surface p-3">
+    <Card>
       <div className="text-xs font-medium">加入守护</div>
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <div className="min-w-52 flex-1">
           <StrategySelect strategies={strategies} value={strategyId} onChange={setStrategyId} />
         </div>
-        <select value={objective} onChange={e => setObjective(e.target.value)} className={`${INPUT_CLS} w-32`}>
+        <select value={objective} onChange={e => setObjective(e.target.value)} className={`${fieldSelect} w-32`}>
           {PRIMARY_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
         </select>
-        <button
+        <Button
+          variant="primary"
+          size="sm"
           onClick={() => adopt.mutate()}
           disabled={!strategyId || adopt.isPending}
-          className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-xs font-medium text-on-accent hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="gap-1.5"
         >
           <ShieldCheck className="h-3.5 w-3.5" /> 入护并复验
-        </button>
+        </Button>
       </div>
       <div className="mt-1.5 text-micro text-secondary">
         手动入护用入护日前 252 个交易日的尾随表现作参考基线 (非样本外), 判定只针对此后新数据; 挖掘发布的策略自动入护 (门槛基线, 天然 OOS)。
       </div>
-      {error && <div className="mt-2 text-micro text-red-400">{error}</div>}
-    </div>
+      {error && <div className="mt-2 text-micro text-danger">{error}</div>}
+    </Card>
   )
 }
 
@@ -155,7 +156,7 @@ function LabReportCard({ report }: { report: LabReport | undefined }) {
   const mining = report.mining.last_run
   const refinement = mining?.refinement as { applied?: boolean; refined_weights?: number[]; original_weights?: number[] } | null | undefined
   return (
-    <div className="rounded-card border border-border bg-surface p-3">
+    <Card>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs font-medium">实验室战报</div>
         <div className="flex flex-wrap gap-2 text-micro text-secondary">
@@ -169,7 +170,7 @@ function LabReportCard({ report }: { report: LabReport | undefined }) {
               <BellRing className="h-3 w-3" /> {report.guardian.alerts} 个连续观察告警
             </span>
           )}
-          <span className={report.slots.full ? 'text-red-400' : ''}>
+          <span className={report.slots.full ? 'text-danger' : ''}>
             挖掘名额 {report.slots.active_mined}/{report.slots.limit === 0 ? '∞' : report.slots.limit}
             {report.slots.full ? ' (已满, 新候选等位)' : ''}
           </span>
@@ -180,10 +181,10 @@ function LabReportCard({ report }: { report: LabReport | undefined }) {
           ? `最近挖掘 ${mining.status} · ${mining.algorithm_version ?? '—'} · 候选 ${mining.candidate_count ?? '—'} 个 · 有效折 ${mining.valid_fold_count ?? '—'}`
           : '还没有挖掘运行'}
         {refinement?.applied === true && (
-          <span className="text-emerald-400"> · 冠军权重已精调 {JSON.stringify(refinement.original_weights)} → {JSON.stringify(refinement.refined_weights)}</span>
+          <span className="text-accent"> · 冠军权重已精调 {JSON.stringify(refinement.original_weights)} → {JSON.stringify(refinement.refined_weights)}</span>
         )}
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -202,18 +203,19 @@ function CombinationsCard({
 }) {
   const [creating, setCreating] = useState<string | null>(null)
   return (
-    <div className="rounded-card border border-border bg-surface p-3">
+    <Card>
       <div className="flex items-center justify-between">
         <div className="inline-flex items-center gap-1.5 text-xs font-medium">
           <GitMerge className="h-3.5 w-3.5 text-secondary" /> 组合建议
         </div>
-        <button
+        <Button
+          size="xs"
           onClick={onScan}
           disabled={busy}
-          className="inline-flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-micro text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-40"
+          className="gap-1"
         >
           <RefreshCw className="h-3 w-3" /> 扫描相关性
-        </button>
+        </Button>
       </div>
       {combinations.length === 0 ? (
         <div className="mt-2 text-micro text-secondary">
@@ -229,7 +231,9 @@ function CombinationsCard({
                   {item.a} <span className="text-secondary">×</span> {item.b}
                   <span className="ml-2 text-secondary">相关性 {item.corr.toFixed(2)} · {item.common_days} 日</span>
                 </span>
-                <button
+                <Button
+                  variant="primary"
+                  size="xs"
                   onClick={() => {
                     if (window.confirm(`生成组合策略 ${item.a} + ${item.b}? (等权 composite, 自动加入守护)`)) {
                       setCreating(key)
@@ -240,16 +244,16 @@ function CombinationsCard({
                     }
                   }}
                   disabled={busy || creating === key}
-                  className="shrink-0 rounded-btn bg-accent px-2 py-1 text-micro font-medium text-on-accent hover:opacity-90 disabled:opacity-40"
+                  className="shrink-0"
                 >
                   {creating === key ? '生成中…' : '生成组合'}
-                </button>
+                </Button>
               </div>
             )
           })}
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -304,13 +308,13 @@ export function StrategyGuardian() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-1">
       {(error || queryError) && (
-        <div className="rounded-input border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+        <div className="rounded-input border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
           {error ?? (queryError instanceof Error ? queryError.message : '加载失败')}
         </div>
       )}
 
       {activeRun && (
-        <div className="rounded-card border border-border bg-surface px-3 py-2">
+        <Card padding="tight">
           <div className="flex items-center justify-between text-xs">
             <span className="inline-flex items-center gap-1.5 text-secondary">
               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -320,11 +324,11 @@ export function StrategyGuardian() {
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-elevated">
             <div
-              className="h-full bg-accent transition-all"
+              className="h-full bg-accent transition-[width]"
               style={{ width: `${progress?.total ? ((progress.done ?? 0) / progress.total) * 100 : 0}%` }}
             />
           </div>
-        </div>
+        </Card>
       )}
 
       <LabReportCard report={labReport} />
@@ -339,13 +343,15 @@ export function StrategyGuardian() {
 
       <div className="flex items-center justify-between">
         <div className="text-xs font-medium">守护中的策略 ({items.length})</div>
-        <button
+        <Button
+          variant="primary"
+          size="sm"
           onClick={() => runAll.mutate()}
           disabled={runAll.isPending || !!activeRun}
-          className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-on-accent hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="gap-1.5"
         >
           <Play className="h-3.5 w-3.5" /> 全部复验
-        </button>
+        </Button>
       </div>
 
       {isLoading ? (
@@ -356,7 +362,7 @@ export function StrategyGuardian() {
           hint="挖掘发布的策略会在发布时自动建立守护基线; 也可以在上方手动把任意策略加入守护。守护会在每天收盘数据更新后, 用基线之后的新数据自动复验, 退化时告警、严重时标记退役。"
         />
       ) : (
-        <div className="overflow-x-auto rounded-card border border-border bg-surface">
+        <Card padding="none" className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-border text-secondary">
@@ -405,7 +411,7 @@ export function StrategyGuardian() {
                       <div>{last?.checked_at ? new Date(last.checked_at).toLocaleString('zh-CN', { hour12: false }) : '—'}</div>
                       <div className="max-w-56 truncate text-micro" title={lastText}>{lastText}</div>
                     </td>
-                    <td className="px-2 py-2 text-right font-medium" style={{ color: last?.degradation_pct != null && last.degradation_pct > 0 ? '#f87171' : undefined }}>
+                    <td className={`px-2 py-2 text-right font-medium${last?.degradation_pct != null && last.degradation_pct > 0 ? ' text-danger' : ''}`}>
                       {fmtDegradation(last?.degradation_pct)}
                     </td>
                     <td className="max-w-64 px-2 py-2 text-micro text-secondary">
@@ -413,25 +419,30 @@ export function StrategyGuardian() {
                     </td>
                     <td className="px-2 py-2">
                       <div className="flex justify-end gap-1">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          icon
                           onClick={() => rerun.mutate(p.strategy_id)}
                           disabled={rerun.isPending || !!activeRun}
                           title="立即复验"
-                          className="rounded-btn border border-border p-1.5 text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-40"
                         >
                           <RefreshCw className="h-3.5 w-3.5" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          icon
                           onClick={() => {
                             if (window.confirm(`移除 ${p.name ?? p.strategy_id} 的守护? 档案与复验历史将删除 (策略本身不受影响)。`))
                               drop.mutate(p.strategy_id)
                           }}
                           disabled={drop.isPending}
                           title="移除守护"
-                          className="rounded-btn border border-border p-1.5 text-secondary hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40"
+                          className="hover:bg-danger/10 hover:text-danger"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -439,7 +450,7 @@ export function StrategyGuardian() {
               })}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
     </div>
   )

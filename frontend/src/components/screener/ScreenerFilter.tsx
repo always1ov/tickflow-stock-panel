@@ -1,4 +1,5 @@
 import { X, RotateCcw, Filter } from 'lucide-react'
+import { Button } from '@/components/ui'
 import { BOARDS, getBoardType } from '@/lib/board'
 
 // ===== 筛选类型 =====
@@ -153,15 +154,16 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
         </div>
         <div className="flex items-center gap-1">
           {filterActive(value) && (
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={onReset}
               title="清空全部筛选"
-              className="inline-flex items-center gap-1 px-1.5 h-6 rounded-btn text-micro
-                text-secondary hover:text-danger hover:bg-danger/10 transition-colors"
+              className="h-6 px-1.5 gap-1 text-micro hover:bg-danger/10 hover:text-danger"
             >
               <RotateCcw className="h-3 w-3" />
               清空
-            </button>
+            </Button>
           )}
           <button
             onClick={onClose}

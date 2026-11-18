@@ -6,6 +6,7 @@ import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
 import { api, type WatchlistEntry, type WatchlistGroup } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { Button } from '@/components/ui'
 
 interface Props {
   source: string
@@ -16,10 +17,10 @@ interface Props {
 export function WatchlistGroupTransfer(props: Props) {
   const [open, setOpen] = useState(false)
   return <>
-    <button type="button" onClick={() => setOpen(true)} title="批量分组" aria-haspopup="dialog"
-      className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-btn px-2 text-xs text-secondary hover:bg-elevated hover:text-foreground">
+    <Button type="button" onClick={() => setOpen(true)} title="批量分组" aria-haspopup="dialog"
+      variant="ghost" size="xs" className="ml-2 shrink-0">
       <ListChecks aria-hidden="true" className="h-4 w-4" />批量分组
-    </button>
+    </Button>
     {open && createPortal(<TransferDialog {...props} onClose={() => setOpen(false)} />, document.body)}
   </>
 }
@@ -77,10 +78,10 @@ function TransferDialog({ source, groups, entries, onClose }: Props & { onClose:
         <h2 className="text-title font-semibold text-foreground">批量分组</h2>
         <p className="mt-1 break-words text-xs text-secondary">从「{sourceName}」选择标的</p>
       </div>
-      <button type="button" aria-label="关闭" disabled={pending} onClick={onClose}
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-btn text-secondary hover:bg-elevated">
+      <Button type="button" aria-label="关闭" disabled={pending} onClick={onClose}
+        variant="ghost" size="md" icon className="shrink-0">
         <X className="h-4 w-4" />
-      </button>
+      </Button>
     </header>
     <div className="space-y-3 px-4 py-3">
       <input type="search" aria-label="搜索分组标的" placeholder="搜索名称或代码" value={query}
@@ -118,14 +119,14 @@ function TransferDialog({ source, groups, entries, onClose }: Props & { onClose:
       {transfer.isError && <p role="alert" className="text-sm text-danger">{transfer.error.message}</p>}
     </div>
     <footer className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-3">
-      {source !== 'ungrouped' && <button type="button" disabled={!canSubmit} onClick={() => target && transfer.mutate({ action: 'copy', target, symbols })}
-        className="min-h-10 rounded-btn border border-border bg-surface px-4 text-sm text-foreground disabled:opacity-50">
+      {source !== 'ungrouped' && <Button type="button" disabled={!canSubmit} onClick={() => target && transfer.mutate({ action: 'copy', target, symbols })}
+        size="md">
         {pending && transfer.variables?.action === 'copy' ? '复制中…' : '复制到目标组'}
-      </button>}
-      {source !== 'all' && <button type="button" disabled={!canSubmit} onClick={() => target && transfer.mutate({ action: 'move', target, symbols })}
-        className="min-h-10 rounded-btn bg-accent px-4 text-sm text-on-accent hover:bg-accent/90 disabled:opacity-50">
+      </Button>}
+      {source !== 'all' && <Button type="button" disabled={!canSubmit} onClick={() => target && transfer.mutate({ action: 'move', target, symbols })}
+        variant="primary" size="md">
         {pending && transfer.variables?.action === 'move' ? '移动中…' : '移动到目标组'}
-      </button>}
+      </Button>}
     </footer>
   </Modal>
 }

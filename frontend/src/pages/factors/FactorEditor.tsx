@@ -5,12 +5,12 @@ import { ChevronRight, CircleAlert, CircleCheck, FlaskConical, PenLine, Play, Sa
 import { toast } from '@/components/Toast'
 import { api, type FactorTrialResponse, type FactorValidateResponse } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
-import { TYPE, buttonClass } from '@/components/ui'
+import { Card, Button, TYPE, fieldInput, fieldSelect } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { selectableDefinitions, definitionOptionLabel } from '@/lib/definitionOptions'
 
-const INPUT_CLS = 'w-full rounded-input border border-border bg-surface px-2.5 py-1.5 text-xs focus:border-accent focus:outline-none'
-const CHIP_CLS = 'shrink-0 rounded-btn border border-border bg-base/60 px-1.5 py-0.5 font-mono text-micro text-secondary transition-colors hover:border-accent/40 hover:text-accent cursor-pointer'
+const INPUT_CLS = cn(fieldInput, 'w-full text-xs')
+const CHIP_CLS = 'shrink-0 rounded-btn border border-border bg-surface px-1.5 py-0.5 font-mono text-micro text-secondary transition-colors hover:border-accent/40 hover:text-accent cursor-pointer'
 
 const DEFAULT_FORMULA = 'rank(-ts_sum(change_pct, 5))'
 
@@ -228,7 +228,7 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
   return (
     <div className="grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden xl:grid-cols-2">
       {/* ── 左栏: 编辑 ── */}
-      <section className="flex min-h-0 flex-col gap-3 rounded-card border border-border bg-surface/80 p-3 xl:overflow-y-auto">
+      <Card padding="md" className="flex min-h-0 flex-col gap-3 xl:overflow-y-auto">
         <div className="flex flex-wrap items-center gap-2">
           <FlaskConical className="h-4 w-4 shrink-0 text-accent" />
           <span className={cn('shrink-0', TYPE.card)}>因子编辑器</span>
@@ -245,7 +245,7 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
                 if (!event.target.value) { setEditing(null); return }
                 loadForEdit(event.target.value)
               }}
-              className="ml-auto h-7 max-w-[14rem] shrink-0 rounded-input border border-border bg-surface px-1.5 text-xs text-secondary"
+              className={cn(fieldSelect, 'ml-auto h-7 max-w-[14rem] shrink-0 text-xs')}
               aria-label="编辑已有自定义因子"
             >
               <option value="">编辑已有因子…</option>
@@ -260,7 +260,7 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
           <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
             <label className="shrink-0 text-xs font-medium text-secondary">公式 (DSL)</label>
             <select
-              className="h-7 shrink-0 rounded-input border border-border bg-surface px-1.5 text-xs text-secondary"
+              className={cn(fieldSelect, 'h-7 shrink-0 text-xs')}
               onChange={event => {
                 const value = event.target.value
                 if (!value) return
@@ -293,7 +293,7 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
             onChange={event => { setFormula(event.target.value); setValidation(null); setTrial(null); setSavedId('') }}
             spellCheck={false}
             rows={5}
-            className="w-full resize-y rounded-input border border-border bg-base/60 px-3 py-2 font-mono text-xs leading-relaxed text-foreground focus:border-accent focus:outline-none"
+            className={cn(fieldInput, 'w-full resize-y text-xs leading-relaxed')}
             placeholder="例如: rank(-ts_sum(change_pct, 5))"
           />
         </div>
@@ -365,29 +365,29 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
 
         {/* 动作行: nowrap 防止按钮文字折行 */}
         <div className="flex flex-wrap items-center gap-2">
-          <select value={assetType} onChange={event => setAssetType(event.target.value as typeof assetType)} className={`${INPUT_CLS} h-8 w-24 shrink-0`} aria-label="试算资产">
+          <select value={assetType} onChange={event => setAssetType(event.target.value as typeof assetType)} className={cn(fieldSelect, 'h-8 w-24 shrink-0 text-xs')} aria-label="试算资产">
             <option value="stock">股票</option>
             <option value="etf">ETF</option>
           </select>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={runBoth}
             disabled={!formula.trim() || validate.isPending}
-            className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-btn border border-border bg-surface px-3 text-xs font-medium text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+            className="ml-auto shrink-0 gap-1.5 whitespace-nowrap"
           >
             <ShieldQuestion className="h-3.5 w-3.5" />
             {validate.isPending ? '校验中…' : '校验'}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
             onClick={() => runTrial.mutate()}
             disabled={!canTrial}
-            className={buttonClass({ variant: 'primary' }, 'shrink-0 gap-1.5 whitespace-nowrap')}
+            className="shrink-0 gap-1.5 whitespace-nowrap"
             title={validation?.ok ? '用最近 40 个交易日数据试算 IC' : '请先校验通过'}
           >
             <Play className="h-3.5 w-3.5" />
             {runTrial.isPending ? '试算中…' : '试算 40 日'}
-          </button>
+          </Button>
         </div>
 
         {validate.isError && (
@@ -395,10 +395,10 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
             {String((validate.error as Error).message)}
           </div>
         )}
-      </section>
+      </Card>
 
       {/* ── 右栏: 校验 / 试算 / 保存 ── */}
-      <section className="flex min-h-0 flex-col gap-3 rounded-card border border-border bg-surface/80 p-3 xl:overflow-y-auto">
+      <Card padding="md" className="flex min-h-0 flex-col gap-3 xl:overflow-y-auto">
         <div className={TYPE.card}>校验与试算</div>
 
         {!validation && !validate.isPending && (
@@ -522,7 +522,7 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
                         value={saveLabel}
                         onChange={event => { setSaveLabel(event.target.value); setSavedId('') }}
                         placeholder="名称 (必填, 如 我的反转)"
-                        className={`${INPUT_CLS} h-8`}
+                        className={cn(INPUT_CLS, 'h-8')}
                       />
                       <input
                         type="text"
@@ -532,11 +532,11 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
                           else setSaveId(event.target.value)
                         }}
                         placeholder={editing ? '分组' : 'id (可空, 自动生成 uf_ 前缀)'}
-                        className={`${INPUT_CLS} h-8 font-mono`}
+                        className={cn(INPUT_CLS, 'h-8 font-mono')}
                       />
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <select value={direction} onChange={event => setDirection(event.target.value as typeof direction)} className={`${INPUT_CLS} h-8 w-32 shrink-0`} aria-label="预期方向">
+                      <select value={direction} onChange={event => setDirection(event.target.value as typeof direction)} className={cn(fieldSelect, 'h-8 w-32 shrink-0 text-xs')} aria-label="预期方向">
                         <option value="none">方向未知</option>
                         <option value="high">值大看多</option>
                         <option value="low">值小看多</option>
@@ -546,28 +546,27 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
                         value={saveDescription}
                         onChange={event => setSaveDescription(event.target.value)}
                         placeholder="描述 (可空, 记录设计意图, 如: 短线超跌反转)"
-                        className={`${INPUT_CLS} h-8 min-w-[12rem] flex-1`}
+                        className={cn(INPUT_CLS, 'h-8 min-w-[12rem] flex-1')}
                         maxLength={500}
                       />
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
+                      <Button
+                        variant="primary"
                         onClick={() => save.mutate()}
                         disabled={!saveLabel.trim() || save.isPending}
-                        className={buttonClass({ variant: 'primary' }, 'shrink-0 gap-1.5 whitespace-nowrap')}
+                        className="shrink-0 gap-1.5 whitespace-nowrap"
                       >
                         <Save className="h-3.5 w-3.5" />
                         {save.isPending ? '保存中…' : editing ? (formulaDirty ? '保存新版本 (回草稿)' : '保存元数据') : '保存 (草稿态)'}
-                      </button>
+                      </Button>
                       {savedId && !save.isPending && (
-                        <button
-                          type="button"
+                        <Button
                           onClick={() => navigate(`/factors?tab=discover&focus=${savedId}`)}
-                          className={buttonClass({}, 'shrink-0 gap-1.5 whitespace-nowrap')}
+                          className="shrink-0 gap-1.5 whitespace-nowrap"
                         >
                           去检验 {savedId}
-                        </button>
+                        </Button>
                       )}
                     </div>
                     <div className="mt-1 text-micro text-muted">
@@ -584,7 +583,7 @@ export function FactorEditor({ editId = '' }: { editId?: string }) {
             )}
           </div>
         )}
-      </section>
+      </Card>
     </div>
   )
 }

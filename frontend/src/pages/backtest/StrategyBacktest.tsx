@@ -46,7 +46,24 @@ import { ScoringEditor } from '@/components/ScoringEditor'
 import { strategyResultCandidate } from './researchCandidates'
 import { BacktestEvidencePanel } from './components/BacktestEvidencePanel'
 import { buildDailyNavItems, buildTradeKeyMap, buildTradesNavItems, type TradeNavItem } from './tradeNav'
-import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, THEAD, TYPE, buttonClass } from '@/components/ui'
+import {
+  SEG,
+  SEG_ITEM,
+  SEG_OFF,
+  SEG_ON,
+  THEAD,
+  TYPE,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  DialogClose,
+  Switch,
+  buttonClass,
+  fieldInput,
+  fieldSelect,
+  type BadgeTone,
+} from '@/components/ui'
 import { cn } from '@/lib/cn'
 
 const formatDate = (date: Date) => date.toISOString().slice(0, 10)
@@ -109,8 +126,8 @@ const quickRangeTitle = (range: QuickRangeConfig) => range.unit === 'all'
     ? `近 ${range.value} 年`
     : `近 ${range.value} 个月`
 
-const INPUT_CLS = `w-full px-2.5 py-1.5 rounded-input bg-surface border border-border text-xs
-  focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth`
+const INPUT_CLS = `${fieldInput} w-full text-xs`
+const SELECT_CLS = `${fieldSelect} w-full text-xs`
 
 /** 成交时序说明 — 黄色问号图标, 点击弹出气泡。
  * 用 fixed 定位脱离父容器 overflow 裁剪(左侧表单是 overflow-y-auto, absolute 气泡会被裁)。 */
@@ -173,11 +190,11 @@ function FillRuleHint() {
 
 const SRC_MAP: Record<string, string> = { custom: '自定义', ai: 'AI', composite: '叠加' }
 const TRADE_PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100]
-const BADGE_CLS_MAP: Record<string, string> = {
-  builtin: 'bg-secondary/10 text-muted border-border',
-  ai: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
-  custom: 'bg-warning/10 text-warning border-warning/30',
-  composite: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
+const BADGE_TONE_MAP: Record<string, BadgeTone> = {
+  builtin: 'neutral',
+  ai: 'accent',
+  custom: 'warning',
+  composite: 'accent',
 }
 const FIELD_LABEL: Record<string, string> = {}
 for (const c of BUILTIN_COLUMNS) {
@@ -230,14 +247,15 @@ function RegimeRecomputeButton({ from, to, pending, onClick }: {
 }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
-      <button
+      <Button
+        size="xs"
         onClick={onClick}
         disabled={pending}
-        className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-50"
+        className="gap-1.5"
       >
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
         {pending ? '补算环境数据中…' : '补算环境数据并重跑'}
-      </button>
+      </Button>
       <span className="text-micro text-secondary">
         将补算 {from} ~ {to || '今天'} 的市场环境数据，完成后自动重跑本次回测
       </span>
@@ -390,33 +408,33 @@ const fmtLots = (v: number | null | undefined) => {
   return v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
 
-const statValueColor = (v: number | null | undefined) => {
-  // 中性值继承页面前景色 (亮暗主题都可读), 不再写死近白色
-  if (v == null || Number.isNaN(v) || v === 0) return 'inherit'
-  return v > 0 ? '#f87171' : '#34d399'
+const statValueColorClass = (v: number | null | undefined) => {
+  // 中性值继承页面前景色 (亮暗主题都可读)
+  if (v == null || Number.isNaN(v) || v === 0) return ''
+  return v > 0 ? 'text-bull' : 'text-bear'
 }
 
 /** 信号 ID → 可读名称映射 (内置 + 自定义), 供交易记录显示具体触发信号。 */
 const useSignalNames = useCustomSignalNames
 
 function ExitReasonBadge({ reason, signalId, signalNames }: { reason: string; signalId?: string | null; signalNames?: Record<string, string> }) {
-  const config: Record<string, { label: string; cls: string }> = {
-    signal: { label: '信号', cls: 'bg-accent/10 text-accent border-accent/30' },
-    stop_loss: { label: '止损', cls: 'bg-red-500/10 text-red-400 border-red-500/30' },
-    take_profit: { label: '止盈', cls: 'bg-accent/10 text-emerald-400 border-accent/30' },
-    trailing_stop: { label: '移损', cls: 'bg-warning/10 text-warning border-warning/30' },
-    trailing_take_profit: { label: '回撤止盈', cls: 'bg-accent/10 text-emerald-400 border-accent/30' },
-    max_hold: { label: '超期', cls: 'bg-warning/10 text-warning border-warning/30' },
-    pending_exit: { label: '待卖', cls: 'bg-warning/10 text-warning border-warning/30' },
-    end: { label: '期末', cls: 'bg-secondary/10 text-secondary border-border' },
+  const config: Record<string, { label: string; tone: BadgeTone }> = {
+    signal: { label: '信号', tone: 'accent' },
+    stop_loss: { label: '止损', tone: 'danger' },
+    take_profit: { label: '止盈', tone: 'accent' },
+    trailing_stop: { label: '移损', tone: 'warning' },
+    trailing_take_profit: { label: '回撤止盈', tone: 'accent' },
+    max_hold: { label: '超期', tone: 'warning' },
+    pending_exit: { label: '待卖', tone: 'warning' },
+    end: { label: '期末', tone: 'neutral' },
   }
-  const c = config[reason] ?? { label: reason, cls: 'bg-elevated text-muted border-border' }
+  const c = config[reason] ?? { label: reason, tone: 'neutral' as BadgeTone }
   // 信号类退出且能解析出具体信号名时, 显示具体信号而非笼统的"信号"
   const specific = reason === 'signal' && signalId ? cnSignal(signalId, signalNames) : null
   return (
-    <span className={`text-micro px-1.5 py-0.5 rounded-btn border ${c.cls} ${specific ? 'max-w-[7rem] truncate' : ''}`} title={specific ?? c.label}>
+    <Badge tone={c.tone} className={specific ? 'max-w-[7rem] truncate' : undefined} title={specific ?? c.label}>
       {specific ?? c.label}
-    </span>
+    </Badge>
   )
 }
 
@@ -452,8 +470,8 @@ function DailyTradeChip({ trade, side, strategyName, onClick, signalNames, activ
   const buyStrategy = strategyName || '策略'
 
   return (
-    <button type="button" onClick={onClick} className={`inline-flex ${isBuy ? 'w-[14.5rem]' : 'w-[14.5rem]'} flex-col gap-0.5 rounded-btn border px-1.5 py-1 text-left text-xs leading-4 transition-colors hover:border-accent/45 hover:bg-elevated/60 focus:outline-none focus:ring-1 focus:ring-accent/40 ${
-      isBuy ? 'border-accent/25 bg-accent/5' : 'border-border/70 bg-base/45'
+    <button type="button" onClick={onClick} className={`inline-flex ${isBuy ? 'w-[14.5rem]' : 'w-[14.5rem]'} flex-col gap-0.5 rounded-btn border px-1.5 py-1 text-left text-xs leading-4 transition-colors hover:border-accent/45 hover:bg-elevated/60 ${
+      isBuy ? 'border-accent/25 bg-accent/5' : 'border-border/70 bg-surface'
     } ${active ? 'ring-2 ring-accent/60' : ''}`}>
       <span className="flex items-center gap-1">
         <span className={`shrink-0 rounded-btn px-1 py-px text-micro font-medium ${
@@ -531,7 +549,7 @@ function TradeLegCell({ trade, side, signalNames }: { trade: StrategyBacktestTra
         <span className="font-mono text-secondary">
           成交 {date}
           {minuteTime && (
-            <span className="ml-1 rounded-btn border border-sky-500/30 bg-sky-500/10 px-1 py-px text-micro font-medium text-sky-400">{minuteTime}</span>
+            <span className="ml-1 rounded-btn border border-accent/30 bg-accent/10 px-1 py-px text-micro font-medium text-accent">{minuteTime}</span>
           )}
         </span>
         <span className={`rounded-btn px-1.5 py-px text-micro font-medium ${
@@ -693,26 +711,25 @@ function MetricLabel({ label, metric }: { label: string; metric: MetricHelpKey }
   )
 }
 
-function Stat({ label, value, color }: { label: ReactNode; value: string; color?: string }) {
+function Stat({ label, value, colorClass }: { label: ReactNode; value: string; colorClass?: string }) {
   // 长值 (如蒙卡回撤双值) 降一档字号, 保证单行不撑高卡片
   const compact = value.length > 12
   return (
-    <div className="min-w-0 rounded-card border border-border bg-surface px-3 py-2.5">
+    <Card className="min-w-0">
       <div className="text-micro text-muted">{label}</div>
       <div
-        className={`mt-1 break-words font-mono font-semibold leading-tight tracking-tight num ${compact ? 'text-sm' : 'text-xl'}`}
-        style={{ color: color ?? 'inherit' }}
+        className={`mt-1 break-words font-mono font-semibold leading-tight tracking-tight num ${compact ? 'text-sm' : 'text-xl'} ${colorClass ?? ''}`}
         title={value}
       >
         {value}
       </div>
-    </div>
+    </Card>
   )
 }
 
 function ConfigSection({ title, hint, actions, children }: { title: string; hint?: ReactNode; actions?: ReactNode; children: ReactNode }) {
   return (
-    <div className="rounded-card border border-border bg-surface p-3">
+    <Card>
       <div className="flex items-start justify-between gap-3">
         <div className={TYPE.card}>
           {title}
@@ -721,7 +738,7 @@ function ConfigSection({ title, hint, actions, children }: { title: string; hint
         {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
       </div>
       <div className="mt-3 space-y-2">{children}</div>
-    </div>
+    </Card>
   )
 }
 
@@ -739,18 +756,10 @@ const StrategyParamInput = memo(function StrategyParamInput({ param, value, onCh
     return (
       <label className="block">
         <span className="mb-1 block text-xs text-secondary">{param.label}</span>
-        <button
-          type="button"
-          onClick={() => onChange(param.id, !checked)}
-          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-            checked ? 'bg-accent' : 'bg-surface border border-border'
-          }`}
-          aria-pressed={checked}
-        >
-          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-            checked ? 'translate-x-[18px]' : 'translate-x-0.5'
-          }`} />
-        </button>
+        <Switch
+          checked={checked}
+          onChange={next => onChange(param.id, next)}
+        />
       </label>
     )
   }
@@ -769,7 +778,7 @@ const StrategyParamInput = memo(function StrategyParamInput({ param, value, onCh
               toast(`已应用预设「${v}」，覆盖 ${Object.keys(applies).length} 个参数`, 'success')
             } else onChange(param.id, v)
           }}
-          className={INPUT_CLS}
+          className={SELECT_CLS}
         >
           {/* [R174] fork 的 options 可能是 {value,label} 对象 (AI/自定义策略), 统一走取值助手, 避免 [object Object] */}
           {(param.options ?? []).map(opt => {
@@ -895,10 +904,10 @@ function StockPoolPicker({ value, onChange, assetType = 'stock' }: { value: stri
             onChange={e => { setQuery(e.target.value); setOpen(true) }}
             onFocus={() => { if (query.trim()) setOpen(true) }}
             placeholder="搜索股票名称/代码添加股票池"
-            className="w-full rounded-input border border-border bg-surface py-1.5 pl-8 pr-2.5 text-xs focus:border-accent focus:outline-none"
+            className={`${fieldInput} w-full pl-8 text-xs`}
           />
           {open && results.length > 0 && (
-            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-card border border-border bg-base shadow-xl">
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-card border border-border bg-surface shadow-xl">
               {results.map(r => {
                 const added = symbols.includes(r.symbol)
                 return (
@@ -939,23 +948,24 @@ function StockPoolPicker({ value, onChange, assetType = 'stock' }: { value: stri
             disableEmpty
             menuLabel="导入自选分组"
             align="right"
-            triggerClassName="inline-flex items-center gap-1 whitespace-nowrap rounded-input border border-border bg-surface px-2 py-1.5 text-xs text-secondary transition-colors hover:border-accent/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            triggerClassName={buttonClass({ size: 'xs' }, 'gap-1 whitespace-nowrap')}
             title="选择自选分组并加入回测范围"
             ariaLabel="从自选分组导入回测范围"
           >
             <ListPlus className="h-3 w-3" />
             {watchlist.isLoading ? '加载…' : watchlistCount === 0 ? '自选空' : `导入自选(${watchlistCount})`}
           </WatchlistGroupMenu>
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="xs"
             onClick={() => setSymbols([])}
             disabled={symbols.length === 0}
-            className="inline-flex items-center gap-1 whitespace-nowrap rounded-input border border-border bg-surface px-2 py-1.5 text-xs text-secondary transition-colors hover:border-danger/50 hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
+            className="gap-1 whitespace-nowrap"
             title="清空回测范围"
           >
             <X className="h-3 w-3" />
             清空
-          </button>
+          </Button>
         </div>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -1740,7 +1750,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
   return (
     // [R538] 左栏 18rem 时, 回测区间两个日期各只剩 ~118px, 「2026-06-26」折成两行, 建仓口径「次日开盘（推荐）」被截断;
     // 放到 21rem, 两者都不折不截。右侧结果区照样吃满剩下的宽度。
-    <div className="h-full min-h-0 overflow-hidden rounded-card border border-border bg-surface/80 grid grid-cols-1 xl:grid-cols-[21rem_minmax(0,1fr)]">
+    <Card padding="none" className="grid h-full min-h-0 grid-cols-1 overflow-hidden xl:grid-cols-[21rem_minmax(0,1fr)]">
       {/* 配置面板 */}
       <section className="space-y-3 border-b xl:border-b-0 xl:border-r border-border bg-base/25 px-3 py-3 xl:overflow-y-auto">
         <div>
@@ -1750,23 +1760,18 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             {!isMinuteStrategy && (
             <div className="flex items-center gap-1">
               <Gauge className={`h-3 w-3 ${highGranularity ? 'text-warning' : 'text-muted/50'}`} />
-              <button
-                onClick={toggleMinuteFill}
+              <Switch
+                checked={highGranularity}
+                onChange={() => toggleMinuteFill()}
                 disabled={!hasMinuteBatch}
+                size="sm"
+                tone="warning"
+                label="分钟K成交"
                 title={!hasMinuteBatch
                   ? '分钟K成交价：分钟K(批量)数据不可用'
                   : '分钟K成交：细化成交价，并为兼容的卖出信号提供下一分钟成交。'
                 }
-                className={`group relative inline-flex h-3.5 w-6 items-center rounded-full shrink-0 transition-colors duration-200 ${
-                  !hasMinuteBatch ? 'bg-surface border border-border opacity-50 cursor-not-allowed'
-                  : highGranularity ? 'bg-warning cursor-pointer'
-                  : 'bg-surface cursor-pointer'
-                }`}
-              >
-                <span className={`inline-block h-2.5 w-2.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                  highGranularity ? 'translate-x-[13px]' : 'translate-x-0.5'
-                }`} />
-              </button>
+              />
               <span className={`text-micro font-medium ${highGranularity ? 'text-warning' : 'text-muted/50'}`}>分钟成交</span>
               {!hasMinuteBatch && (
                 <span className="text-micro text-accent/70 font-medium bg-accent/10 px-1 py-px rounded-btn">分钟K</span>
@@ -1776,9 +1781,9 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
           </div>
           {/* 分钟策略提示条: 数据窗口 + 成交语义 */}
           {isMinuteStrategy && (
-            <div className="mb-2 flex items-start gap-1.5 rounded-btn border border-sky-500/30 bg-sky-500/5 px-2 py-1.5">
-              <Clock className="h-3 w-3 text-sky-400 shrink-0 mt-px" />
-              <div className="text-micro leading-snug text-sky-400/90">
+            <div className="mb-2 flex items-start gap-1.5 rounded-btn border border-accent/30 bg-accent/5 px-2 py-1.5">
+              <Clock className="h-3 w-3 shrink-0 mt-px text-accent" />
+              <div className="text-micro leading-snug text-accent/90">
                 <span className="font-medium">分钟策略回测</span>
                 ：逐日回放分钟K，信号分钟收盘价买入；日线条件按 T-1 完成态评估。
                 {minuteDataStatus?.minute?.earliest_date
@@ -1828,7 +1833,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             {libraryGroups.some(group => group.id) && (
               <div className="border-b border-border/60 p-1">
                 <select aria-label="策略分组" value={effectiveLibraryGroup} onChange={event => setLibraryGroup(event.target.value)}
-                  className="w-full rounded-btn border border-border bg-base px-2 py-1 text-xs text-secondary focus:border-accent focus:outline-none">
+                  className={SELECT_CLS}>
                   <option value="all">全部分组</option>
                   {libraryGroups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
                 </select>
@@ -1842,21 +1847,22 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               <span className="text-xs text-muted px-2 py-1">当前分组暂无策略</span>
             )}
             {filteredStrategyList.map(st => (
-              <button
+              <Button
                 key={st.id}
+                size="xs"
+                selected={selectedStrategy === st.id}
                 onClick={() => setSelectedStrategy(st.id)}
-                className={buttonClass({ size: 'xs', selected: selectedStrategy === st.id })}
               >
                 <span className="font-medium">{strategyOptionLabel(st)}</span>
                 {st.timeframes?.includes('1m') && (
-                  <span className="ml-1 text-micro px-1 py-px rounded-btn border border-sky-500/30 bg-sky-500/10 text-sky-400">分钟</span>
+                  <span className="ml-1 rounded-btn border border-accent/30 bg-accent/10 px-1 py-px text-micro text-accent">分钟</span>
                 )}
                 {st.source && (
-                  <span className={`ml-1 text-micro px-1 py-px rounded-btn border ${BADGE_CLS_MAP[st.source] ?? ''}`}>
+                  <Badge tone={BADGE_TONE_MAP[st.source] ?? 'neutral'} className="ml-1">
                     {SRC_MAP[st.source] ?? ''}
-                  </span>
+                  </Badge>
                 )}
-              </button>
+              </Button>
             ))}
             </div>
             {/* 底部拖拽手柄: 上下拉动调整策略列表高度 */}
@@ -1898,24 +1904,22 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
           <span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs font-medium text-secondary">
             <span className="truncate">{selectedStrategyName}</span>
             {selectedStrategySource && (
-              <span className={`shrink-0 text-micro px-1 py-px rounded-btn border ${BADGE_CLS_MAP[selectedStrategySource] ?? ''}`}>
+              <Badge tone={BADGE_TONE_MAP[selectedStrategySource] ?? 'neutral'} className="shrink-0">
                 {SRC_MAP[selectedStrategySource] ?? selectedStrategySource}
-              </span>
+              </Badge>
             )}
           </span>
           <span className="mt-1 block text-micro font-medium text-secondary">{stockPoolSummary}</span>
           <span className="mt-1 block text-micro leading-4 text-muted">{advancedSummary}</span>
         </button>
 
-        <div className="rounded-btn border border-border bg-surface p-2.5">
+        <Card padding="none" className="p-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5">
               <div className={TYPE.card}>回测区间</div>
               <WarmupBadge />
             </div>
-            <span className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-micro font-medium text-accent">
-              {rangeTitle}
-            </span>
+            <Badge tone="accent" className="shrink-0">{rangeTitle}</Badge>
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -1956,15 +1960,17 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 </button>
               ))}
             </div>
-            <button
-              type="button"
+            <Button
+              size="xs"
+              icon
+              selected={rangeSettingsOpen}
               onClick={() => setRangeSettingsOpen(v => !v)}
               title="设置快捷区间"
               aria-label="设置快捷区间"
-              className={buttonClass({ icon: true, selected: rangeSettingsOpen }, 'shrink-0')}
+              className="shrink-0"
             >
               <SlidersHorizontal className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
 
           {rangeSettingsOpen && (
@@ -1979,18 +1985,16 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                   return (
                     <div key={range.id} className="grid grid-cols-[3rem_1fr_4.5rem] items-center gap-1.5">
                       <label className="flex items-center gap-1 text-xs text-secondary">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={range.enabled}
                           onChange={e => updateQuickRange(range.id, { enabled: e.target.checked })}
-                          className="h-3 w-3 accent-accent"
                         />
                         {index + 1}
                       </label>
                       <select
                         value={range.unit}
                         onChange={e => updateQuickRange(range.id, { unit: e.target.value as QuickRangeUnit })}
-                        className={INPUT_CLS}
+                        className={SELECT_CLS}
                       >
                         <option value="month">月</option>
                         <option value="year">年</option>
@@ -2012,7 +2016,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               </div>
             </div>
           )}
-        </div>
+        </Card>
 
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -2022,12 +2026,12 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             </div>
             {isMinuteStrategy ? (
               <div className={`${INPUT_CLS} flex items-center gap-1.5`} title="信号在盘中触发分钟成交，无次日开盘口径">
-                <Clock className="h-3 w-3 text-sky-400 shrink-0" />
+                <Clock className="h-3 w-3 shrink-0 text-accent" />
                 <span className="text-secondary">信号分钟收盘</span>
-                <span className="text-micro px-1 py-px rounded-btn border border-sky-500/30 bg-sky-500/10 text-sky-400">分钟</span>
+                <span className="rounded-btn border border-accent/30 bg-accent/10 px-1 py-px text-micro text-accent">分钟</span>
               </div>
             ) : (
-              <select value={entryFill} onChange={e => setEntryFill(e.target.value as 'close_t' | 'open_t+1')} className={INPUT_CLS}>
+              <select value={entryFill} onChange={e => setEntryFill(e.target.value as 'close_t' | 'open_t+1')} className={SELECT_CLS}>
                 <option value="open_t+1">次日开盘（推荐）</option>
                 <option value="close_t">信号日收盘</option>
               </select>
@@ -2038,7 +2042,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             <select
               value={exitFill}
               onChange={e => setExitFill(e.target.value as 'close_t' | 'open_t+1' | 'signal_next_minute')}
-              className={INPUT_CLS}
+              className={SELECT_CLS}
             >
               <option value="close_t">信号日收盘（推荐）</option>
               <option value="open_t+1">次日开盘</option>
@@ -2075,17 +2079,17 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
           </div>
           <div>
             <label className="text-xs font-medium text-secondary block mb-1.5">买入权重</label>
-            <select value={positionSizing} onChange={e => setPositionSizing(e.target.value as any)} className={INPUT_CLS}>
+            <select value={positionSizing} onChange={e => setPositionSizing(e.target.value as any)} className={SELECT_CLS}>
               <option value="equal">等权买入</option>
               <option value="score_weight">评分加权</option>
               <option value="policy">自定义策略</option>
             </select>
             {positionSizing === 'policy' && (
-              <div className="mt-2 space-y-2 rounded-card border border-border bg-surface p-2.5">
+              <Card padding="none" className="mt-2 space-y-2 p-2.5">
                 <select
                   value={positionPolicyId}
                   onChange={e => setPositionPolicyId(e.target.value)}
-                  className={INPUT_CLS}
+                  className={SELECT_CLS}
                 >
                   <option value="">选择仓位策略…</option>
                   {(positionPoliciesQ.data?.policies ?? []).map(p => (
@@ -2098,8 +2102,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                     <label key={pd.id} className="flex items-center justify-between gap-2 text-xs text-secondary">
                       <span className="truncate">{pd.label || pd.id}</span>
                       {pd.type === 'bool' ? (
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={Boolean(positionPolicyParams[pd.id] ?? pd.default)}
                           onChange={e => setPositionPolicyParams(prev => ({ ...prev, [pd.id]: e.target.checked }))}
                         />
@@ -2117,7 +2120,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 <div className="text-micro text-muted">
                   在 设置 → 定义 → 仓位策略 创建与管理; 建仓时按当日候选与历史表现动态分配资金。
                 </div>
-              </div>
+              </Card>
             )}
           </div>
           <div>
@@ -2167,34 +2170,39 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
         )}
 
         {isPending ? (
-          <button
+          <Button
+            variant="danger"
+            size="md"
             onClick={stopBacktest}
-            className={buttonClass({ size: 'md' }, 'w-full gap-1.5 border-danger/40 font-medium text-danger hover:bg-danger/10')}
+            className="w-full gap-1.5"
           >
             <Square className="h-3.5 w-3.5 fill-current" />
             停止回测
-          </button>
+          </Button>
         ) : (
-          // [R585 同步上游 v0.3.23] 采纳「强制重跑」双按钮, 主按钮沿用 fork
-          // buttonClass (上游渐变+发光违反 R368)
+          // [R585 同步上游 v0.3.23] 采纳「强制重跑」双按钮
           <div className="flex gap-2">
-            <button
+            <Button
+              variant="primary"
+              size="md"
               onClick={() => handleRun()}
               disabled={!selectedStrategy || strategyDetail.isLoading || backtestDataUnavailable}
-              className={buttonClass({ variant: 'primary', size: 'md' }, 'min-w-0 flex-1 gap-2')}
+              className="min-w-0 flex-1 gap-2"
             >
               <Play className="h-3.5 w-3.5 fill-current" />
               运行回测
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="md"
               onClick={() => handleRun(true)}
               disabled={!selectedStrategy || strategyDetail.isLoading || backtestDataUnavailable}
               title="忽略同参数结果缓存 (保留 5 分钟), 强制重新计算"
-              className={buttonClass({ variant: 'secondary', size: 'md' }, 'shrink-0 gap-1.5')}
+              className="shrink-0 gap-1.5"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               重跑
-            </button>
+            </Button>
           </div>
         )}
       </section>
@@ -2240,21 +2248,21 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               )
             )}
             {result && !result.error && (
-              <button
-                type="button"
+              <Button
+                size="sm"
                 onClick={() => saveCandidate.mutate()}
                 disabled={saveCandidate.isPending}
-                className="inline-flex h-8 items-center gap-1.5 rounded-btn border border-border bg-surface px-2.5 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
+                className="gap-1.5"
               >
                 <BookmarkPlus className="h-3.5 w-3.5" />
                 {saveCandidate.isPending ? '保存中' : '保存候选'}
-              </button>
+              </Button>
             )}
           </div>
         </div>
 
         {/* 市场环境过滤: 只在指定环境的交易日入场(强制 T-1, 用前一日环境判定) */}
-        <div className="rounded-btn border border-border bg-surface/50 px-3 py-2 space-y-1.5">
+        <Card padding="tight" className="space-y-1.5">
           {/* [R395] 窄屏要能换行: 这一行是「图标 + 标题 + 一句长说明 + 右侧输入框」,
               不换行的话那句长说明会把右边的「最低分」挤成一个字宽竖着排(实测 19×48)。
               `ml-auto` 只在同一行里才有意义, 换行之后它自然失效, 不用额外处理。 */}
@@ -2266,7 +2274,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               <span className="whitespace-nowrap text-micro text-muted">最低分</span>
               <input type="number" min={0} max={100} value={regimeMinScore} placeholder="不限"
                 onChange={e => setRegimeMinScore(e.target.value ? Number(e.target.value) : '')}
-                className="w-14 h-6 px-1 rounded-btn border border-border bg-base text-xs text-foreground text-center focus:outline-none focus:border-accent/50" />
+                className={`${INPUT_CLS} h-6 w-14 px-1 text-center`} />
             </div>
           </div>
           <div className="flex flex-wrap gap-1">
@@ -2288,7 +2296,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 className="text-micro text-secondary hover:text-danger px-1">清除</button>
             )}
           </div>
-        </div>
+        </Card>
 
         {result?.error && (
           <div className="text-xs text-danger bg-danger/10 border border-danger/30 rounded-btn px-3 py-2">
@@ -2360,19 +2368,20 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                   {((backtestTask.progress.day / backtestTask.progress.total) * 100).toFixed(0)}%
                 </span>
               )}
-              <button
-                type="button"
+              <Button
+                variant="danger"
+                size="xs"
                 onClick={stopBacktest}
-                className="inline-flex shrink-0 items-center gap-1 rounded-btn border border-danger/40 bg-danger/10 px-2 py-1 text-xs text-danger transition-colors hover:bg-danger/20"
+                className="shrink-0 gap-1"
               >
                 <Square className="h-3 w-3 fill-current" />
                 停止
-              </button>
+              </Button>
             </div>
             {backtestTask?.progress && (
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-base/60">
                 <div
-                  className="h-full rounded-full bg-accent transition-all duration-300 ease-out"
+                  className="h-full rounded-full bg-accent transition-[width] duration-300 ease-out"
                   style={{ width: `${(backtestTask.progress.day / backtestTask.progress.total) * 100}%` }}
                 />
               </div>
@@ -2400,15 +2409,15 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 </span>
               )}
               <span className="text-micro text-secondary">持有 {result.config?.holding_days ?? 5} 天</span>
-              <button
-                type="button"
+              <Button
+                size="xs"
                 onClick={exportResultCsv}
                 title="导出回测结果 CSV (概要 + 净值曲线 + 交易明细 + 分标的统计)"
-                className={buttonClass({ size: 'xs' }, 'ml-1 shrink-0 gap-1')}
+                className="ml-1 shrink-0 gap-1"
               >
                 <Download className="h-3 w-3" />
                 导出
-              </button>
+              </Button>
               <span className="ml-auto text-xs text-muted font-mono">
                 {String(result.config?.start).slice(0,10)} ~ {String(result.config?.end).slice(0,10)}
               </span>
@@ -2416,14 +2425,14 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
 
             {/* 统计卡片 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <Stat label={<MetricLabel label="平均收益" metric="avgReturn" />} value={fmtPct(result.stats.avg_return)} color={statValueColor(result.stats.avg_return)} />
-              <Stat label={<MetricLabel label="中位数" metric="medianReturn" />} value={fmtPct(result.stats.median_return)} color={statValueColor(result.stats.median_return)} />
-              <Stat label={<MetricLabel label="胜率" metric="winRate" />} value={fmtPct(result.stats.win_rate)} color={statValueColor(result.stats.win_rate)} />
+              <Stat label={<MetricLabel label="平均收益" metric="avgReturn" />} value={fmtPct(result.stats.avg_return)} colorClass={statValueColorClass(result.stats.avg_return)} />
+              <Stat label={<MetricLabel label="中位数" metric="medianReturn" />} value={fmtPct(result.stats.median_return)} colorClass={statValueColorClass(result.stats.median_return)} />
+              <Stat label={<MetricLabel label="胜率" metric="winRate" />} value={fmtPct(result.stats.win_rate)} colorClass={statValueColorClass(result.stats.win_rate)} />
               <Stat label={<MetricLabel label="盈亏比" metric="profitFactor" />} value={result.stats.profit_factor != null ? Number(result.stats.profit_factor).toFixed(2) : '—'} />
-              <Stat label={<MetricLabel label="超额(vs基准)" metric="excessReturn" />} value={fmtPct(result.stats.excess)} color={statValueColor(result.stats.excess)} />
+              <Stat label={<MetricLabel label="超额(vs基准)" metric="excessReturn" />} value={fmtPct(result.stats.excess)} colorClass={statValueColorClass(result.stats.excess)} />
               <Stat label={<MetricLabel label="夏普" metric="sharpe" />} value={result.stats.sharpe != null ? Number(result.stats.sharpe).toFixed(2) : '—'} />
-              <Stat label={<MetricLabel label="最大回撤" metric="maxDrawdown" />} value={fmtPct(result.stats.max_drawdown)} color={statValueColor(result.stats.max_drawdown)} />
-              <Stat label={<MetricLabel label="累计收益" metric="totalReturn" />} value={fmtPct(result.stats.total_return)} color={statValueColor(result.stats.total_return)} />
+              <Stat label={<MetricLabel label="最大回撤" metric="maxDrawdown" />} value={fmtPct(result.stats.max_drawdown)} colorClass={statValueColorClass(result.stats.max_drawdown)} />
+              <Stat label={<MetricLabel label="累计收益" metric="totalReturn" />} value={fmtPct(result.stats.total_return)} colorClass={statValueColorClass(result.stats.total_return)} />
             </div>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
@@ -2437,21 +2446,21 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
 
             {/* 累计超额曲线 (复用 StrategyNavChart) */}
             {result.equity_curve.length > 1 && (
-              <div className="rounded-card border border-border p-3">
+              <Card>
                 <div className="mb-2 text-xs font-medium text-secondary">累计收益曲线(日均复利)</div>
                 <StrategyNavChart result={result} />
-              </div>
+              </Card>
             )}
 
             {/* 收益分布直方图 */}
             {Array.isArray(result.stats.return_distribution) && result.stats.return_distribution.length > 0 && (
-              <div className="rounded-card border border-border p-3">
+              <Card>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-medium text-secondary">候选标的收益分布(持有 {result.config?.holding_days ?? 5} 天)</span>
                   <span className="text-micro text-muted">红=正收益 · 绿=负收益</span>
                 </div>
                 <ReturnDistributionChart distribution={result.stats.return_distribution} />
-              </div>
+              </Card>
             )}
 
             <div className="text-xs text-muted">run_id: {result.run_id}</div>
@@ -2471,12 +2480,12 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-medium text-foreground">{result.strategy_info.name}</span>
                   {result.stats.full_kind === 'candidate_execution' && (
-                    <span className="text-micro px-1 py-px rounded-btn border border-accent/30 bg-accent/10 text-accent">全量独立执行</span>
+                    <Badge tone="accent">全量独立执行</Badge>
                   )}
                   {result.strategy_info.source && (
-                    <span className={`text-micro px-1 py-px rounded-btn border ${BADGE_CLS_MAP[result.strategy_info.source] ?? ''}`}>
+                    <Badge tone={BADGE_TONE_MAP[result.strategy_info.source] ?? 'neutral'}>
                       {SRC_MAP[result.strategy_info.source] ?? ''}
-                    </span>
+                    </Badge>
                   )}
                   {resultRegimeSummary && (
                     <span className="inline-flex items-center gap-1 rounded-btn border border-accent/25 bg-accent/10 px-1.5 py-px text-micro text-accent">
@@ -2488,11 +2497,11 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 {/* 叠加策略: 子策略构成归因 */}
                 {result.strategy_info.composite_children && result.strategy_info.composite_children.length > 0 && (
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <Layers className="h-3 w-3 text-teal-400 shrink-0" />
+                    <Layers className="h-3 w-3 shrink-0 text-accent" />
                     <span className="text-micro text-muted">叠加 {result.strategy_info.composite_children.length} 策略</span>
                     {result.strategy_info.composite_children.map(c => (
-                      <span key={c.id} className="text-micro px-1.5 py-px rounded-btn border border-teal-500/25 bg-teal-500/10 text-teal-400">
-                        {c.id}<span className="text-teal-400/60 ml-0.5">{(c.weight * 100).toFixed(0)}%</span>
+                      <span key={c.id} className="rounded-btn border border-accent/25 bg-accent/10 px-1.5 py-px text-micro text-accent">
+                        {c.id}<span className="ml-0.5 text-accent/60">{(c.weight * 100).toFixed(0)}%</span>
                       </span>
                     ))}
                   </div>
@@ -2525,43 +2534,43 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                     <span className="num">{fmtDuration(result.elapsed_ms)}</span>
                   </span>
                 )}
-                <button
-                  type="button"
+                <Button
+                  size="xs"
                   onClick={exportResultCsv}
                   title="导出回测结果 CSV (概要 + 净值曲线 + 交易明细 + 分标的统计)"
-                  className={buttonClass({ size: 'xs' }, 'ml-1 shrink-0 gap-1')}
+                  className="ml-1 shrink-0 gap-1"
                 >
                   <Download className="h-3 w-3" />
                   导出
-                </button>
+                </Button>
               </div>
             )}
 
             {/* 统计卡片 */}
-            <div className="rounded-card border border-border bg-surface p-4">
+            <Card>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-3">
                 <Stat label={<MetricLabel label="总收益" metric="totalReturn" />} value={strategyReturn != null ? fmtPct(strategyReturn) : '—'}
-                  color={statValueColor(strategyReturn)} />
+                  colorClass={statValueColorClass(strategyReturn)} />
                 <Stat label={<MetricLabel label="年化" metric="annualReturn" />} value={pick('annual_return') != null ? fmtPct(pick('annual_return') as number) : '—'}
-                  color={statValueColor(pick('annual_return') as number)} />
+                  colorClass={statValueColorClass(pick('annual_return') as number)} />
                 <Stat label={<MetricLabel label="同期上证" metric="benchmarkReturn" />} value={benchmarkReturn != null ? fmtPct(benchmarkReturn) : '—'}
-                  color={statValueColor(benchmarkReturn)} />
+                  colorClass={statValueColorClass(benchmarkReturn)} />
                 <Stat label={<MetricLabel label="超额收益" metric="excessReturn" />} value={excessReturn != null ? fmtPct(excessReturn) : '—'}
-                  color={statValueColor(excessReturn)} />
+                  colorClass={statValueColorClass(excessReturn)} />
                 <Stat label={<MetricLabel label="夏普" metric="sharpe" />} value={pick('sharpe') != null ? Number(pick('sharpe')).toFixed(2) : '—'} />
                 <Stat label={<MetricLabel label="索提诺" metric="sortino" />} value={pick('sortino') != null ? Number(pick('sortino')).toFixed(2) : '—'} />
                 <Stat label={<MetricLabel label="最大回撤" metric="maxDrawdown" />} value={pick('max_drawdown') != null ? fmtPct(pick('max_drawdown') as number) : '—'}
-                  color="#34d399" />
+                  colorClass="text-bull" />
                 <Stat
                   label={<MetricLabel label="蒙卡回撤 中位/95%" metric="mcDrawdown" />}
                   value={`${pick('mc_maxdd_p50') != null ? fmtPct(pick('mc_maxdd_p50') as number) : '—'}/${pick('mc_maxdd_p95') != null ? fmtPct(pick('mc_maxdd_p95') as number) : '—'}`}
-                  color="#34d399"
+                  colorClass="text-bull"
                 />
                 <Stat label={<MetricLabel label="胜率" metric="winRate" />} value={pick('win_rate') != null ? fmtPct(pick('win_rate') as number) : '—'} />
                 <Stat
                   label={<MetricLabel label="盈亏比" metric="profitFactor" />}
                   value={pick('profit_factor') != null ? Number(pick('profit_factor')).toFixed(2) : '—'}
-                  color={pick('profit_factor') != null ? statValueColor(Number(pick('profit_factor')) - 1) : undefined}
+                  colorClass={pick('profit_factor') != null ? statValueColorClass(Number(pick('profit_factor')) - 1) : undefined}
                 />
                 <Stat label={<MetricLabel label="交易数" metric="tradeCount" />} value={pick('n_trades') != null ? String(pick('n_trades')) : '—'} />
                 {result.stats.full_kind === 'candidate_execution' ? (
@@ -2570,10 +2579,10 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                   <Stat label={<MetricLabel label="最终权益" metric="finalEquity" />} value={pick('final_equity') != null ? fmtPrice(pick('final_equity') as number) : '—'} />
                 )}
               </div>
-            </div>
+            </Card>
 
             {selectionStages.length > 0 && (
-              <div className="flex flex-wrap items-center gap-y-2 rounded-card border border-border bg-base/35 px-3 py-2 text-xs text-secondary">
+              <Card padding="tight" className="flex flex-wrap items-center gap-y-2 text-xs text-secondary">
                 <span className="mr-2 font-medium text-foreground">选择漏斗</span>
                 {selectionStages.map((stage, index) => (
                   <div key={stage.key} className="flex items-center">
@@ -2584,7 +2593,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 {Number(selectionStats?.entry_trigger_filtered ?? 0) > 0 && (
                   <span className="ml-auto text-warning">入场触发器过滤 {Number(selectionStats?.entry_trigger_filtered)} 个</span>
                 )}
-              </div>
+              </Card>
             )}
 
             {executionSummary.length > 0 && (
@@ -2600,24 +2609,24 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
 
             {/* 净值曲线 */}
             {result.equity_curve.length > 0 && (
-              <div className="rounded-card border border-border overflow-hidden">
+              <Card padding="none" className="overflow-hidden">
                 <StrategyNavChart result={result} />
-              </div>
+              </Card>
             )}
 
             {Array.isArray(result.stats.return_distribution) && result.stats.return_distribution.length > 0 && (
-              <div className="rounded-card border border-border p-3">
+              <Card>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-medium text-secondary">独立候选交易收益分布</span>
                   <span className="text-micro text-muted">红=正收益 · 绿=负收益</span>
                 </div>
                 <ReturnDistributionChart distribution={result.stats.return_distribution} />
-              </div>
+              </Card>
             )}
 
             {/* Tab: 按日期 / 交易明细 / 策略分析 / 因子归因 */}
             {(result.trades.length > 0 || result.per_symbol_stats.length > 0 || (result.factor_attribution?.factors.length ?? 0) > 0) && (
-              <div className="rounded-card border border-border overflow-hidden">
+              <Card padding="none" className="overflow-hidden">
                 <div className="flex items-center gap-1 border-b border-border px-4 pt-2">
                   {(['daily', 'trades', 'picks', 'attribution'] as const).map(t => {
                     const attributionCount = result.factor_attribution?.factors.length ?? 0
@@ -2705,25 +2714,23 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                           显示 {dailyStart + 1}-{dailyEnd} 天 / 共 {dailyTradeRows.length} 天，每页 10 天
                         </span>
                         <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
+                          <Button
+                            size="xs"
                             onClick={() => setDailyPage(p => Math.max(0, p - 1))}
                             disabled={safeDailyPage <= 0}
-                            className="rounded-btn border border-border bg-surface px-2.5 py-1 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
                           >
                             上一页
-                          </button>
+                          </Button>
                           <span className="num text-secondary">
                             {safeDailyPage + 1} / {dailyPageCount}
                           </span>
-                          <button
-                            type="button"
+                          <Button
+                            size="xs"
                             onClick={() => setDailyPage(p => Math.min(dailyPageCount - 1, p + 1))}
                             disabled={safeDailyPage >= dailyPageCount - 1}
-                            className="rounded-btn border border-border bg-surface px-2.5 py-1 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
                           >
                             下一页
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -2758,7 +2765,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                             role="button"
                             tabIndex={0}
                             title="点击查看该笔交易的K线回放"
-                            className={`border-t border-border hover:bg-elevated/50 transition-colors group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset ${
+                            className={`border-t border-border hover:bg-elevated/50 transition-colors group cursor-pointer ${
                               t === selectedTrade ? 'bg-accent/10' : ''
                             }`}
                           >
@@ -2808,7 +2815,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                                 setTradePageSize(Number(e.target.value))
                                 setTradePage(0)
                               }}
-                              className="rounded-btn border border-border bg-surface px-2 py-1 text-xs text-secondary focus:outline-none focus:border-accent"
+                              className={`${fieldSelect} text-xs`}
                             >
                               {TRADE_PAGE_SIZE_OPTIONS.map(size => (
                                 <option key={size} value={size}>{size}</option>
@@ -2816,25 +2823,23 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                             </select>
                             <span>条</span>
                           </label>
-                          <button
-                            type="button"
+                          <Button
+                            size="xs"
                             onClick={() => setTradePage(p => Math.max(0, p - 1))}
                             disabled={safeTradePage <= 0}
-                            className="rounded-btn border border-border bg-surface px-2.5 py-1 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
                           >
                             上一页
-                          </button>
+                          </Button>
                           <span className="num text-secondary">
                             {safeTradePage + 1} / {tradePageCount}
                           </span>
-                          <button
-                            type="button"
+                          <Button
+                            size="xs"
                             onClick={() => setTradePage(p => Math.min(tradePageCount - 1, p + 1))}
                             disabled={safeTradePage >= tradePageCount - 1}
-                            className="rounded-btn border border-border bg-surface px-2.5 py-1 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-45"
                           >
                             下一页
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -2867,7 +2872,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                           role="button"
                           tabIndex={0}
                           title="点击查看该标的在回测期的K线 (标注每次买卖)"
-                          className={`border-t border-border hover:bg-elevated/50 transition-colors group cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset ${
+                          className={`border-t border-border hover:bg-elevated/50 transition-colors group cursor-pointer ${
                             r.symbol === picksSymbol ? 'bg-accent/10' : ''
                           }`}
                         >
@@ -2938,7 +2943,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                     </div>
                   </div>
                 )}
-              </div>
+              </Card>
             )}
 
             <div className="text-xs text-muted">
@@ -2948,11 +2953,11 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
         )}
 
         {/* 免责声明: 常驻于结果区底部 */}
-        <div className="rounded-card border border-border/60 bg-base/40 px-3 py-2 text-center text-micro leading-4 text-muted">
+        <Card padding="tight" className="text-center text-micro leading-4 text-muted">
           回测基于历史数据与当前参数设定模拟,受成交假设与市场环境影响,过往结果不代表未来收益;
           行情数据来自第三方数据源,其准确性、完整性与及时性不作保证,可能存在缺失、延迟或错误;
           仅供参考,不构成投资建议,请独立决策并自担风险。
-        </div>
+        </Card>
       </section>
 
       {settingsOpen && detail && (
@@ -2969,38 +2974,33 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             initial={{ x: 32, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-y-0 right-0 z-[60] flex w-full max-w-3xl flex-col border-l border-border bg-base shadow-2xl"
+            className="fixed inset-y-0 right-0 z-[60] flex w-full max-w-3xl flex-col border-l border-border bg-surface shadow-2xl"
           >
             <div className="border-b border-border px-4 py-3">
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={TYPE.section}>高级策略设置</span>
-                    <span className={`text-micro px-1 py-px rounded-btn border ${BADGE_CLS_MAP[detail.source] ?? ''}`}>
+                    <Badge tone={BADGE_TONE_MAP[detail.source] ?? 'neutral'}>
                       {SRC_MAP[detail.source] ?? ''}
-                    </span>
+                    </Badge>
                   </div>
                   <div className="mt-1 truncate text-xs text-secondary">{detail.name}</div>
                   <div className="mt-0.5 text-micro leading-4 text-muted">{advancedSummary}</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSettingsOpen(false)}
-                  className="rounded-btn border border-border bg-surface p-1.5 text-secondary transition-colors hover:border-accent/40 hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <DialogClose onClose={() => setSettingsOpen(false)} label="关闭高级策略设置" />
               </div>
               <div className="mt-3 flex gap-1 overflow-x-auto">
                 {visibleAdvancedTabs.map(tab => (
-                  <button
+                  <Button
                     key={tab.id}
-                    type="button"
+                    size="xs"
+                    selected={settingsTab === tab.id}
                     onClick={() => setSettingsTab(tab.id)}
-                    className={buttonClass({ selected: settingsTab === tab.id }, 'shrink-0')}
+                    className="shrink-0"
                   >
                     {tab.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -3018,8 +3018,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
               <div className={settingsTab === 'conditions' ? 'space-y-3' : 'hidden'}>
                 <ConfigSection title="基础过滤" hint="用于候选池">
                   <label className="flex items-center gap-2 text-xs text-secondary">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={basicFilter.enabled !== false}
                       onChange={e => updateBasicFilter('enabled', e.target.checked)}
                     />
@@ -3061,8 +3060,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                     })}
                   </div>
                   <label className="flex items-center gap-2 text-xs text-secondary">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={!!basicFilter.exclude_st}
                       onChange={e => updateBasicFilter('exclude_st', e.target.checked)}
                     />
@@ -3076,14 +3074,14 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                       const boards = Array.isArray(basicFilter.boards) ? basicFilter.boards : []
                       const checked = boards.includes(board)
                       return (
-                        <button
+                        <Button
                           key={board}
-                          type="button"
+                          size="xs"
+                          selected={checked}
                           onClick={() => updateBasicFilter('boards', checked ? boards.filter((b: string) => b !== board) : [...boards, board])}
-                          className={buttonClass({ size: 'xs', selected: checked })}
                         >
                           {board}
-                        </button>
+                        </Button>
                       )
                     })}
                   </div>
@@ -3302,14 +3300,13 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                 <ConfigSection title="回测范围">
                   <div className="flex items-center gap-2">
                     <span className="text-micro text-muted">资产类型</span>
-                    <div className="inline-flex h-8 rounded-btn border border-border overflow-hidden">
+                    <div className={SEG}>
                       {(['stock', 'etf'] as const).map(t => (
                         <button
                           key={t}
                           type="button"
                           onClick={() => { setAssetType(t); setSelectedStrategy(null); setSymbols('') }}
-                          className={`h-full px-3 text-xs font-medium transition-colors cursor-pointer
-                            ${assetType === t ? 'bg-foreground text-surface font-medium' : 'text-secondary hover:text-foreground'}`}
+                          className={cn(SEG_ITEM, assetType === t ? SEG_ON : SEG_OFF)}
                         >
                           {t === 'stock' ? '股票' : 'ETF'}
                         </button>
@@ -3324,31 +3321,18 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
-              <button
-                type="button"
-                onClick={() => resetConfigFromDetail(detail)}
-                className="rounded-btn border border-border bg-surface px-3 py-1.5 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent"
-              >
+              <Button size="sm" onClick={() => resetConfigFromDetail(detail)}>
                 恢复默认
-              </button>
+              </Button>
               {/* 应用到策略: 把当前配置持久化为策略定义(仅用户自有策略可改) */}
               {(detail.source === 'custom' || detail.source === 'ai' || detail.source === 'composite') && (
-                <button
-                  type="button"
-                  onClick={handleApplyToStrategy}
-                  disabled={applying}
-                  className={buttonClass({}, 'ml-auto')}
-                >
+                <Button size="sm" onClick={handleApplyToStrategy} disabled={applying} className="ml-auto">
                   {applying ? '应用中…' : '应用到策略'}
-                </button>
+                </Button>
               )}
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(false)}
-                className={buttonClass({ variant: 'primary' })}
-              >
+              <Button variant="primary" size="md" onClick={() => setSettingsOpen(false)}>
                 完成
-              </button>
+              </Button>
             </div>
           </motion.aside>
         </>
@@ -3371,6 +3355,6 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
         onNavigate={(sym) => setChartOverlay({ kind: 'symbol', symbol: sym })}
         onClose={() => setChartOverlay(null)}
       />
-    </div>
+    </Card>
   )
 }

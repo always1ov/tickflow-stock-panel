@@ -36,7 +36,7 @@ import { toNavItems, type NavItem } from '@/lib/listNav'
 import { DimensionMembersDialog, type DimensionKind, type DimensionMembersTarget } from '@/components/DimensionMembersDialog'
 import { usePreferences, useQuoteStatus } from '@/lib/useSharedQueries'
 import { PageTabs, usePageTab, type PageTabDef } from '@/components/PageTabs'
-import { SELECTED, TYPE, buttonClass } from '@/components/ui'
+import { TYPE, Badge, Button, Checkbox, DialogClose, Radio, buttonClass, dialogPanel, fieldInput, fieldSelect } from '@/components/ui'
 
 export type MonitorTab = 'alerts' | 'rules' | 'focus'
 
@@ -61,19 +61,17 @@ const SEVERITY_DOT: Record<string, string> = {
   warn: 'bg-warning',
   critical: 'bg-danger',
 }
-const SOURCE_BADGE_STYLE: Record<string, string> = {
-  strategy: 'bg-warning/10 text-warning border-warning/20',
-  signal:   'bg-accent/10 text-accent border-accent/20',
-  price:    'bg-emerald-400/10 text-emerald-400 border-emerald-400/20',
-  market:   'bg-sky-500/10 text-sky-400 border-sky-500/20',
-  sector:   'bg-cyan-500/10 text-cyan-700 border-cyan-500/20 dark:text-cyan-300',
-  abnormal: 'bg-warning/10 text-warning border-warning/20 dark:text-warning',
-  volume_delta: 'bg-teal-500/10 text-teal-500 border-teal-500/20 dark:text-teal-300',
-  date:     'bg-secondary/10 text-secondary border-border',
+/** 类型 → 徽标色。只有语义三档: 警示 / 强调 / 中性 —— 原来自定的一套蓝绿不参与控件配色 */
+const SOURCE_BADGE_TONE: Record<string, 'warning' | 'accent' | 'neutral'> = {
+  strategy: 'warning',
+  signal: 'accent',
+  price: 'neutral',
+  market: 'neutral',
+  sector: 'neutral',
+  abnormal: 'warning',
+  volume_delta: 'neutral',
+  date: 'neutral',
 }
-
-/** 图标按钮 —— 工具条右侧那几颗 */
-const ICON_BTN = 'inline-flex h-7 w-7 items-center justify-center rounded-btn border border-border/60 bg-surface text-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-30 cursor-pointer'
 
 /**
  * 渲染策略类消息 — 策略名黄色、进入红/移出绿 (A 股红涨绿跌惯例)、其余白色。
@@ -344,10 +342,7 @@ function AlertsTab({ alertsQuery, loading, total, sourceCounts, filter, setFilte
   const [confirmClear, setConfirmClear] = useState(false)
   // 只画有记录的类型; 当前选中的哪怕清零了也留着, 不然按钮在手底下消失
   const sources = SOURCE_ORDER.filter(s => (sourceCounts[s] ?? 0) > 0 || s === filter)
-  const chipCls = (on: boolean) => cn(
-    'inline-flex h-7 items-center gap-1 rounded-btn border px-2 text-xs transition-colors cursor-pointer',
-    on ? SELECTED : 'border-transparent text-muted hover:bg-elevated hover:text-foreground',
-  )
+  const chipCls = (on: boolean) => buttonClass({ variant: 'ghost', size: 'xs', selected: on }, 'gap-1')
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -366,16 +361,16 @@ function AlertsTab({ alertsQuery, loading, total, sourceCounts, filter, setFilte
           <button
             onClick={() => setFocusOnly(v => !v)}
             title={focusOnly ? '当前只看焦点内(持有 / 计划中 / 钉住)。点击含焦点外的' : '当前含焦点外的(灰显)。点击只看焦点内'}
-            className={buttonClass({ selected: focusOnly }, 'h-7 px-2')}
+            className={buttonClass({ size: 'xs', selected: focusOnly }, 'px-2')}
           >
             {focusOnly ? '只看焦点' : '含焦点外'}
           </button>
-          <button onClick={onOpenExtConfig} title="配置行业/概念标签" className={cn(ICON_BTN, extConfigOpen && 'border-accent/40 text-accent')}>
+          <Button icon size="xs" variant="secondary" onClick={onOpenExtConfig} title="配置行业/概念标签" className={cn(extConfigOpen && 'border-accent/40 text-accent')}>
             <Tags className="h-3.5 w-3.5" /><span className="sr-only">配置行业/概念标签</span>
-          </button>
-          <button onClick={() => setConfirmClear(true)} disabled={total === 0} title="清空触发记录" className={cn(ICON_BTN, 'hover:border-danger/40 hover:text-danger')}>
+          </Button>
+          <Button icon size="xs" variant="danger" onClick={() => setConfirmClear(true)} disabled={total === 0} title="清空触发记录">
             <Trash2 className="h-3.5 w-3.5" /><span className="sr-only">清空触发记录</span>
-          </button>
+          </Button>
         </div>
       </div>
       <AlertsList alertsQuery={alertsQuery} loading={loading} confirmClear={confirmClear} setConfirmClear={setConfirmClear} total={total} enterTs={enterTs} monitorExtFields={monitorExtFields} />
@@ -604,7 +599,7 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
               className="inline-flex min-w-0 items-center gap-1.5 rounded-btn px-1 -mx-1 text-xs font-medium text-foreground transition-colors hover:bg-elevated/50 hover:text-accent cursor-pointer"
               title={ev.sector_kind === 'index' ? '打开指数详情' : '查看成分股'}
             >
-              <Tags className="h-3.5 w-3.5 shrink-0 text-cyan-600 dark:text-cyan-300" />
+              <Tags className="h-3.5 w-3.5 shrink-0 text-secondary" />
               <span className="truncate">{ev.sector_name ?? ev.name}</span>
               {ev.symbol && <span className="shrink-0 font-mono text-micro text-muted">{ev.symbol}</span>}
             </button>
@@ -659,12 +654,9 @@ function AlertRow({ ev, dayHeader, isNew, customNames, monitorExtFields, confirm
 
         {/* 规则 · 命中了什么 · 行业/概念 */}
         <div className="contents sm:flex sm:min-w-0 sm:basis-0 sm:grow sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1 sm:text-xs">
-          <span
-            className={cn('shrink-0 rounded-btn border px-1.5 py-px text-micro font-medium', SOURCE_BADGE_STYLE[ev.source] ?? 'bg-elevated text-muted border-border')}
-            title={ruleConditionsText(ev, customNames)}
-          >
+          <Badge tone={SOURCE_BADGE_TONE[ev.source] ?? 'neutral'} title={ruleConditionsText(ev, customNames)}>
             {badgeLabel}
-          </span>
+          </Badge>
           {eventMeta && ev.symbol && (
             <span className={cn('shrink-0 font-medium', eventMeta.className)}>{eventMeta.action}</span>
           )}
@@ -712,21 +704,23 @@ function RulesTab({ rulesQuery, rulesCount, onNew, onEdit, onBatchChannels, onCl
   return (
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <button onClick={onNew} className={buttonClass({ variant: 'primary' }, 'h-7 gap-1 px-2.5')}>
+        <Button variant="primary" size="xs" onClick={onNew} className="gap-1">
           <Plus className="h-3.5 w-3.5" />新建规则
-        </button>
+        </Button>
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
-          <button
+          <Button
+            icon
+            size="xs"
+            variant="secondary"
             onClick={onBatchChannels}
             disabled={rulesCount === 0}
             title="批量设置推送渠道(飞书/企微/钉钉)—— 一次改所有规则, 不用逐条打开"
-            className={ICON_BTN}
           >
             <BellRing className="h-3.5 w-3.5" /><span className="sr-only">批量设置推送渠道</span>
-          </button>
-          <button onClick={onClearAll} disabled={rulesCount === 0} title="清除全部规则" className={cn(ICON_BTN, 'hover:border-danger/40 hover:text-danger')}>
+          </Button>
+          <Button icon size="xs" variant="danger" onClick={onClearAll} disabled={rulesCount === 0} title="清除全部规则">
             <Trash2 className="h-3.5 w-3.5" /><span className="sr-only">清除全部规则</span>
-          </button>
+          </Button>
         </div>
       </div>
       <RulesList rulesQuery={rulesQuery} onEdit={onEdit} />
@@ -835,8 +829,6 @@ function RulesList({ rulesQuery, onEdit }: {
     }
   }
 
-  const pill = 'rounded-btn bg-elevated px-1.5 py-px text-micro text-secondary'
-
   return (
     <div>
       {rulesQuery.isLoading ? (
@@ -870,18 +862,16 @@ function RulesList({ rulesQuery, onEdit }: {
               >
                 {/* 类型 */}
                 <span className="flex w-[4.5rem] shrink-0 items-center gap-1">
-                  <span className={cn('rounded-btn px-1.5 py-px text-micro font-semibold', SOURCE_BADGE_STYLE[r.type] ?? 'bg-elevated text-muted')}>
-                    {TYPE_LABEL[r.type]}
-                  </span>
+                  <Badge tone={SOURCE_BADGE_TONE[r.type] ?? 'neutral'}>{TYPE_LABEL[r.type]}</Badge>
                 </span>
 
                 {/* 对象: 策略名 / 个股 / 分组 / 规则名 */}
                 <div className="flex min-w-0 grow basis-0 items-center gap-1.5 sm:w-60 sm:grow-0 sm:basis-auto">
                   {r.lot_id && (
-                    <span className="shrink-0 rounded-btn bg-emerald-400/10 px-1.5 py-px text-micro font-semibold text-emerald-500" title="由「持仓提醒」页托管, 请在持仓提醒页修改或删除">批次</span>
+                    <Badge title="由「持仓提醒」页托管, 请在持仓提醒页修改或删除">批次</Badge>
                   )}
                   {r.asset_type === 'index' && (
-                    <span className="shrink-0 rounded-btn bg-sky-500/10 px-1.5 py-px text-micro font-semibold text-sky-400">指数</span>
+                    <Badge>指数</Badge>
                   )}
                   {/* 策略类型始终显示策略名；其他个股类型才显示可点击的代码+名称。 */}
                   {r.type === 'strategy' ? (
@@ -924,12 +914,9 @@ function RulesList({ rulesQuery, onEdit }: {
                 {/* 操作 */}
                 <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:order-last">
                   {r.lot_id ? (
-                    <span
-                      className="inline-flex items-center rounded-btn border border-border/60 bg-elevated/60 px-1.5 py-0.5 text-micro text-secondary"
-                      title="由「持仓提醒」页生成的规则, 该页托管; 启停/修改/删除请到持仓提醒页"
-                    >
+                    <Badge title="由「持仓提醒」页生成的规则, 该页托管; 启停/修改/删除请到持仓提醒页">
                       批次托管
-                    </span>
+                    </Badge>
                   ) : (
                     <>
                       <button
@@ -982,9 +969,9 @@ function RulesList({ rulesQuery, onEdit }: {
                   {r.type === 'sector' ? (
                     <>
                       {(r.sector_targets ?? []).slice(0, 3).map(target => (
-                        <span key={target.key} className="max-w-28 truncate rounded-btn bg-cyan-500/8 px-1.5 py-px text-micro text-cyan-700 dark:text-cyan-300">
+                        <Badge key={target.key} className="max-w-28 truncate">
                           {target.name}
-                        </span>
+                        </Badge>
                       ))}
                       {(r.sector_targets?.length ?? 0) > 3 && (
                         <span className="text-micro text-muted">+{(r.sector_targets?.length ?? 0) - 3}</span>
@@ -996,15 +983,15 @@ function RulesList({ rulesQuery, onEdit }: {
                     </>
                   ) : r.type === 'abnormal' ? (
                     <>
-                      <span className="rounded-btn bg-warning/8 px-1.5 py-px text-micro text-warning dark:text-warning">
+                      <Badge tone="warning">
                         接近度 ≥ {r.threshold_pct ?? 70}%
-                      </span>
-                      <span className={pill}>
+                      </Badge>
+                      <Badge>
                         {r.abnormal_window && r.abnormal_window !== 'any' ? `${r.abnormal_window.toUpperCase()} 窗口` : '全部窗口'}
-                      </span>
-                      <span className={pill}>
+                      </Badge>
+                      <Badge>
                         {r.direction === 'up' ? '涨势偏离' : r.direction === 'down' ? '跌势偏离' : '涨跌双向'}
-                      </span>
+                      </Badge>
                     </>
                   ) : r.type === 'date' ? (
                     <span className="text-micro text-secondary">
@@ -1014,26 +1001,26 @@ function RulesList({ rulesQuery, onEdit }: {
                     </span>
                   ) : r.type === 'volume_delta' ? (
                     <>
-                      <span className="rounded-btn bg-teal-500/10 px-1.5 py-px font-mono text-micro text-teal-500 dark:text-teal-300">
+                      <Badge className="font-mono">
                         {r.metric === 'amount'
                           ? `单轮增量 ≥ ${Math.round((r.threshold_amount ?? 1e6) / 1e4).toLocaleString()} 万元`
                           : `单轮增量 ≥ ${(r.threshold_volume ?? 9000).toLocaleString()} 手`}
-                      </span>
-                      <span className={pill}>冷却 {Math.round((r.cooldown_seconds ?? 300) / 60)} 分钟</span>
+                      </Badge>
+                      <Badge>冷却 {Math.round((r.cooldown_seconds ?? 300) / 60)} 分钟</Badge>
                       {r.basic_filter && Object.values(r.basic_filter).some(v => v !== null && v !== false) && (
-                        <span className={pill}>基础过滤{r.basic_filter.exclude_st ? ' · 剔除ST' : ''}</span>
+                        <Badge>基础过滤{r.basic_filter.exclude_st ? ' · 剔除ST' : ''}</Badge>
                       )}
                     </>
                   ) : r.type === 'strategy' && r.strategy_id ? (
                     <>
                       {(r.score_min != null || r.score_max != null) && (
-                        <span className="rounded-btn bg-warning/10 px-1.5 py-px font-mono text-micro text-warning">
+                        <Badge tone="warning" className="font-mono">
                           评分 {r.score_min ?? 0}–{r.score_max ?? 100}
-                        </span>
+                        </Badge>
                       )}
                       {(r.notify_events ?? LEGACY_STRATEGY_NOTIFY_EVENTS).map(event => {
                         const option = STRATEGY_NOTIFY_EVENT_OPTIONS.find(item => item.key === event)
-                        return option ? <span key={event} className={pill}>{option.label}</span> : null
+                        return option ? <Badge key={event}>{option.label}</Badge> : null
                       })}
                     </>
                   ) : r.conditions.length > 0 && (
@@ -1155,20 +1142,21 @@ function BatchChannelsDialog({ open, rulesCount, prefs, onClose }: {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="w-full max-w-sm rounded-dialog border border-border bg-surface p-5 shadow-2xl"
+            className={dialogPanel('sm', 'p-5')}
             onClick={e => e.stopPropagation()}
           >
-            <h3 className={TYPE.section}>批量设置推送渠道</h3>
+            <div className="flex items-start justify-between gap-2">
+              <h3 className={TYPE.section}>批量设置推送渠道</h3>
+              <DialogClose onClose={onClose} />
+            </div>
             <p className="mt-1.5 text-xs text-muted">作用于全部 {rulesCount} 条监控规则;站内通知恒开,不受影响。</p>
             <div className="mt-3 flex flex-wrap gap-3">
               {channelDefs.map(c => (
                 <label key={c.key} className={cn('inline-flex items-center gap-2 text-xs', c.configured ? 'text-foreground' : 'text-muted/50')}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={channels.includes(c.key)}
                     disabled={!c.configured}
                     onChange={() => setChannels(cur => cur.includes(c.key) ? cur.filter(x => x !== c.key) : [...cur, c.key])}
-                    className="h-3.5 w-3.5 accent-sky-500"
                   />
                   {c.label}
                   {!c.configured && <span className="text-micro">未配置</span>}
@@ -1178,7 +1166,7 @@ function BatchChannelsDialog({ open, rulesCount, prefs, onClose }: {
             <div className="mt-3 space-y-1.5">
               {modeDefs.map(m => (
                 <label key={m.key} className="flex items-start gap-2 text-xs text-foreground cursor-pointer">
-                  <input type="radio" name="batch-ch-mode" checked={mode === m.key} onChange={() => setMode(m.key)} className="mt-0.5 h-3.5 w-3.5 accent-sky-500" />
+                  <Radio name="batch-ch-mode" checked={mode === m.key} onChange={() => setMode(m.key)} className="mt-0.5" />
                   <span>
                     {m.label}
                     <span className="ml-1.5 text-micro text-muted">{m.hint}</span>
@@ -1190,14 +1178,14 @@ function BatchChannelsDialog({ open, rulesCount, prefs, onClose }: {
               <p className="mt-2 text-micro text-warning">当前选择会清空所有规则的外部推送渠道(只留站内)。</p>
             )}
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={onClose} className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs cursor-pointer">取消</button>
-              <button
+              <Button variant="secondary" onClick={onClose}>取消</Button>
+              <Button
+                variant="primary"
                 onClick={() => mut.mutate()}
                 disabled={mut.isPending || !canApply}
-                className="px-3 py-1.5 rounded-btn bg-accent text-base text-xs font-medium disabled:opacity-50 cursor-pointer"
               >
                 {mut.isPending ? '应用中…' : `应用到 ${rulesCount} 条规则`}
-              </button>
+              </Button>
             </div>
           </motion.div>
         </motion.div>
@@ -1232,23 +1220,23 @@ function ConfirmDialog({ open, title, message, confirmText, danger, pending, onC
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="w-full max-w-sm rounded-dialog border border-border bg-surface p-5 shadow-2xl"
+            className={dialogPanel('sm', 'p-5')}
             onClick={e => e.stopPropagation()}
           >
-            <h3 className={TYPE.section}>{title}</h3>
+            <div className="flex items-start justify-between gap-2">
+              <h3 className={TYPE.section}>{title}</h3>
+              <DialogClose onClose={onCancel} />
+            </div>
             <p className="mt-1.5 text-xs text-muted">{message}</p>
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={onCancel} className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs cursor-pointer">取消</button>
-              <button
+              <Button variant="secondary" onClick={onCancel}>取消</Button>
+              <Button
+                variant={danger ? 'danger' : 'primary'}
                 onClick={onConfirm}
                 disabled={pending}
-                className={cn(
-                  'px-3 py-1.5 rounded-btn text-xs font-medium disabled:opacity-50 cursor-pointer',
-                  danger ? 'bg-danger text-white' : 'bg-accent text-on-accent',
-                )}
               >
                 {confirmText ?? '确定'}
-              </button>
+              </Button>
             </div>
           </motion.div>
         </motion.div>
@@ -1302,12 +1290,13 @@ function MonitorExtConfigDialog({ open, fields, onClose }: {
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="w-full max-w-md rounded-dialog border border-border bg-surface p-5 shadow-2xl max-h-[85vh] overflow-y-auto"
+            className={dialogPanel('md', 'max-h-screen overflow-y-auto p-5')}
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center gap-2 mb-4">
+            <div className="mb-4 flex items-center gap-2">
               <Tags className="h-4 w-4 text-accent" />
               <h3 className={TYPE.section}>个股通知标签配置</h3>
+              <DialogClose onClose={onClose} className="ml-auto" />
             </div>
             <p className="text-xs text-muted mb-4">选择在触发记录和推送通知中显示的行业/概念字段,留空则不显示。</p>
             <div className="space-y-4">
@@ -1315,8 +1304,8 @@ function MonitorExtConfigDialog({ open, fields, onClose }: {
               <ExtFieldSection label="概念字段" value={concept} onChange={setConcept} groups={groups} loading={schema.isLoading} />
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={onClose} className="px-3 py-1.5 rounded-btn text-xs text-secondary hover:text-foreground transition-colors cursor-pointer">取消</button>
-              <button onClick={handleSave} className="px-3 py-1.5 rounded-btn text-xs font-medium bg-accent text-on-accent cursor-pointer">保存</button>
+              <Button variant="ghost" onClick={onClose}>取消</Button>
+              <Button variant="primary" onClick={handleSave}>保存</Button>
             </div>
           </motion.div>
         </motion.div>
@@ -1357,7 +1346,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
           value={field}
           onChange={e => pickField(e.target.value || null)}
           disabled={loading}
-          className="flex-1 min-w-0 h-8 bg-elevated border border-border rounded-btn text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
+          className={cn(fieldSelect, 'h-8 min-w-0 flex-1 px-2 py-0 text-xs')}
         >
           <option value="">不显示</option>
           {groups.map(g => (
@@ -1367,9 +1356,9 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
           ))}
         </select>
         {field && (
-          <button onClick={() => onChange(null)} title="清除" className="shrink-0 p-1 rounded-btn text-secondary hover:text-danger transition-colors cursor-pointer">
+          <Button icon size="xs" variant="ghost" onClick={() => onChange(null)} title="清除" className="shrink-0 hover:bg-danger/10 hover:text-danger">
             <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         )}
       </div>
       {field && (
@@ -1380,7 +1369,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
             value={maxTags || ''}
             onChange={e => setMaxTags(e.target.value ? Number(e.target.value) : 0)}
             placeholder="不限"
-            className="w-14 h-6 bg-elevated border border-border rounded-btn text-xs text-foreground px-1.5 focus:outline-none focus:border-accent/50"
+            className={cn(fieldInput, 'h-6 w-14 px-1.5 py-0 text-xs')}
           />
           <span className="text-micro text-muted/60">留空=全部</span>
         </div>

@@ -5,9 +5,18 @@ import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
 import { api, type FactorBatchItem } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
-import { TYPE, buttonClass } from '@/components/ui'
-
-const INPUT_CLS = 'h-8 w-full rounded-input border border-border bg-surface px-2.5 text-xs text-foreground focus:border-accent focus:outline-none'
+import {
+  Badge,
+  Button,
+  DialogClose,
+  DIALOG_BODY,
+  DIALOG_FOOTER,
+  DIALOG_HEADER,
+  DIALOG_TITLE,
+  dialogPanel,
+  fieldInput,
+  fieldSelect,
+} from '@/components/ui'
 
 /** 按因子族给默认阈值 (RSI/KDJ 经典区间, z 分 ±2, 有界位置 0.2/0.8, 乖离 ±5%)。 */
 function suggestThreshold(factorId: string, op: '>' | '<'): number {
@@ -107,24 +116,27 @@ export function AddFactorSignalDialog({
     <Modal
       onClose={onClose}
       labelledBy="add-factor-signal-title"
-      panelClassName="flex max-h-[86vh] w-[92vw] max-w-md flex-col overflow-hidden border border-border bg-surface shadow-xl rounded-card"
+      panelClassName={dialogPanel('md', 'flex max-h-[86vh] flex-col overflow-hidden')}
     >
-      <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="min-w-0">
+      <div className={DIALOG_HEADER}>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 shrink-0 text-secondary" />
-            <span id="add-factor-signal-title" className={TYPE.section}>因子加入信号条件</span>
+            <span id="add-factor-signal-title" className={DIALOG_TITLE}>因子加入信号条件</span>
           </div>
           {selected && <p className="mt-1 font-mono text-xs text-muted">{selected.factor_name}</p>}
         </div>
-        {selected && <span className="shrink-0 rounded-btn bg-elevated px-1.5 py-0.5 text-micro text-secondary">{selected.label}</span>}
+        <div className="flex shrink-0 items-center gap-2">
+          {selected && <Badge>{selected.label}</Badge>}
+          <DialogClose onClose={onClose} />
+        </div>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+      <div className={`${DIALOG_BODY} min-h-0 flex-1 space-y-3 overflow-y-auto`}>
         {!item && (
           <label className="block">
             <span className="mb-1 block text-micro text-muted">选择因子（内置 / 自定义 / 复合）</span>
-            <select value={selectedId} onChange={event => pickFactor(event.target.value)} className={INPUT_CLS}>
+            <select value={selectedId} onChange={event => pickFactor(event.target.value)} className={`${fieldSelect} w-full`}>
               <option value="">{library.isPending ? '加载因子中…' : '请选择因子'}</option>
               {grouped.map(([group, factors]) => (
                 <optgroup key={group} label={group}>
@@ -149,7 +161,7 @@ export function AddFactorSignalDialog({
         <div className="grid grid-cols-[5rem_1fr] gap-2">
           <label className="block">
             <span className="mb-1 block text-micro text-muted">运算符</span>
-            <select value={op} onChange={event => pickOp(event.target.value as '>' | '<')} className={INPUT_CLS}>
+            <select value={op} onChange={event => pickOp(event.target.value as '>' | '<')} className={`${fieldSelect} w-full`}>
               <option value=">">&gt; 超过阈值</option>
               <option value="<">&lt; 低于阈值</option>
             </select>
@@ -159,17 +171,17 @@ export function AddFactorSignalDialog({
             <input
               type="number" step="any" value={threshold}
               onChange={event => setThreshold(event.target.value)}
-              className={`${INPUT_CLS} font-mono`}
+              className={`${fieldInput} w-full font-mono`}
             />
           </label>
         </div>
         <label className="block">
           <span className="mb-1 block text-micro text-muted">信号名称</span>
-          <input type="text" value={name} maxLength={24} onChange={event => setName(event.target.value)} className={INPUT_CLS} />
+          <input type="text" value={name} maxLength={24} onChange={event => setName(event.target.value)} className={`${fieldInput} w-full`} />
         </label>
         <label className="block">
           <span className="mb-1 block text-micro text-muted">类型</span>
-          <select value={kind} onChange={event => setKind(event.target.value as 'entry' | 'exit' | 'both')} className={INPUT_CLS}>
+          <select value={kind} onChange={event => setKind(event.target.value as 'entry' | 'exit' | 'both')} className={`${fieldSelect} w-full`}>
             <option value="entry">入场</option>
             <option value="exit">出场</option>
             <option value="both">出入通用</option>
@@ -180,17 +192,18 @@ export function AddFactorSignalDialog({
         </p>
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
-        <button type="button" onClick={onClose} className="rounded-btn bg-surface border border-border px-3 py-1.5 text-xs text-foreground transition-colors hover:text-foreground">取消</button>
-        <button
-          type="button"
+      <div className={DIALOG_FOOTER}>
+        <Button size="sm" onClick={onClose}>取消</Button>
+        <Button
+          variant="primary"
+          size="md"
           onClick={() => save.mutate()}
           disabled={save.isPending || !selected || !thresholdValid || !name.trim()}
-          className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
+          className="gap-1.5"
         >
           <Zap className="h-3.5 w-3.5" />
           {save.isPending ? '保存中…' : '保存信号'}
-        </button>
+        </Button>
       </div>
     </Modal>
   )

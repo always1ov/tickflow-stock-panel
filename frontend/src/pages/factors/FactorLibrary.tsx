@@ -1,22 +1,28 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, ArchiveRestore, ArrowRight, FlaskConical, PenLine, Search, Sparkles, Trash2, X } from 'lucide-react'
+import {
+  Archive, ArchiveRestore, ArrowRight, FlaskConical, PenLine, Search, Sparkles, Trash2,
+} from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
 import { api, type FactorLibraryItem } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { refreshResourceQueries } from '@/lib/importCenter'
 import { GenerateFactorStrategyDialog } from './GenerateFactorStrategyDialog'
-import { THEAD, TH_ROW, TYPE, buttonClass } from '@/components/ui'
+import {
+  Badge, Button, DialogClose, DIALOG_BODY, DIALOG_FOOTER, DIALOG_HEADER, DIALOG_TITLE,
+  SEG, SEG_ITEM, SEG_OFF, SEG_ON, THEAD, TH_ROW, dialogPanel, fieldInput, fieldSelect,
+  type BadgeTone,
+} from '@/components/ui'
 import { cn } from '@/lib/cn'
 
-const INPUT_CLS = 'rounded-input border border-border bg-surface px-2.5 py-1.5 text-xs focus:border-accent focus:outline-none'
+const INPUT_CLS = cn(fieldInput, 'text-xs')
 
-const KIND_META: Record<FactorLibraryItem['kind'], { label: string; cls: string }> = {
-  base: { label: '基础', cls: 'bg-elevated text-secondary' },
-  virtual: { label: '虚拟', cls: 'bg-accent/10 text-accent' },
-  composite: { label: '复合', cls: 'bg-bull/10 text-bull' },
-  custom: { label: '自定义', cls: 'bg-warning/10 text-warning' },
+const KIND_META: Record<FactorLibraryItem['kind'], { label: string; tone: BadgeTone }> = {
+  base: { label: '基础', tone: 'neutral' },
+  virtual: { label: '虚拟', tone: 'accent-soft' },
+  composite: { label: '复合', tone: 'bull' },
+  custom: { label: '自定义', tone: 'warning' },
 }
 
 /** 生命周期状态 (仅自定义/复合因子有): 表格状态列、筛选与详情弹窗共用。
@@ -24,13 +30,13 @@ const KIND_META: Record<FactorLibraryItem['kind'], { label: string; cls: string 
  * [R578 同步上游 v0.3.16] 上游给因子库加了生命周期筛选; 本 fork 保持手机不横滑的
  * 表格形态(R537), 只把状态并进「类型」列与筛选条。
  */
-const STATUS_META: Record<string, { label: string; cls: string }> = {
-  active: { label: '激活', cls: 'bg-bull/10 text-bull' },
-  watch: { label: '观察', cls: 'bg-warning/10 text-warning' },
-  draft: { label: '草稿', cls: 'bg-base text-muted' },
-  retired: { label: '退役', cls: 'bg-danger/10 text-danger/80' },
+const STATUS_META: Record<string, { label: string; tone: BadgeTone }> = {
+  active: { label: '激活', tone: 'bull' },
+  watch: { label: '观察', tone: 'warning' },
+  draft: { label: '草稿', tone: 'neutral' },
+  retired: { label: '退役', tone: 'danger' },
 }
-const BUILTIN_STATUS = { label: '内置', cls: 'bg-elevated/60 text-muted' }
+const BUILTIN_STATUS = { label: '内置', tone: 'neutral' as const }
 const statusOf = (item: FactorLibraryItem) =>
   (item.status && STATUS_META[item.status]) || BUILTIN_STATUS
 
@@ -95,21 +101,21 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
             value={query}
             onChange={event => setQuery(event.target.value)}
             placeholder="搜索因子 (id / 名称 / 公式)"
-            className={`${INPUT_CLS} w-56 pl-7`}
+            className={cn(INPUT_CLS, 'w-56 pl-7')}
           />
         </div>
-        <select value={kind} onChange={event => setKind(event.target.value)} className={`${INPUT_CLS} w-24`} aria-label="因子类型">
+        <select value={kind} onChange={event => setKind(event.target.value)} className={cn(fieldSelect, 'w-24 text-xs')} aria-label="因子类型">
           <option value="all">全部类型</option>
           <option value="base">基础</option>
           <option value="virtual">虚拟</option>
           <option value="composite">复合</option>
           <option value="custom">自定义</option>
         </select>
-        <select value={group} onChange={event => setGroup(event.target.value)} className={`${INPUT_CLS} w-28`} aria-label="因子分组">
+        <select value={group} onChange={event => setGroup(event.target.value)} className={cn(fieldSelect, 'w-28 text-xs')} aria-label="因子分组">
           <option value="all">全部分组</option>
           {groups.map(name => <option key={name} value={name}>{name}</option>)}
         </select>
-        <select value={status} onChange={event => setStatus(event.target.value)} className={`${INPUT_CLS} w-24`} aria-label="生命周期状态">
+        <select value={status} onChange={event => setStatus(event.target.value)} className={cn(fieldSelect, 'w-24 text-xs')} aria-label="生命周期状态">
           <option value="all">全部状态</option>
           <option value="builtin">内置</option>
           <option value="active">激活</option>
@@ -118,10 +124,10 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
           <option value="retired">退役</option>
         </select>
         <span className="ml-auto text-micro text-muted">{lib.isLoading ? '加载中…' : `${filtered.length} / ${factors.length} 个因子`}</span>
-        <div className="flex shrink-0 items-center rounded-btn border border-border p-0.5" role="tablist" aria-label="因子库视图">
+        <div className={SEG} role="tablist" aria-label="因子库视图">
           {([['library', '因子库'], ['archive', `档案库 ${archivedCount}`]] as const).map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}
-              className={`rounded-btn px-2 py-1 text-micro transition-colors ${view === id ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground'}`}>
+              className={cn(SEG_ITEM, view === id ? SEG_ON : SEG_OFF)}>
               {label}
             </button>
           ))}
@@ -174,16 +180,16 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
                   </td>
                   <td className="px-3 py-2 text-secondary max-sm:order-3 max-sm:p-0">{item.group}</td>
                   <td className="whitespace-nowrap px-3 py-2 max-sm:order-4 max-sm:p-0">
-                    <span className={`inline-flex rounded-btn px-1.5 py-0.5 text-micro font-medium ${KIND_META[item.kind].cls}`}>
+                    <Badge tone={KIND_META[item.kind].tone}>
                       {KIND_META[item.kind].label}
-                    </span>
+                    </Badge>
                     {item.pit && <span className="ml-1 text-micro text-warning" title="点时数据: 仅使用公告日不晚于当日的财务数据">点时</span>}
                     {item.archived ? (
-                      <span className="ml-1 inline-flex rounded-btn bg-muted/15 px-1.5 py-0.5 text-micro font-medium text-muted">已归档</span>
+                      <Badge className="ml-1">已归档</Badge>
                     ) : item.status != null && (
-                      <span className={`ml-1 inline-flex rounded-btn px-1.5 py-0.5 text-micro font-medium ${statusOf(item).cls}`}>
+                      <Badge className="ml-1" tone={statusOf(item).tone}>
                         {statusOf(item).label}
-                      </span>
+                      </Badge>
                     )}
                   </td>
                   <td className="max-w-[22rem] px-3 py-2 max-sm:order-5 max-sm:min-w-0 max-sm:flex-1 max-sm:p-0">
@@ -194,24 +200,26 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
                     {item.asset_types.includes('stock') && item.asset_types.includes('etf') ? '股票/ETF' : item.asset_types.join('/')}
                   </td>
                   <td className="px-3 py-2 text-right max-sm:order-2 max-sm:ml-auto max-sm:p-0">
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="xs"
                       onClick={event => { event.stopPropagation(); onInspect(item.id) }}
-                      className={buttonClass({ variant: 'ghost', size: 'xs' }, 'gap-1 text-accent')}
+                      className="gap-1 text-accent"
                       title="去检验该因子（切到检验页并只选它）"
                     >
                       去检验 <ArrowRight className="h-3 w-3" />
-                    </button>
+                    </Button>
                     {(item.kind === 'custom' || item.kind === 'composite') && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="xs"
                         onClick={event => { event.stopPropagation(); setArchived.mutate({ id: item.id, archived: !item.archived }) }}
                         disabled={setArchived.isPending}
-                        className={buttonClass({ variant: 'ghost', size: 'xs' }, 'ml-1 gap-1 text-secondary disabled:opacity-40')}
+                        className="ml-1 gap-1"
                         title={item.archived ? '恢复到因子库 (归档可逆, 不影响计算)' : '归档到档案库 (可恢复, 不删除因子)'}
                       >
                         {item.archived ? <><ArchiveRestore className="h-3 w-3" />恢复</> : <><Archive className="h-3 w-3" />归档</>}
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -313,36 +321,29 @@ function FactorDetailModal({
     <Modal
       onClose={onClose}
       labelledBy="factor-detail-title"
-      panelClassName="flex max-h-[86vh] w-[92vw] max-w-lg flex-col overflow-hidden border border-border bg-surface shadow-xl rounded-card"
+      panelClassName={dialogPanel('md', 'flex max-h-[86vh] flex-col overflow-hidden')}
     >
-      <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="min-w-0">
+      <div className={DIALOG_HEADER}>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <FlaskConical className="h-4 w-4 shrink-0 text-accent" />
-            <span id="factor-detail-title" className={cn('truncate', TYPE.section)}>{item.label}</span>
-            <span className={`inline-flex shrink-0 rounded-btn px-1.5 py-0.5 text-micro font-medium ${KIND_META[item.kind].cls}`}>
+            <h2 id="factor-detail-title" className={cn('truncate', DIALOG_TITLE)}>{item.label}</h2>
+            <Badge className="shrink-0" tone={KIND_META[item.kind].tone}>
               {KIND_META[item.kind].label}
-            </span>
+            </Badge>
             {item.archived ? (
-              <span className="inline-flex shrink-0 rounded-btn bg-muted/15 px-1.5 py-0.5 text-micro font-medium text-muted">已归档</span>
+              <Badge className="shrink-0">已归档</Badge>
             ) : item.status != null && (
-              <span className={`inline-flex shrink-0 rounded-btn px-1.5 py-0.5 text-micro font-medium ${statusOf(item).cls}`}>
+              <Badge className="shrink-0" tone={statusOf(item).tone}>
                 {statusOf(item).label}
-              </span>
+              </Badge>
             )}
           </div>
           <div className="mt-1 font-mono text-xs text-muted">{item.id}</div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className={buttonClass({ variant: 'ghost', icon: true }, 'shrink-0')}
-          aria-label="关闭"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <DialogClose onClose={onClose} />
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div className={cn(DIALOG_BODY, 'min-h-0 flex-1 overflow-y-auto')}>
         <dl className="space-y-2">
           {rows.map(([key, value]) => (
             <div key={key} className="flex items-start gap-3 text-xs">
@@ -355,17 +356,16 @@ function FactorDetailModal({
                       value={groupDraft}
                       maxLength={24}
                       onChange={event => setGroupDraft(event.target.value)}
-                      className="h-7 w-32 rounded-input border border-border bg-base/60 px-1.5 text-xs text-foreground focus:border-accent focus:outline-none"
+                      className={cn(fieldInput, 'h-7 w-32 text-xs')}
                       aria-label="修改分组"
                     />
-                    <button
-                      type="button"
+                    <Button
+                      size="xs"
                       onClick={() => setGroup.mutate()}
                       disabled={setGroup.isPending || !groupDraft.trim() || groupDraft.trim() === item.group}
-                      className={buttonClass({ size: 'xs' })}
                     >
                       保存
-                    </button>
+                    </Button>
                   </span>
                 ) : value}
               </dd>
@@ -376,90 +376,86 @@ function FactorDetailModal({
           方向说明：因子方向不预填，以最近一次检验的 IC 符号为准（IC 为正 = 值大看多）。到「检验」页运行后可查看。
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
+      <div className={cn(DIALOG_FOOTER, 'flex-wrap justify-start')}>
         {isDynamic && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-micro text-muted" title="生命周期流转">状态：</span>
             {(['active', 'watch', 'retired', 'draft'] as const).map(status => (
-              <button
+              <Button
                 key={status}
-                type="button"
+                size="xs"
                 onClick={() => setStatus.mutate(status)}
                 disabled={setStatus.isPending}
-                className={buttonClass({ size: 'xs' })}
               >
                 {status === 'active' ? '激活' : status === 'watch' ? '观察' : status === 'retired' ? '退役' : '回草稿'}
-              </button>
+              </Button>
             ))}
           </div>
         )}
         {isDynamic && (
-          <button
-            type="button"
+          <Button
+            size="xs"
             onClick={() => setArchived.mutate(!item.archived)}
             disabled={setArchived.isPending}
-            className={buttonClass({ size: 'xs' }, 'gap-1')}
+            className="gap-1"
             title="归档可逆: 收进档案库, 不删除定义、不影响引用它的策略与评分列"
           >
             {item.archived ? <><ArchiveRestore className="h-3 w-3" />恢复到因子库</> : <><Archive className="h-3 w-3" />归档到档案库</>}
-          </button>
+          </Button>
         )}
         {item.kind === 'custom' && onEdit && (
-          <button
-            type="button"
+          <Button
             onClick={() => { onClose(); onEdit(item.id) }}
-            className={buttonClass({}, 'gap-1')}
+            className="gap-1"
             title="在编辑器中打开该公式, 修改后保存为新版本"
           >
             <PenLine className="h-3 w-3" />
             编辑公式
-          </button>
+          </Button>
         )}
-        <button
-          type="button"
+        <Button
           onClick={() => setGenerateOpen(true)}
-          className={buttonClass({}, 'gap-1')}
+          className="gap-1"
           title="按该因子生成单因子排名策略, 保存到自定义策略后可直接回测"
         >
           <Sparkles className="h-3 w-3" />
           生成策略
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="primary"
           onClick={() => { onClose(); onInspect(item.id) }}
-          className={buttonClass({ variant: 'primary' }, 'ml-auto shrink-0 gap-1')}
+          className="ml-auto shrink-0 gap-1"
         >
           检验此因子 <ArrowRight className="h-3 w-3" />
-        </button>
+        </Button>
         {isDynamic && (
           confirmDelete ? (
             <>
-              <button
-                type="button"
+              <Button
+                variant="danger"
                 onClick={() => removeFactor.mutate(false)}
                 disabled={removeFactor.isPending}
-                className={buttonClass({}, 'shrink-0 gap-1 border-danger bg-danger font-medium text-on-accent hover:bg-danger/90')}
+                className="shrink-0 gap-1"
               >
                 {removeFactor.isPending ? '删除中…' : '确认删除'}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
                 onClick={() => { setConfirmDelete(false); setBlockedRefs(null) }}
-                className={buttonClass({}, 'shrink-0')}
+                className="shrink-0"
               >
                 取消
-              </button>
+              </Button>
             </>
           ) : (
-            <button
-              type="button"
+            <Button
+              variant="danger"
               onClick={() => setConfirmDelete(true)}
-              className={buttonClass({ variant: 'danger' }, 'shrink-0 gap-1')}
+              className="shrink-0 gap-1"
               title="删除该自定义/复合因子; 被策略或复合因子引用时需强制删除"
             >
               <Trash2 className="h-3 w-3" />
               删除
-            </button>
+            </Button>
           )
         )}
         {blockedRefs && (
@@ -467,14 +463,14 @@ function FactorDetailModal({
             <div className="font-medium">该因子仍被以下对象引用，删除后相关策略/复合因子将无法计算：</div>
             <div className="mt-1 font-mono text-micro break-all text-danger/90">{blockedRefs.join('、')}</div>
             <div className="mt-2 flex items-center gap-2">
-              <button
-                type="button"
+              <Button
+                variant="danger"
+                size="sm"
                 onClick={() => removeFactor.mutate(true)}
                 disabled={removeFactor.isPending}
-                className="rounded-btn bg-danger px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-danger/90 disabled:opacity-40"
               >
                 {removeFactor.isPending ? '删除中…' : '仍要强制删除'}
-              </button>
+              </Button>
               <button
                 type="button"
                 onClick={() => setBlockedRefs(null)}

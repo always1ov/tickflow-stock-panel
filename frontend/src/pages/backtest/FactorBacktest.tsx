@@ -13,7 +13,7 @@ import { selectableDefinitions, definitionOptionLabel } from '@/lib/definitionOp
 import { FactorICChart } from './charts/FactorICChart'
 import { FactorGroupNavChart } from './charts/FactorGroupNavChart'
 import { factorResultCandidate } from './researchCandidates'
-import { SEG, SEG_ITEM, SEG_ON, SEG_OFF, TYPE, THEAD, buttonClass } from '@/components/ui'
+import { SEG, SEG_ITEM, SEG_ON, SEG_OFF, TYPE, THEAD, Badge, Button, Card, fieldInput, fieldSelect } from '@/components/ui'
 import { cn } from '@/lib/cn'
 
 const formatDate = (date: Date) => date.toISOString().slice(0, 10)
@@ -24,9 +24,6 @@ const monthsAgo = (months: number) => {
 }
 const TODAY = formatDate(new Date())
 const THREE_MONTHS_AGO = monthsAgo(3)
-
-const INPUT_CLS = `w-full px-2.5 py-1.5 rounded-input bg-surface border border-border text-xs
-  focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth`
 
 function StatCard({ label, value, highlight }: {
   label: string
@@ -70,7 +67,7 @@ function LoadingPanel({ symbolsText }: { symbolsText: string }) {
         ))}
       </div>
 
-      <div className="rounded-card border border-border bg-surface p-4">
+      <Card>
         <div className="flex items-center justify-between">
           <div className="text-xs font-medium text-secondary">分层净值预览</div>
           <div className="text-xs text-muted">等待后端返回完整结果</div>
@@ -82,7 +79,7 @@ function LoadingPanel({ symbolsText }: { symbolsText: string }) {
             ))}
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   )
 }
@@ -201,7 +198,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d', autoRun = f
   const rangeButtonCls = (key: string) => cn(SEG_ITEM, 'justify-center whitespace-nowrap px-1', rangeKey === key ? SEG_ON : SEG_OFF)
 
   return (
-    <div className="h-full min-h-0 overflow-hidden rounded-card border border-border bg-surface/80 grid grid-cols-1 xl:grid-cols-[18rem_minmax(0,1fr)]">
+    <Card padding="none" className="grid h-full min-h-0 grid-cols-1 overflow-hidden xl:grid-cols-[18rem_minmax(0,1fr)]">
       {/* 配置面板 */}
       <section className="space-y-3 border-b xl:border-b-0 xl:border-r border-border bg-base/25 px-3 py-3 xl:overflow-y-auto">
         <div className="border-b border-border/70 pb-2">
@@ -214,7 +211,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d', autoRun = f
           <select
             value={factorName}
             onChange={e => setFactorName(e.target.value)}
-            className={INPUT_CLS}
+            className={`${fieldSelect} w-full`}
           >
             {Object.entries(factorGroups).map(([group, cols]) => (
               <optgroup key={group} label={group}>
@@ -251,17 +248,14 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d', autoRun = f
             value={symbols}
             onChange={e => setSymbols(e.target.value)}
             placeholder="留空则使用全市场，建议最近3个月"
-            className={`w-full px-2.5 py-1.5 rounded-input bg-surface border border-border text-xs font-mono
-              focus:outline-none focus:border-accent transition-colors duration-150 ease-smooth`}
+            className={`${fieldInput} w-full text-xs`}
           />
         </div>
 
-        <div className="rounded-btn border border-border bg-surface p-2.5">
+        <Card padding="none" className="p-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs font-medium text-foreground">回测区间</div>
-            <span className="shrink-0 rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 text-micro font-medium text-accent">
-              {rangeTitle}
-            </span>
+            <Badge tone="accent">{rangeTitle}</Badge>
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -295,12 +289,12 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d', autoRun = f
             <button type="button" onClick={() => applyRange(12)} className={`${rangeButtonCls('1y')} flex-1`}>1年</button>
             <button type="button" onClick={applyAllRange} className={`${rangeButtonCls('all')} flex-1`}>全部</button>
           </div>
-        </div>
+        </Card>
 
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="text-xs font-medium text-secondary block mb-1.5">分组数</label>
-            <select value={nGroups} onChange={e => setNGroups(Number(e.target.value))} className={INPUT_CLS}>
+            <select value={nGroups} onChange={e => setNGroups(Number(e.target.value))} className={`${fieldSelect} w-full`}>
               <option value={3}>3组</option>
               <option value={5}>5组</option>
               <option value={10}>10组</option>
@@ -308,14 +302,14 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d', autoRun = f
           </div>
           <div>
             <label className="text-xs font-medium text-secondary block mb-1.5">权重</label>
-            <select value={weight} onChange={e => setWeight(e.target.value as any)} className={INPUT_CLS}>
+            <select value={weight} onChange={e => setWeight(e.target.value as any)} className={`${fieldSelect} w-full`}>
               <option value="equal">等权</option>
               <option value="factor_weight">因子加权</option>
             </select>
           </div>
           <div>
             <label className="text-xs text-secondary block mb-1">调仓频率</label>
-            <select value={rebalance} onChange={e => setRebalance(e.target.value as any)} className={INPUT_CLS}>
+            <select value={rebalance} onChange={e => setRebalance(e.target.value as any)} className={`${fieldSelect} w-full`}>
               <option value="daily">日度</option>
               <option value="weekly">周度</option>
               <option value="monthly">月度</option>
@@ -324,23 +318,25 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d', autoRun = f
           <div>
             <label className="text-xs text-secondary block mb-1">佣金(万分之)</label>
             <input type="number" min="0" value={fees} onChange={e => setFees(e.target.value)}
-              className={INPUT_CLS} />
+              className={`${fieldInput} w-full text-xs`} />
           </div>
           <div>
             <label className="text-xs text-secondary block mb-1">滑点(bp)</label>
             <input type="number" min="0" value={slippage} onChange={e => setSlippage(e.target.value)}
-              className={INPUT_CLS} />
+              className={`${fieldInput} w-full text-xs`} />
           </div>
         </div>
 
-        <button
+        <Button
+          variant="primary"
+          size="md"
           onClick={() => run.mutate()}
           disabled={run.isPending}
-          className={buttonClass({ variant: 'primary', size: 'md' }, 'w-full gap-1.5')}
+          className="w-full gap-1.5"
         >
           <Play className="h-3.5 w-3.5" />
           {run.isPending ? '分析中…' : '开始因子分析'}
-        </button>
+        </Button>
       </section>
 
       {/* 结果面板 */}
@@ -384,19 +380,19 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d', autoRun = f
             className="space-y-4"
           >
             {/* IC/IR 指标 */}
-            <div className="rounded-card border border-border bg-surface p-4">
+            <Card>
               <div className="flex items-center justify-between mb-3">
                 <h3 className={TYPE.card}>因子历史有效性</h3>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
+                  <Button
+                    size="xs"
                     onClick={() => saveCandidate.mutate()}
                     disabled={saveCandidate.isPending}
-                    className="inline-flex items-center gap-1 rounded-btn border border-border bg-base/50 px-2 py-1 text-xs text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
+                    className="gap-1"
                   >
                     <BookmarkPlus className="h-3 w-3" />
                     {saveCandidate.isPending ? '保存中' : '保存候选'}
-                  </button>
+                  </Button>
                   <span className="text-xs text-muted">
                     Rank IC · {rebalance === 'daily' ? '日度' : rebalance === 'weekly' ? '周度' : '月度'}调仓
                   </span>
@@ -430,35 +426,35 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d', autoRun = f
                   标的数量过少，无法计算 IC/IR（需 ≥2 只）。可清空标的使用全市场，或补充更多标的。
                 </div>
               )}
-            </div>
+            </Card>
 
             {/* IC 时序图 */}
             {result.ic_series.length > 0 && (
-              <div className="rounded-card border border-border overflow-hidden">
+              <Card padding="none" className="overflow-hidden">
                 <div className="bg-elevated px-4 py-2">
                   <span className="text-xs font-medium text-secondary">IC 时序</span>
                 </div>
                 <div className="p-2">
                   <FactorICChart result={result} />
                 </div>
-              </div>
+              </Card>
             )}
 
             {/* 分层净值 */}
             {result.group_nav.length > 0 && (
-              <div className="rounded-card border border-border overflow-hidden">
+              <Card padding="none" className="overflow-hidden">
                 <div className="bg-elevated px-4 py-2">
                   <span className="text-xs font-medium text-secondary">分层净值曲线</span>
                 </div>
                 <div className="p-2">
                   <FactorGroupNavChart result={result} />
                 </div>
-              </div>
+              </Card>
             )}
 
             {/* 分层统计表 */}
             {result.group_stats.length > 0 && (
-              <div className="rounded-card border border-border overflow-hidden">
+              <Card padding="none" className="overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className={THEAD}>
                     <tr className="text-left text-micro text-muted">
@@ -504,7 +500,7 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d', autoRun = f
                     )}
                   </tbody>
                 </table>
-              </div>
+              </Card>
             )}
 
             {/* 数据概要 */}
@@ -516,6 +512,6 @@ export function FactorBacktest({ initialFactorName = 'momentum_20d', autoRun = f
           </motion.div>
         )}
       </section>
-    </div>
+    </Card>
   )
 }

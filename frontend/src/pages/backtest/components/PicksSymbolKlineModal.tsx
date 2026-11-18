@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { X } from 'lucide-react'
 import { StockPanel } from '@/components/StockPanel'
 import { NavPager, NavWrapToast } from '@/components/NavPager'
 import type { ChartMarker } from '@/components/EChartsCandlestick'
@@ -10,7 +9,7 @@ import { useListNav } from '@/lib/useListNav'
 import { fmtPct, fmtPrice, priceColorClass } from '@/lib/format'
 import { boardTag } from '@/lib/board'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
-import { TYPE } from '@/components/ui'
+import { Badge, DialogClose, TYPE } from '@/components/ui'
 import { cn } from '@/lib/cn'
 
 interface Props {
@@ -116,7 +115,7 @@ export function PicksSymbolKlineModal({ symbol, result, periodStart, periodEnd, 
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="relative flex max-h-[94vh] w-[92vw] max-w-read flex-col overflow-hidden rounded-card border border-border bg-base shadow-2xl"
+            className="relative flex max-h-[94vh] w-[92vw] max-w-read flex-col overflow-hidden rounded-card border border-border bg-surface shadow-2xl"
           >
             <div className="border-b border-border px-5 py-3">
               <div className="flex items-start justify-between gap-4">
@@ -124,12 +123,8 @@ export function PicksSymbolKlineModal({ symbol, result, periodStart, periodEnd, 
                   <div className="flex items-center gap-2">
                     <span className={cn('font-mono', TYPE.section)}>{symbol}</span>
                     {name && <span className="truncate text-sm text-foreground">{name}</span>}
-                    {tag && (
-                      <span className="rounded-btn border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-micro text-accent">
-                        {tag}
-                      </span>
-                    )}
-                    <span className="rounded-btn border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-micro text-accent">标的回放</span>
+                    {tag && <Badge tone="accent">{tag}</Badge>}
+                    <Badge tone="accent">标的回放</Badge>
 
                     {/* 切标的: 上一只 / n·N / 下一只 */}
                     <NavPager nav={nav} prevLabel="上一只" nextLabel="下一只" />
@@ -163,13 +158,7 @@ export function PicksSymbolKlineModal({ symbol, result, periodStart, periodEnd, 
                       </div>
                     </div>
                   )}
-                  <button
-                    onClick={onClose}
-                    className="rounded-btn p-1 text-secondary transition-colors hover:bg-elevated hover:text-foreground"
-                    aria-label="关闭标的回放"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                  <DialogClose onClose={onClose} label="关闭标的回放" />
                 </div>
               </div>
             </div>

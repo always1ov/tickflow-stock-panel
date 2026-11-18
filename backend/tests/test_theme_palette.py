@@ -320,7 +320,7 @@ def test_R369_全球指数整个特性没了_不是只删了那张卡():
     比留着更糟: 没有任何地方能让它停下来。
 
     这一条同时钉住**该留的留住了**: 上游的 A 股指数页 `pages/Indices.tsx` 一个
-    字没动, 侧栏的 A 股指数卡照常在。
+    字没动; 侧栏那张四只指数卡则在 R807 由用户点名删除, 不在这条的要求里。
     """
     import pathlib
 
@@ -347,12 +347,13 @@ def test_R369_全球指数整个特性没了_不是只删了那张卡():
                     hits.append(f"{f}: {p}")
     assert not hits, "还有残留引用:\n  " + "\n  ".join(sorted(set(hits)))
 
-    # ③ **该留的留住**: 上游 A 股指数页还在, 侧栏 A 股指数卡还在
+    # ③ **该留的留住**: 上游 A 股指数页还在
     assert (SRC / "pages/Indices.tsx").exists(), "上游的 A 股指数页被误删了"
-    layout = code_of("components/Layout.tsx")
-    assert "function SidebarIndexQuotes({ rows, items, cnLive }" in layout, \
-        "侧栏 A 股指数卡被一起删掉了"
-    assert "{items.map(item => {" in layout, "A 股那几张卡的渲染没了"
+    # [R814] 侧栏那张「核心四只指数」卡在 R807 被用户点名删掉
+    # (「菜单列表那四个指数也不需要了，删掉」), 所以这里不再要求它存在。
+    # 仍然不能误删的是 `CORE_INDEXES`: 轮动卡的指数下拉还在引用它(R807 裁决)。
+    assert "CORE_INDEXES" in code_of("components/SectorRotationCard.tsx"), \
+        "轮动卡的指数下拉还在用 CORE_INDEXES, 别把它跟着卡一起删了"
 
 
 # ── [R379] 换皮肤不许碰指标色 ────────────────────────────────────────────

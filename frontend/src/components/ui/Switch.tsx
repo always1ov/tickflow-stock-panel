@@ -18,7 +18,46 @@ const SIZES = {
   sm: { track: 'h-4 w-7', knob: 'h-3 w-3', on: 'translate-x-[14px]', off: 'translate-x-[2px]' },
 } as const
 
-export function Switch({ checked, onChange, disabled, size = 'md', title, label, className }: {
+/**
+ * [R821] 纯视觉轨道 —— 只画"轨道 + 白点", 不接事件、不进 tab 序。
+ *
+ * 给"整行可点的按钮借开关外观"那一类用（策略构建器的「AI 迭代」行）: 整行是
+ * `<button aria-pressed>`, 右边再塞一只真开关就会变成按钮套按钮、键盘要按两下。
+ * 抽出来是为了让轨道样式仍然只有一个产地 —— 谁再手写 `h-5 w-9 rounded-full`
+ * 就是两套外观各走各的。
+ */
+export function SwitchTrack({ checked, size = 'md', tone = 'accent', className }: {
+  checked: boolean
+  size?: keyof typeof SIZES
+  /** [R822] 开启态配色。默认 accent; `warning` 给"打开它是有代价的"那一类
+   *  (备份的「覆盖已存在的同名项」—— 开了会盖掉本机文件), 让警示留在开关本体上,
+   *  而不是回页面手写一份新轨道。 */
+  tone?: 'accent' | 'warning'
+  className?: string
+}) {
+  const s = SIZES[size]
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'relative inline-flex shrink-0 items-center rounded-full transition-colors duration-hover ease-out',
+        s.track,
+        checked ? (tone === 'warning' ? 'bg-warning' : 'bg-accent') : 'border border-border bg-surface',
+        className,
+      )}
+    >
+      <span
+        className={cn(
+          'inline-block rounded-full bg-white shadow-sm transition-transform duration-expand ease-in-out-strong',
+          s.knob,
+          checked ? s.on : s.off,
+        )}
+      />
+    </span>
+  )
+}
+
+export function Switch({ checked, onChange, disabled, size = 'md', tone = 'accent', title, label, className }: {
   checked: boolean
   /** 点一下: 拿到切换后的值; 事件也给出来(嵌在可点的行里时要 stopPropagation) */
   onChange: (next: boolean, e: MouseEvent<HTMLButtonElement>) => void
@@ -27,9 +66,10 @@ export function Switch({ checked, onChange, disabled, size = 'md', title, label,
   title?: string
   /** 读屏用的名字; 旁边已有可见文字标签时可不传 */
   label?: string
+  /** 开启态配色, 默认 accent; 见 SwitchTrack 的说明 */
+  tone?: 'accent' | 'warning'
   className?: string
 }) {
-  const s = SIZES[size]
   return (
     <button
       type="button"
@@ -42,20 +82,13 @@ export function Switch({ checked, onChange, disabled, size = 'md', title, label,
       className={cn(
         // [R549] 轨道同时过渡颜色与 transform: 全站按下规则(index.css :active → scale(0.97))给的缩放原来不在过渡属性里,
         // 按下 / 松开都是瞬间跳变; 按压反馈按 STANDARDS 取 160ms + 有力的 ease-out, 颜色仍是 150ms ease
-        'tap-target relative inline-flex shrink-0 items-center rounded-full [transition:background-color_150ms_ease,transform_160ms_var(--ease-out-strong)]',
-        'disabled:cursor-not-allowed disabled:opacity-40',
-        s.track,
-        checked ? 'bg-accent' : 'bg-surface border border-border',
+        'tap-target inline-flex shrink-0 cursor-pointer items-center rounded-full [transition:background-color_150ms_ease,transform_160ms_var(--ease-out-strong)]',
+        // [R814] 禁用态全站只有一个值(50), 原来这里是 40, 与 Button 不一致
+        'disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
     >
-      <span
-        className={cn(
-          'inline-block rounded-full bg-white shadow-sm transition-transform duration-expand ease-in-out-strong',
-          s.knob,
-          checked ? s.on : s.off,
-        )}
-      />
+      <SwitchTrack checked={checked} size={size} tone={tone} />
     </button>
   )
 }

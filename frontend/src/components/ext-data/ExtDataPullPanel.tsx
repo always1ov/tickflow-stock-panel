@@ -6,6 +6,7 @@ import { api, type ExtDataBackfillResult, type ExtDataConfig, type ExtPullAuth }
 import { toast } from '@/components/Toast'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 import { invalidateExtDataQueries } from '@/lib/ext-data-cache'
+import { Switch } from '@/components/ui'
 import {
   SectionHead, INPUT_CLS, formatIntervalSummary,
   MIN_PULL_INTERVAL_SECONDS, MAX_PULL_INTERVAL_SECONDS, validatePullInterval,
@@ -145,22 +146,12 @@ export function ExtDataPullPanel({ config, onSaved }: {
             <Clock className="h-3 w-3 text-muted" />
             <span>定时拉取</span>
           </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={enabled}
+          <Switch
+            size="sm"
+            checked={enabled}
             disabled={toggling}
-            onClick={() => handleToggle(!enabled)}
-            className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors duration-200 disabled:opacity-50 ${
-              enabled ? 'bg-accent' : 'bg-border'
-            }`}
-          >
-            <span
-              className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                enabled ? 'translate-x-3.5' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
+            onChange={next => handleToggle(next)}
+          />
         </div>
 
         <div className="text-micro leading-relaxed">
@@ -614,22 +605,14 @@ function ExtPullConfigDialog({ config, onSaved, onClose }: {
           {/* 02 调度 */}
           <section>
             <SectionHead num="02" title="调度">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={enabled}
+              <Switch
+                size="sm"
+                checked={enabled}
                 disabled={toggling}
-                onClick={() => handleToggle(!enabled)}
-                className="relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors duration-200 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40"
+                onChange={next => handleToggle(next)}
                 title={enabled ? '点击关闭定时拉取 (立即生效)' : '点击启用定时拉取 (保存当前编辑态并立即首次拉取)'}
-              >
-                <span className={`absolute inset-0 rounded-full ${enabled ? 'bg-accent' : 'bg-border'}`} />
-                <span
-                  className={`relative inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                    enabled ? 'translate-x-3.5' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
+                className="focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40"
+              />
             </SectionHead>
 
             <div className="rounded-card border border-border/60 bg-elevated/20 p-3.5 space-y-3">

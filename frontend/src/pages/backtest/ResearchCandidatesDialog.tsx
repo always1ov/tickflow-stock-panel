@@ -1,12 +1,26 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, BookmarkCheck, CheckCircle2, Clock3, Link2, Loader2, RotateCcw, Trash2, X, XCircle } from 'lucide-react'
+import { ArrowDown, ArrowUp, BookmarkCheck, CheckCircle2, Clock3, Link2, Loader2, RotateCcw, Trash2, XCircle } from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
 import { api, type ResearchCandidate, type ResearchCandidateStatus, type ScoringDirection } from '@/lib/api'
 import { fmtPct } from '@/lib/format'
 import { QK } from '@/lib/queryKeys'
-import { SEG, SEG_ITEM, SEG_ON, SEG_OFF, TYPE, buttonClass } from '@/components/ui'
+import {
+  Badge,
+  Button,
+  DialogClose,
+  DIALOG_HEADER,
+  DIALOG_TITLE,
+  dialogPanel,
+  fieldInput,
+  fieldSelect,
+  SEG,
+  SEG_ITEM,
+  SEG_ON,
+  SEG_OFF,
+  TYPE,
+} from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { selectableStrategies } from '@/lib/strategyLibrary'
 import { StrategyOptions } from '@/components/StrategyOptions'
@@ -137,23 +151,15 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
     <Modal
       onClose={onClose}
       labelledBy="research-candidates-title"
-      panelClassName="flex max-h-[82vh] w-[94vw] max-w-4xl flex-col overflow-hidden rounded-card border border-border bg-base shadow-2xl"
+      panelClassName={dialogPanel('xl', 'flex max-h-[82vh] flex-col overflow-hidden')}
     >
-      <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
-        <BookmarkCheck className="h-4 w-4 text-accent" />
-        <div className="min-w-0">
-          <h2 id="research-candidates-title" className={TYPE.section}>候选方案</h2>
+      <header className={`${DIALOG_HEADER} shrink-0 items-center pb-s2`}>
+        <BookmarkCheck className="h-4 w-4 shrink-0 text-accent" />
+        <div className="min-w-0 flex-1">
+          <h2 id="research-candidates-title" className={DIALOG_TITLE}>候选方案</h2>
           <div className="mt-0.5 text-xs text-muted">仅保存研究定义、配置与指标摘要</div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="ml-auto flex h-8 w-8 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-elevated hover:text-foreground"
-          title="关闭"
-          aria-label="关闭候选方案"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <DialogClose onClose={onClose} label="关闭候选方案" />
       </header>
 
       <div className="flex shrink-0 items-center gap-1 border-b border-border px-4 py-2">
@@ -199,12 +205,9 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
             <div className="grid grid-cols-1 gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_8rem_7rem] md:items-center">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className={`shrink-0 rounded-btn border px-1.5 py-0.5 text-micro font-medium ${item.kind === 'factor'
-                    ? 'border-cyan-400/30 bg-cyan-400/10 text-cyan-400'
-                    : 'border-warning/30 bg-warning/10 text-warning'
-                  }`}>
+                  <Badge tone={item.kind === 'factor' ? 'accent' : 'warning'}>
                     {item.kind === 'factor' ? '因子' : '策略'}
-                  </span>
+                  </Badge>
                   <span className={cn('truncate', TYPE.card)}>{item.name}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
@@ -220,7 +223,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                 onChange={event => update.mutate({ id: item.id, status: event.target.value as ResearchCandidateStatus })}
                 disabled={update.isPending}
                 aria-label={`更新 ${item.name} 的状态`}
-                className="h-8 rounded-input border border-border bg-surface px-2 text-xs text-secondary focus:border-accent focus:outline-none disabled:opacity-50"
+                className={`${fieldSelect} h-8 text-xs`}
               >
                 {STATUS_OPTIONS.map(option => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -228,40 +231,42 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
               </select>
               <div className="flex items-center justify-end gap-1">
                 {item.kind === 'strategy' && onLoadStrategy && (
-                  <button
-                    type="button"
+                  <Button
+                    size="xs"
                     onClick={() => onLoadStrategy(item)}
-                    className={buttonClass({}, 'gap-1.5')}
+                    className="gap-1.5"
                     title="把此候选保存的回测配置 (策略/区间/参数/费率/仓位/环境过滤) 回填到回测表单, 可直接复测"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                     载入复测
-                  </button>
+                  </Button>
                 )}
                 {item.kind === 'factor' && (
-                  <button
-                    type="button"
+                  <Button
+                    size="xs"
                     onClick={() => linking ? setLinkDraft(null) : startLink(item)}
                     disabled={!canLink || strategies.isLoading || factorColumns.isLoading}
-                    className={buttonClass({}, 'gap-1.5')}
+                    className="gap-1.5"
                     title={item.status !== 'validated' ? '验证通过后可加入策略' : factorSupported ? '加入策略评分' : '当前因子不可用于策略评分'}
                   >
                     <Link2 className="h-3.5 w-3.5" />
                     加入策略
-                  </button>
+                  </Button>
                 )}
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon
                   onClick={() => {
                     if (window.confirm(`确认删除候选方案“${item.name}”？`)) remove.mutate(item.id)
                   }}
                   disabled={remove.isPending}
-                  className="flex h-8 w-8 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-50"
+                  className="hover:bg-danger/10 hover:text-danger"
                   title="删除候选"
                   aria-label={`删除候选 ${item.name}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </div>
             </div>
             {linking && linkDraft && (
@@ -272,7 +277,7 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                     value={linkDraft.strategyId}
                     onChange={event => setLinkDraft(current => current ? { ...current, strategyId: event.target.value } : current)}
                     aria-label="目标策略"
-                    className="h-8 w-full rounded-input border border-border bg-base px-2 text-xs text-secondary focus:border-accent focus:outline-none"
+                    className={`${fieldSelect} h-8 w-full text-xs`}
                   >
                     {options.length === 0 && <option value="">没有兼容策略</option>}
                     <StrategyOptions strategies={options} selected={linkDraft ? [linkDraft.strategyId] : []} />
@@ -280,16 +285,13 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                 </label>
                 <div>
                   <span className="mb-1 block text-micro text-muted">评分方向</span>
-                  <div className="grid h-8 grid-cols-2 overflow-hidden rounded-input border border-border bg-base">
+                  <div className={cn(SEG, 'w-full')}>
                     {([['high', ArrowUp, '高值'], ['low', ArrowDown, '低值']] as const).map(([value, Icon, label]) => (
                       <button
                         key={value}
                         type="button"
                         onClick={() => setLinkDraft(current => current ? { ...current, direction: value } : current)}
-                        className={`flex items-center justify-center gap-1 text-xs transition-colors ${linkDraft.direction === value
-                          ? 'bg-foreground font-medium text-surface'
-                          : 'text-secondary hover:bg-elevated'
-                        }`}
+                        className={cn(SEG_ITEM, 'flex-1 justify-center gap-1', linkDraft.direction === value ? SEG_ON : SEG_OFF)}
                         title={`偏好${label}`}
                         aria-label={`评分方向：偏好${label}`}
                         aria-pressed={linkDraft.direction === value}
@@ -317,28 +319,23 @@ export function ResearchCandidatesDialog({ onClose, onLoadStrategy }: {
                         ...current,
                         weight: Math.min(100, Math.max(1, Number(event.target.value) || 1)),
                       } : current)}
-                      className="h-8 w-full rounded-input border border-border bg-base px-2 pr-7 text-xs text-foreground focus:border-accent focus:outline-none"
+                      className={`${fieldInput} h-8 w-full pr-7 text-xs`}
                     />
                     <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-micro text-muted">%</span>
                   </div>
                 </label>
                 <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setLinkDraft(null)}
-                    className="h-8 rounded-btn px-2.5 text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="button"
+                  <Button variant="ghost" size="sm" onClick={() => setLinkDraft(null)}>取消</Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={() => applyFactor.mutate({ candidate: item, draft: linkDraft })}
                     disabled={!linkDraft.strategyId || applyFactor.isPending}
-                    className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
+                    className="gap-1.5"
                   >
                     {applyFactor.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
                     应用
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

@@ -13,7 +13,7 @@ import {
   minimizeDialog, closeDialog, startAnalysis, deleteReport,
 } from '@/lib/stockAnalysisStore'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
-import { TYPE, buttonClass } from '@/components/ui'
+import { TYPE, Button, buttonClass } from '@/components/ui'
 
 /**
  * AI 个股分析对话框 —— 蓝色主题,与财务分析对话框区分。
@@ -135,30 +135,29 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {content && !isWorking && (
-                  <button onClick={handleCopy} title="复制全文"
-                    className="p-1.5 rounded-btn hover:bg-elevated text-secondary hover:text-foreground transition-colors">
+                  <Button variant="ghost" size="xs" icon onClick={handleCopy} title="复制全文">
                     {copied ? <Check className="h-4 w-4 text-bear" /> : <Copy className="h-4 w-4" />}
-                  </button>
+                  </Button>
                 )}
                 {isHistory && task && 'id' in task && (
-                  <button
+                  <Button
+                    variant="danger"
+                    size="xs"
+                    icon
                     onClick={() => { deleteReport(task.id); toast('报告已删除', 'success'); closeDialog() }}
-                    title="删除这份报告"
-                    className="p-1.5 rounded-btn hover:bg-danger/10 text-secondary hover:text-danger transition-colors">
+                    title="删除这份报告">
                     <Trash2 className="h-4 w-4" />
-                  </button>
+                  </Button>
                 )}
                 {!isHistory && isWorking && (
-                  <button onClick={minimizeDialog} title="最小化为气泡,后台继续生成"
-                    className="p-1.5 rounded-btn hover:bg-elevated text-secondary hover:text-foreground transition-colors">
+                  <Button variant="ghost" size="xs" icon onClick={minimizeDialog} title="最小化为气泡,后台继续生成">
                     <Minimize2 className="h-4 w-4" />
-                  </button>
+                  </Button>
                 )}
                 {(!isWorking || isHistory) && (
-                  <button onClick={closeDialog} title="关闭"
-                    className="p-1.5 rounded-btn hover:bg-elevated text-secondary hover:text-foreground transition-colors">
+                  <Button variant="ghost" size="xs" icon onClick={closeDialog} title="关闭">
                     <X className="h-4 w-4" />
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>

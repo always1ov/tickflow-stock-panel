@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, LoaderCircle, RefreshCw, Square } from 'lu
 import { toast } from '@/components/Toast'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { Button } from '@/components/ui'
 
 /** Checking/recovering is always available; terminating an owner remains a separate action. */
 export function MiningLockControl() {
@@ -70,18 +71,18 @@ export function MiningLockControl() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
+          <Button
+            size="sm"
             disabled={busy}
             onClick={() => { release.reset(); recover.mutate() }}
-            className="inline-flex min-h-8 items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground hover:bg-base disabled:opacity-50"
+            className="gap-1.5"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${recover.isPending ? 'animate-spin' : ''}`} />
             {recover.isPending ? '正在检查并恢复…' : '检查并恢复挖掘'}
-          </button>
+          </Button>
           {blocked && data.force_releasable && holder && !error && (
-            <button
-              type="button"
+            <Button
+              size="sm"
               disabled={busy}
               onClick={() => {
                 if (window.confirm(
@@ -89,11 +90,11 @@ export function MiningLockControl() {
                   '如果它是另一个正在使用的面板实例，请优先到该实例正常退出。确认后会再次核验占用状态。',
                 )) { recover.reset(); release.mutate(holder.pid) }
               }}
-              className="inline-flex min-h-8 items-center gap-1.5 rounded-btn border border-warning/60 bg-warning/20 px-3 py-1.5 text-xs font-medium text-foreground hover:bg-warning/30 disabled:opacity-50"
+              className="gap-1.5 border-warning/60 bg-warning/20 hover:bg-warning/30"
             >
               {release.isPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Square className="h-3.5 w-3.5" />}
               强制停止并接管
-            </button>
+            </Button>
           )}
         </div>
       </div>

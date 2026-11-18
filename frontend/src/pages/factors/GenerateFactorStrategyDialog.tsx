@@ -4,9 +4,11 @@ import { Sparkles } from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
 import { api } from '@/lib/api'
-import { TYPE, SELECTED, buttonClass } from '@/components/ui'
-
-const INPUT_CLS = 'h-8 w-full rounded-input border border-border bg-surface px-2.5 text-xs text-foreground focus:border-accent focus:outline-none'
+import {
+  Badge, Button, DialogClose, DIALOG_BODY, DIALOG_FOOTER, DIALOG_HEADER, DIALOG_TITLE,
+  dialogPanel, fieldInput,
+} from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 /** 渲染与挖掘发布同构的单因子排名策略源码 (FactorRankResearchMatrixStrategy)。 */
 function renderStrategyCode(strategyId: string, name: string, factorId: string, direction: 'high' | 'low', description: string): string {
@@ -91,42 +93,40 @@ export function GenerateFactorStrategyDialog({
     <Modal
       onClose={onClose}
       labelledBy="generate-factor-strategy-title"
-      panelClassName="flex max-h-[86vh] w-[92vw] max-w-md flex-col overflow-hidden border border-border bg-surface shadow-xl rounded-card"
+      panelClassName={dialogPanel('md', 'flex max-h-[86vh] flex-col overflow-hidden')}
     >
-      <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="min-w-0">
+      <div className={DIALOG_HEADER}>
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 shrink-0 text-accent" />
-            <span id="generate-factor-strategy-title" className={TYPE.section}>因子生成策略</span>
+            <h2 id="generate-factor-strategy-title" className={DIALOG_TITLE}>因子生成策略</h2>
+            <Badge className="shrink-0">{item.label}</Badge>
           </div>
           <p className="mt-1 font-mono text-xs text-muted">{item.id}</p>
         </div>
-        <span className="shrink-0 rounded-btn bg-elevated px-1.5 py-0.5 text-micro text-secondary">{item.label}</span>
+        <DialogClose onClose={onClose} />
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+      <div className={cn(DIALOG_BODY, 'min-h-0 flex-1 space-y-3 overflow-y-auto')}>
         <div className="rounded-btn border border-border bg-base/40 px-3 py-2 text-xs leading-relaxed text-secondary">
           生成一个单因子排名策略：按因子值全市场排名打分，评分高于「入选评分下限」入场、跌破「离场评分上限」出场。
           入场/离场评分、每日入选上限都是策略参数，回测时可直接调。
         </div>
         <label className="block">
           <span className="mb-1 block text-micro text-muted">策略名称</span>
-          <input type="text" value={name} maxLength={24} onChange={event => setName(event.target.value)} className={INPUT_CLS} />
+          <input type="text" value={name} maxLength={24} onChange={event => setName(event.target.value)} className={cn(fieldInput, 'h-8 w-full text-xs')} />
         </label>
         <div>
           <span className="mb-1 block text-micro text-muted">因子方向（打分方向）</span>
           <div className="flex gap-1.5">
             {([['high', '值大加分'], ['low', '值小加分']] as const).map(([value, label]) => (
-              <button
+              <Button
                 key={value}
-                type="button"
+                selected={direction === value}
                 onClick={() => setDirection(value)}
-                className={`rounded-btn border px-2.5 py-1.5 text-xs transition-colors ${direction === value
-                  ? SELECTED
-                  : 'border-border bg-base text-secondary hover:border-accent/40'}`}
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
           <p className="mt-1 text-micro text-muted">拿不准就先按默认生成，回测对比两个方向再定。</p>
@@ -136,17 +136,17 @@ export function GenerateFactorStrategyDialog({
         </p>
       </div>
 
-      <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
-        <button type="button" onClick={onClose} className="rounded-btn bg-surface border border-border px-3 py-1.5 text-xs text-foreground transition-colors hover:text-foreground">取消</button>
-        <button
-          type="button"
+      <div className={DIALOG_FOOTER}>
+        <Button variant="outline" onClick={onClose}>取消</Button>
+        <Button
+          variant="primary"
           onClick={() => generate.mutate()}
           disabled={generate.isPending || !name.trim()}
-          className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
+          className="gap-1.5"
         >
           <Sparkles className="h-3.5 w-3.5" />
           {generate.isPending ? '生成中…' : '生成策略'}
-        </button>
+        </Button>
       </div>
     </Modal>
   )

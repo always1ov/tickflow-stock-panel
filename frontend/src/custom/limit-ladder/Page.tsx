@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { RefreshCw, ChevronDown, Flame, Settings2, X, Bell, BellOff, AlertCircle } from 'lucide-react'
 import { DatePicker } from '@/components/DatePicker'
+import { ErrorState } from '@/components/ErrorState'
 import { api, type LimitLadderTier, type LimitLadderStock, type MonitorRule } from '@/lib/api'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { toNavItems, type NavItem } from '@/lib/listNav'
@@ -17,7 +18,7 @@ import { useCapabilities, usePreferences } from '@/lib/useSharedQueries'
 import { SealedBadge } from '@/components/SealedBadge'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 import type { ExtColumnDisplayConfig } from '@/lib/watchlist-columns'
-import { buttonClass } from '@/components/ui'
+import { Button, buttonClass } from '@/components/ui'
 
 // ===== Ext 字段配置 =====
 
@@ -531,7 +532,7 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
             <Bell className="h-3.5 w-3.5 text-warning shrink-0" />
             <span className="font-medium text-foreground truncate">{stock.name ?? stock.symbol}</span>
           </div>
-          <button onClick={onClose} className="text-secondary hover:text-foreground shrink-0"><X className="h-3.5 w-3.5" /></button>
+          <Button variant="ghost" size="xs" icon onClick={onClose} className="shrink-0"><X className="h-3.5 w-3.5" /></Button>
         </div>
 
         {/* [R60] 统一页面留白 */}
@@ -624,20 +625,24 @@ function MonitorMenu({ stock, direction, sealMode, monitorRule, anchorRect, hasD
         {/* 底部按钮区 */}
         <div className="flex items-center gap-2 px-3 py-2.5 border-t border-border bg-elevated/30">
           {existing && (
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={handleRemove}
               disabled={saving || !hasDepth}
-              className="shrink-0 h-7 px-2.5 rounded-btn text-xs text-secondary hover:text-danger hover:bg-danger/5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-            >关闭监控</button>
+              className="shrink-0 px-2.5 hover:text-danger hover:bg-danger/5"
+            >关闭监控</Button>
           )}
-          <button
+          <Button
+            variant="primary"
+            size="xs"
             onClick={handleSave}
             disabled={saving || !threshold || !hasDepth}
             title={!hasDepth ? '五档盘口(批量)数据不可用' : ''}
-            className="flex-1 h-7 rounded-btn text-xs font-medium transition-ui cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-accent text-on-accent hover:bg-accent/90 active:scale-[0.98] disabled:active:scale-100"
+            className="flex-1"
           >
             {saving ? '保存中…' : !hasDepth ? '五档盘口不可用' : existing ? '更新监控' : '开启监控'}
-          </button>
+          </Button>
         </div>
       </div>
     </>
@@ -1452,7 +1457,7 @@ function ExtConfigDialog({ fields, onSave, onClose }: {
         </div>
         {/* 底部按钮 */}
         <div className="flex justify-end gap-2 px-4 py-3">
-          <button onClick={onClose} className="px-3 py-1.5 text-xs text-secondary hover:text-foreground">取消</button>
+          <Button variant="ghost" onClick={onClose}>取消</Button>
           <button
             onClick={() => { onSave(draft); onClose() }}
             className={buttonClass()}
@@ -1546,13 +1551,18 @@ export function LimitUpLadder() {
 
   const extColumnsParam = useMemo(() => buildExtColumnsParam(extFields), [extFields])
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     // key 必须拍平 (spread 展开): key[0] 为字符串 'limit-ladder' 才能被 SSE 前缀失效
     // 命中实现实时刷新, depth_updated 事件 (invalidate ['limit-ladder']) 也才能匹配本查询。
     // 嵌套数组 key 会导致前者靠 String() 侥幸命中、后者永远失配。
     queryKey: [...QK.limitLadder(asOf || undefined), extColumnsParam, direction],
     queryFn: () => api.limitLadder(asOf || undefined, extColumnsParam, direction),
     staleTime: 5 * 60_000,
+    // 改扩展列重取期间沿用上一份「同日期同方向」数据不闪空; 涨跌切换不透传反向梯队
+    placeholderData: (prev: any, prevQuery: any) => {
+      const prevKey = prevQuery?.queryKey as readonly unknown[] | undefined
+      return prevKey?.[1] === (asOf || undefined) && prevKey?.[3] === direction ? prev : undefined
+    },
   })
   const handleOpenDimension = useCallback((kind: DimensionKind, value: string, sourceField?: string) => {
     if (!sourceField) return
@@ -1581,11 +1591,15 @@ export function LimitUpLadder() {
     [sortedTiers],
   )
 
+  // 用 ref 读取导航列表: 回调依赖若含 ladderNavItems, 每个 SSE tick 引用变化会
+  // 击穿全部 React.memo(StockCard); ref 读取让回调恒稳定, memo 真正生效
+  const ladderNavItemsRef = useRef(ladderNavItems)
+  ladderNavItemsRef.current = ladderNavItems
   const handleStockClick = useCallback((symbol: string, name?: string, navList?: NavItem[]) => {
     setPreviewSymbol(symbol)
     setPreviewName(name ?? '')
-    setPreviewNavList(navList ?? ladderNavItems)
-  }, [ladderNavItems])
+    setPreviewNavList(navList ?? ladderNavItemsRef.current)
+  }, [])
 
   // sealed 降级判定
   const sealedDegrade = useSealedDegrade(asOf, data?.as_of, data?.sealed_ready, data?.sealed_counts)
@@ -1594,6 +1608,21 @@ export function LimitUpLadder() {
     return (
       <div className="flex items-center justify-center h-full">
         <RefreshCw className="h-5 w-5 animate-spin text-muted" />
+      </div>
+    )
+  }
+
+  // 错误态与空态分开: 接口失败时不再误报「暂无连板数据」, 归因明确且可重试
+  if (isError) {
+    return (
+      <div className="flex flex-col h-full">
+        <PageHeader title={direction === 'down' ? '连跌梯队' : '连板梯队'} />
+        <ErrorState
+          title="梯队数据加载失败"
+          hint="接口无响应或数据源报错——与「暂无连板数据」不同，可重试"
+          retrying={isFetching}
+          onRetry={() => { void refetch() }}
+        />
       </div>
     )
   }
@@ -1749,20 +1778,26 @@ export function LimitUpLadder() {
             ))}
 
             <div className="w-px h-4 bg-border mx-1" />
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
+              icon
               onClick={() => setShowExtConfig(true)}
-              className="p-1.5 hover:bg-surface text-secondary hover:text-accent"
+              className="hover:bg-surface hover:text-accent"
               title="配置"
             >
               <Settings2 className="h-3.5 w-3.5" />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="xs"
+              icon
               onClick={() => refetch()}
               disabled={isFetching}
-              className="p-1.5 hover:bg-surface text-secondary disabled:opacity-50"
+              className="hover:bg-surface"
             >
               <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-            </button>
+            </Button>
           </div>
         }
       />

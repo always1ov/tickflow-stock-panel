@@ -49,12 +49,27 @@ import { MiningLockControl } from './components/MiningLockControl'
 import { FactorCorrelationHeatmap } from './charts/FactorCorrelationHeatmap'
 import { MiningOosChart } from './charts/MiningOosChart'
 import { RegimeComparisonChart } from './charts/RegimeComparisonChart'
-import { TYPE, SEG, SEG_ITEM, SEG_ON, SEG_OFF, buttonClass } from '@/components/ui'
+import {
+  TYPE,
+  SEG,
+  SEG_ITEM,
+  SEG_ON,
+  SEG_OFF,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  DialogClose,
+  dialogPanel,
+  fieldInput,
+  fieldSelect,
+} from '@/components/ui'
 import { cn } from '@/lib/cn'
 
 const DRAFT_KEY = 'mining_workbench_draft_v1'
 const TODAY = new Date().toISOString().slice(0, 10)
-const INPUT = 'h-8 w-full rounded-input border border-border bg-surface px-2 text-xs text-foreground outline-none transition-colors focus:border-accent'
+const INPUT = `${fieldInput} h-8 w-full text-xs`
+const SELECT = `${fieldSelect} h-8 w-full text-xs`
 const LABEL = 'mb-1 block text-micro text-muted'
 const SUCCESS = new Set(['succeeded', 'succeeded_with_budget_exhausted'])
 const ACTIVE = new Set(['queued', 'running', 'cancelling'])
@@ -677,7 +692,7 @@ export function MiningWorkbench() {
   return (
     <>
     <MiningLockControl />
-    <div className="grid min-h-[calc(100vh-9rem)] grid-cols-1 overflow-hidden rounded-card border border-border bg-surface xl:grid-cols-[20rem_minmax(0,1fr)]">
+    <Card padding="none" className="grid min-h-[calc(100vh-9rem)] grid-cols-1 overflow-hidden xl:grid-cols-[20rem_minmax(0,1fr)]">
       <aside className="border-b border-border bg-base/25 xl:max-h-[calc(100vh-9rem)] xl:overflow-y-auto xl:border-b-0 xl:border-r">
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           <div>
@@ -691,8 +706,8 @@ export function MiningWorkbench() {
           <section>
             <div className={cn('mb-2 flex items-center gap-1.5', TYPE.card)}><Database className="h-3 w-3" />数据范围</div>
             <div className="grid grid-cols-2 gap-2">
-              <label><span className={LABEL}>资产</span><select className={INPUT} value={draft.assetType} onChange={event => changeAssetType(event.target.value as 'stock' | 'etf')}><option value="stock">股票</option><option value="etf">ETF</option></select></label>
-              <label><span className={LABEL}>置信档</span><select className={INPUT} value={draft.profile} onChange={event => updateDraft('profile', event.target.value as MiningBudgetProfile)}><option value="exploratory">探索 · 219 日</option><option value="balanced">均衡 · 786 日</option><option value="strict">严格 · 1164 日</option></select></label>
+              <label><span className={LABEL}>资产</span><select className={SELECT} value={draft.assetType} onChange={event => changeAssetType(event.target.value as 'stock' | 'etf')}><option value="stock">股票</option><option value="etf">ETF</option></select></label>
+              <label><span className={LABEL}>置信档</span><select className={SELECT} value={draft.profile} onChange={event => updateDraft('profile', event.target.value as MiningBudgetProfile)}><option value="exploratory">探索 · 219 日</option><option value="balanced">均衡 · 786 日</option><option value="strict">严格 · 1164 日</option></select></label>
               <label><span className={LABEL}>开始</span><input type="date" className={INPUT} value={draft.start} onChange={event => updateDraft('start', event.target.value)} /></label>
               <label><span className={LABEL}>结束</span><input type="date" className={INPUT} value={draft.end} onChange={event => updateDraft('end', event.target.value)} /></label>
             </div>
@@ -728,14 +743,14 @@ export function MiningWorkbench() {
           <section className="border-t border-border pt-3">
             <div className="mb-2 flex items-center justify-between">
               <span className={cn('flex items-center gap-1.5', TYPE.card)}><FlaskConical className="h-3 w-3" />因子目录</span>
-              <button type="button" className={buttonClass({ variant: 'ghost', size: 'xs' }, 'text-accent')} onClick={() => updateDraft('factorNames', draft.factorNames.length ? [] : selectableDefinitions(factorQuery.data?.columns ?? []).slice(0, 48).map(item => item.id))}>{draft.factorNames.length ? '清空' : '全选'}</button>
+              <Button variant="ghost" size="xs" className="text-accent" onClick={() => updateDraft('factorNames', draft.factorNames.length ? [] : selectableDefinitions(factorQuery.data?.columns ?? []).slice(0, 48).map(item => item.id))}>{draft.factorNames.length ? '清空' : '全选'}</Button>
             </div>
             <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
               {Object.entries(factorGroups).map(([group, items]) => (
                 <div key={group}>
                   <div className="mb-1 text-micro font-medium text-muted">{group}</div>
                   <div className="grid grid-cols-2 gap-1">
-                    {items.map(item => <label key={item.id} className="flex min-w-0 cursor-pointer items-center gap-1.5 text-xs text-secondary"><input type="checkbox" className="h-3.5 w-3.5 accent-accent" checked={draft.factorNames.includes(item.id)} onChange={() => toggleFactor(item.id)} /><span className="truncate" title={`${item.label} · ${item.desc}`}>{definitionOptionLabel(item)}</span></label>)}
+                    {items.map(item => <label key={item.id} className="flex min-w-0 cursor-pointer items-center gap-1.5 text-xs text-secondary"><Checkbox checked={draft.factorNames.includes(item.id)} onChange={() => toggleFactor(item.id)} /><span className="truncate" title={`${item.label} · ${item.desc}`}>{definitionOptionLabel(item)}</span></label>)}
                   </div>
                 </div>
               ))}
@@ -747,7 +762,7 @@ export function MiningWorkbench() {
           <section className="border-t border-border pt-3">
             <div className={cn('mb-2 flex items-center justify-between', TYPE.card)}><span>已有策略对照</span><span className="font-mono text-micro text-muted">{draft.strategyIds.length}/8</span></div>
             <div className="max-h-32 space-y-1 overflow-y-auto pr-1">
-              {strategies.map(item => <label key={item.id} className="flex min-w-0 cursor-pointer items-center gap-1.5 text-xs text-secondary"><input type="checkbox" className="h-3.5 w-3.5 accent-accent" checked={draft.strategyIds.includes(item.id)} onChange={() => toggleStrategy(item.id)} /><span className="truncate" title={item.description}>{strategyOptionLabel(item)}{item.library?.group_name ? ` · ${item.library.group_name}` : ''}</span></label>)}
+              {strategies.map(item => <label key={item.id} className="flex min-w-0 cursor-pointer items-center gap-1.5 text-xs text-secondary"><Checkbox checked={draft.strategyIds.includes(item.id)} onChange={() => toggleStrategy(item.id)} /><span className="truncate" title={item.description}>{strategyOptionLabel(item)}{item.library?.group_name ? ` · ${item.library.group_name}` : ''}</span></label>)}
               {strategyQuery.isError && <div className="text-micro text-danger">策略目录加载失败</div>}
               {!strategyQuery.isLoading && !strategyQuery.isError && !strategies.length && <div className="text-micro text-muted">无可用 matrix-native 策略</div>}
             </div>
@@ -763,25 +778,25 @@ export function MiningWorkbench() {
               <label><span className={LABEL}>组合上限</span><input className={INPUT} inputMode="numeric" value={draft.maxCombinationFactors} onChange={event => updateDraft('maxCombinationFactors', event.target.value)} /></label>
               <label><span className={LABEL}>Beam</span><input className={INPUT} inputMode="numeric" value={draft.beamWidth} onChange={event => updateDraft('beamWidth', event.target.value)} /></label>
               <label><span className={LABEL}>Finalists</span><input className={INPUT} inputMode="numeric" value={draft.maxFinalists} onChange={event => updateDraft('maxFinalists', event.target.value)} /></label>
-              <label className="col-span-2 flex items-end gap-1.5 pb-1 text-xs text-secondary"><input type="checkbox" className="h-3.5 w-3.5 accent-accent" checked={draft.force} onChange={event => updateDraft('force', event.target.checked)} />忽略同配置缓存</label>
+              <label className="col-span-2 flex items-end gap-1.5 pb-1 text-xs text-secondary"><Checkbox checked={draft.force} onChange={event => updateDraft('force', event.target.checked)} />忽略同配置缓存</label>
             </div>
           </section>
 
           <div className="sticky bottom-0 flex gap-2 bg-base/95 py-2">
-            <button type="button" disabled={task.isPending || !draft.factorNames.length || (draft.strategyIds.length > 0 && strategyQuery.isLoading) || !validDateRange || availabilityQuery.isPending || availabilityQuery.isFetching || availabilityQuery.isError || !availabilityQuery.data?.eligible} onClick={runMining} className={buttonClass({ variant: 'primary' }, 'flex-1 justify-center gap-1.5')}><Play className="h-3.5 w-3.5" />开始挖掘</button>
-            {task.isPending && <button type="button" title={task.runId ? '取消任务' : '因子筛选阶段不可取消，run 创建后可取消'} disabled={task.cancelling || !task.runId} onClick={() => void cancelMining()} className="inline-flex h-8 w-9 items-center justify-center rounded-btn border border-danger/40 text-danger hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"><Square className="h-3.5 w-3.5" /></button>}
+            <Button type="button" variant="primary" disabled={task.isPending || !draft.factorNames.length || (draft.strategyIds.length > 0 && strategyQuery.isLoading) || !validDateRange || availabilityQuery.isPending || availabilityQuery.isFetching || availabilityQuery.isError || !availabilityQuery.data?.eligible} onClick={runMining} className="flex-1 justify-center gap-1.5"><Play className="h-3.5 w-3.5" />开始挖掘</Button>
+            {task.isPending && <Button variant="danger" icon title={task.runId ? '取消任务' : '因子筛选阶段不可取消，run 创建后可取消'} disabled={task.cancelling || !task.runId} onClick={() => void cancelMining()}><Square className="h-3.5 w-3.5" /></Button>}
           </div>
 
           <section className="border-t border-border pt-3">
-            <div className="mb-2 flex items-center justify-between"><span className={TYPE.card}>最近运行</span><button type="button" title="刷新历史" onClick={() => void runsQuery.refetch()} className="text-secondary hover:text-accent"><RefreshCw className={`h-3 w-3 ${runsQuery.isFetching ? 'animate-spin' : ''}`} /></button></div>
+            <div className="mb-2 flex items-center justify-between"><span className={TYPE.card}>最近运行</span><Button variant="ghost" size="xs" icon title="刷新历史" onClick={() => void runsQuery.refetch()}><RefreshCw className={`h-3 w-3 ${runsQuery.isFetching ? 'animate-spin' : ''}`} /></Button></div>
             <div className="max-h-40 space-y-1 overflow-y-auto">
-              {(runsQuery.data?.items ?? []).map(run => <button key={run.run_id} type="button" onClick={() => attachRun(run)} className={`flex w-full items-center gap-2 rounded-btn px-2 py-1.5 text-left hover:bg-elevated ${task.runId === run.run_id ? 'bg-surface border border-border font-medium' : ''}`}><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${SUCCESS.has(run.status) ? 'bg-bear' : ACTIVE.has(run.status) ? 'bg-accent' : 'bg-muted'}`} />{run.request?.auto && <span className="shrink-0 rounded-btn bg-accent/10 px-1 text-micro font-medium text-accent" title="自动挖掘（因子池由统计筛选生成）">自动</span>}<span className="min-w-0 flex-1 truncate font-mono text-micro text-secondary">{run.run_id}</span><span className="shrink-0 text-micro text-muted">{statusLabel(run.status)}</span></button>)}
+              {(runsQuery.data?.items ?? []).map(run => <button key={run.run_id} type="button" onClick={() => attachRun(run)} className={`flex w-full items-center gap-2 rounded-btn px-2 py-1.5 text-left hover:bg-elevated ${task.runId === run.run_id ? 'bg-surface border border-border font-medium' : ''}`}><span className={`h-1.5 w-1.5 shrink-0 rounded-full ${SUCCESS.has(run.status) ? 'bg-bear' : ACTIVE.has(run.status) ? 'bg-accent' : 'bg-muted'}`} />{run.request?.auto && <Badge tone="accent" title="自动挖掘（因子池由统计筛选生成）">自动</Badge>}<span className="min-w-0 flex-1 truncate font-mono text-micro text-secondary">{run.run_id}</span><span className="shrink-0 text-micro text-muted">{statusLabel(run.status)}</span></button>)}
               {runsQuery.isError && <div className="text-micro text-danger">运行历史加载失败</div>}
               {!runsQuery.isLoading && !runsQuery.isError && !(runsQuery.data?.items.length) && <div className="text-micro text-muted">暂无持久运行</div>}
             </div>
           </section>
 
-          {scheduleDraft && <section className="border-t border-border pt-3"><div className={cn('mb-2', TYPE.card)}>周度自动挖掘</div><label className="mb-2 flex items-center gap-1.5 text-xs text-secondary"><input type="checkbox" className="h-3.5 w-3.5 accent-accent" checked={scheduleDraft.mining_schedule_enabled} onChange={event => setScheduleDraft({ ...scheduleDraft, mining_schedule_enabled: event.target.checked })} />启用（默认关闭，不自动发布）</label><div className="grid grid-cols-2 gap-2"><label><span className={LABEL}>工作日</span><select className={INPUT} value={scheduleDraft.mining_schedule_weekday} onChange={event => setScheduleDraft({ ...scheduleDraft, mining_schedule_weekday: Number(event.target.value) })}>{['周一', '周二', '周三', '周四', '周五'].map((label, index) => <option key={label} value={index}>{label}</option>)}</select></label><label><span className={LABEL}>档位</span><select className={INPUT} value={scheduleDraft.mining_budget_profile} onChange={event => setScheduleDraft({ ...scheduleDraft, mining_budget_profile: event.target.value as 'balanced' | 'strict' })}><option value="balanced">均衡</option><option value="strict">严格</option></select></label></div><button type="button" disabled={saveSchedule.isPending} onClick={() => saveSchedule.mutate(scheduleDraft)} className={buttonClass({ size: 'xs' }, 'mt-2 w-full gap-1')}><Save className="h-3 w-3" />保存自动配置</button></section>}
+          {scheduleDraft && <section className="border-t border-border pt-3"><div className={cn('mb-2', TYPE.card)}>周度自动挖掘</div><label className="mb-2 flex items-center gap-1.5 text-xs text-secondary"><Checkbox checked={scheduleDraft.mining_schedule_enabled} onChange={event => setScheduleDraft({ ...scheduleDraft, mining_schedule_enabled: event.target.checked })} />启用（默认关闭，不自动发布）</label><div className="grid grid-cols-2 gap-2"><label><span className={LABEL}>工作日</span><select className={SELECT} value={scheduleDraft.mining_schedule_weekday} onChange={event => setScheduleDraft({ ...scheduleDraft, mining_schedule_weekday: Number(event.target.value) })}>{['周一', '周二', '周三', '周四', '周五'].map((label, index) => <option key={label} value={index}>{label}</option>)}</select></label><label><span className={LABEL}>档位</span><select className={SELECT} value={scheduleDraft.mining_budget_profile} onChange={event => setScheduleDraft({ ...scheduleDraft, mining_budget_profile: event.target.value as 'balanced' | 'strict' })}><option value="balanced">均衡</option><option value="strict">严格</option></select></label></div><Button size="xs" disabled={saveSchedule.isPending} onClick={() => saveSchedule.mutate(scheduleDraft)} className="mt-2 w-full gap-1"><Save className="h-3 w-3" />保存自动配置</Button></section>}
         </div>
       </aside>
 
@@ -844,7 +859,7 @@ export function MiningWorkbench() {
               </div>
             </section>
 
-            <section className="border-b border-border"><div className="flex items-center justify-between gap-2 px-3 py-2"><h2 className={cn('shrink-0', TYPE.card)}>策略候选</h2><span className="truncate text-micro text-muted">对照策略在全部 outer 折独立评估 · 发布始终需要人工确认</span></div><div className="grid min-h-72 grid-cols-1 border-t border-border lg:grid-cols-[18rem_minmax(0,1fr)]"><div className="border-b border-border lg:border-b-0 lg:border-r">{candidates.map(candidate => <button key={candidate.signature} type="button" onClick={() => setSelectedCandidate(candidate.signature)} className={`block w-full border-b border-border/60 px-3 py-2 text-left hover:bg-elevated ${activeCandidate?.signature === candidate.signature ? 'bg-surface' : ''}`}><div className="flex items-center justify-between gap-2"><span className="truncate text-micro font-medium text-foreground">{candidate.name}</span><span className="font-mono text-micro text-muted">{formatNumber(candidate.score, 2)}</span></div><div className="mt-1 flex items-center gap-1.5"><span className="min-w-0 truncate text-micro text-muted" title={definitionLabel(candidate)}>{definitionLabel(candidate)}</span>{candidate.gate && <span className={`shrink-0 rounded-full px-1.5 py-px text-micro font-medium ${candidate.gate.qualified ? 'bg-bear/10 text-bear' : 'bg-warning/10 text-warning'}`} title={gateTitle(candidate.gate)}>{candidate.gate.qualified ? '达标' : '未达标'}</span>}</div></button>)}{!candidates.length && <div className="p-4 text-micro text-muted">暂无晋级候选</div>}</div>{activeCandidate ? <div className="min-w-0 p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><span className="truncate text-xs font-semibold text-foreground">{activeCandidate.name}</span>{activeCandidate.gate && <span className={`shrink-0 rounded-full px-1.5 py-px text-micro font-medium ${activeCandidate.gate.qualified ? 'bg-bear/10 text-bear' : 'bg-warning/10 text-warning'}`} title={gateTitle(activeCandidate.gate)}>{activeCandidate.gate.qualified ? '达标' : '未达标'}</span>}</div><div className="mt-1 break-words font-mono text-micro text-muted">{definitionLabel(activeCandidate)}</div></div><div className="flex gap-2"><button type="button" disabled={!currentResult || promote.isPending} onClick={() => promote.mutate(activeCandidate)} className={buttonClass({ size: 'xs' }, 'gap-1')}><Save className="h-3 w-3" />保存候选</button><button type="button" disabled={!currentResult || publish.isPending || activeCandidate.gate?.qualified === false} title={gateTitle(activeCandidate.gate)} onClick={() => { if (window.confirm(`确认发布“${activeCandidate.name}”？\n\n发布会创建独立策略，但不会自动用于实盘或监控。`)) publish.mutate(activeCandidate) }} className={buttonClass({ variant: 'primary' }, 'gap-1')}><Rocket className="h-3 w-3" />显式发布</button></div></div>{activeCandidate.gate && !activeCandidate.gate.qualified && <div className="mt-2 rounded-btn border border-warning/30 bg-warning/5 px-2 py-1.5 text-micro leading-4 text-warning">未达晋级门槛，仅可保存为待定候选：{activeCandidate.gate.reasons.join('；')}</div>}<div className="mt-4 grid grid-cols-2 gap-px border border-border bg-border sm:grid-cols-6">{[['平均每折收益', formatPct(activeCandidate.oos_return)], ['Sharpe', formatNumber(activeCandidate.oos_sharpe)], ['最大回撤', formatPct(activeCandidate.oos_max_drawdown)], ['正收益折', formatPct(activeCandidate.oos_positive_fold_ratio)], ['有效折', activeCandidate.valid_folds == null ? '—' : String(activeCandidate.valid_folds)], ['交易数', activeCandidate.oos_n_trades == null ? '—' : String(activeCandidate.oos_n_trades)]].map(([label, value]) => <div key={label} className="bg-surface px-2 py-2"><div className="text-micro text-muted">{label}</div><div className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">{value}</div></div>)}</div><div className="mt-3 overflow-x-auto"><div className="min-w-[650px]">{candidateFolds.map(fold => <div key={`${fold.fold}-${fold.evaluation_kind || 'selected'}-${fold.test_start}`} className="grid grid-cols-[60px_1fr_1fr_repeat(4,80px)] border-b border-border/60 py-1.5 text-micro text-secondary"><span className="flex items-center gap-1"><span>Fold {fold.fold}</span>{foldKindLabel(fold.evaluation_kind) && <span className="rounded-full bg-elevated px-1 py-px text-micro text-muted">{foldKindLabel(fold.evaluation_kind)}</span>}</span><span>{fold.train_start || '—'} → {fold.train_end || '—'}</span><span>{fold.test_start || '—'} → {fold.test_end || '—'}</span><span className="font-mono">{formatPct(fold.total_return)}</span><span className="font-mono">{formatNumber(fold.sharpe)}</span><span className="font-mono">{formatPct(fold.max_drawdown)}</span><span className={fold.skipped ? 'text-warning' : 'text-bear'}>{fold.skipped ? fold.reason || '跳过' : `${fold.n_trades ?? '—'} 笔`}</span></div>)}</div></div></div> : <div className="grid place-items-center p-8 text-xs text-muted">选择候选查看定义与逐折结果</div>}</div></section>
+            <section className="border-b border-border"><div className="flex items-center justify-between gap-2 px-3 py-2"><h2 className={cn('shrink-0', TYPE.card)}>策略候选</h2><span className="truncate text-micro text-muted">对照策略在全部 outer 折独立评估 · 发布始终需要人工确认</span></div><div className="grid min-h-72 grid-cols-1 border-t border-border lg:grid-cols-[18rem_minmax(0,1fr)]"><div className="border-b border-border lg:border-b-0 lg:border-r">{candidates.map(candidate => <button key={candidate.signature} type="button" onClick={() => setSelectedCandidate(candidate.signature)} className={`block w-full border-b border-border/60 px-3 py-2 text-left hover:bg-elevated ${activeCandidate?.signature === candidate.signature ? 'bg-surface' : ''}`}><div className="flex items-center justify-between gap-2"><span className="truncate text-micro font-medium text-foreground">{candidate.name}</span><span className="font-mono text-micro text-muted">{formatNumber(candidate.score, 2)}</span></div><div className="mt-1 flex items-center gap-1.5"><span className="min-w-0 truncate text-micro text-muted" title={definitionLabel(candidate)}>{definitionLabel(candidate)}</span>{candidate.gate && <span className={`shrink-0 rounded-full px-1.5 py-px text-micro font-medium ${candidate.gate.qualified ? 'bg-bear/10 text-bear' : 'bg-warning/10 text-warning'}`} title={gateTitle(candidate.gate)}>{candidate.gate.qualified ? '达标' : '未达标'}</span>}</div></button>)}{!candidates.length && <div className="p-4 text-micro text-muted">暂无晋级候选</div>}</div>{activeCandidate ? <div className="min-w-0 p-3"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><div className="flex items-center gap-2"><span className="truncate text-xs font-semibold text-foreground">{activeCandidate.name}</span>{activeCandidate.gate && <span className={`shrink-0 rounded-full px-1.5 py-px text-micro font-medium ${activeCandidate.gate.qualified ? 'bg-bear/10 text-bear' : 'bg-warning/10 text-warning'}`} title={gateTitle(activeCandidate.gate)}>{activeCandidate.gate.qualified ? '达标' : '未达标'}</span>}</div><div className="mt-1 break-words font-mono text-micro text-muted">{definitionLabel(activeCandidate)}</div></div><div className="flex gap-2"><Button size="xs" disabled={!currentResult || promote.isPending} onClick={() => promote.mutate(activeCandidate)} className="gap-1"><Save className="h-3 w-3" />保存候选</Button><Button variant="primary" size="sm" disabled={!currentResult || publish.isPending || activeCandidate.gate?.qualified === false} title={gateTitle(activeCandidate.gate)} onClick={() => { if (window.confirm(`确认发布“${activeCandidate.name}”？\n\n发布会创建独立策略，但不会自动用于实盘或监控。`)) publish.mutate(activeCandidate) }} className="gap-1"><Rocket className="h-3 w-3" />显式发布</Button></div></div>{activeCandidate.gate && !activeCandidate.gate.qualified && <div className="mt-2 rounded-btn border border-warning/30 bg-warning/5 px-2 py-1.5 text-micro leading-4 text-warning">未达晋级门槛，仅可保存为待定候选：{activeCandidate.gate.reasons.join('；')}</div>}<div className="mt-4 grid grid-cols-2 gap-px border border-border bg-border sm:grid-cols-6">{[['平均每折收益', formatPct(activeCandidate.oos_return)], ['Sharpe', formatNumber(activeCandidate.oos_sharpe)], ['最大回撤', formatPct(activeCandidate.oos_max_drawdown)], ['正收益折', formatPct(activeCandidate.oos_positive_fold_ratio)], ['有效折', activeCandidate.valid_folds == null ? '—' : String(activeCandidate.valid_folds)], ['交易数', activeCandidate.oos_n_trades == null ? '—' : String(activeCandidate.oos_n_trades)]].map(([label, value]) => <div key={label} className="bg-surface px-2 py-2"><div className="text-micro text-muted">{label}</div><div className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">{value}</div></div>)}</div><div className="mt-3 overflow-x-auto"><div className="min-w-[650px]">{candidateFolds.map(fold => <div key={`${fold.fold}-${fold.evaluation_kind || 'selected'}-${fold.test_start}`} className="grid grid-cols-[60px_1fr_1fr_repeat(4,80px)] border-b border-border/60 py-1.5 text-micro text-secondary"><span className="flex items-center gap-1"><span>Fold {fold.fold}</span>{foldKindLabel(fold.evaluation_kind) && <span className="rounded-full bg-elevated px-1 py-px text-micro text-muted">{foldKindLabel(fold.evaluation_kind)}</span>}</span><span>{fold.train_start || '—'} → {fold.train_end || '—'}</span><span>{fold.test_start || '—'} → {fold.test_end || '—'}</span><span className="font-mono">{formatPct(fold.total_return)}</span><span className="font-mono">{formatNumber(fold.sharpe)}</span><span className="font-mono">{formatPct(fold.max_drawdown)}</span><span className={fold.skipped ? 'text-warning' : 'text-bear'}>{fold.skipped ? fold.reason || '跳过' : `${fold.n_trades ?? '—'} 笔`}</span></div>)}</div></div></div> : <div className="grid place-items-center p-8 text-xs text-muted">选择候选查看定义与逐折结果</div>}</div></section>
 
             <section><div className="flex items-center gap-1.5 border-b border-border px-3 py-2"><Gauge className="h-3.5 w-3.5 text-muted" /><h2 className={TYPE.card}>性能与复用</h2></div><div className="grid grid-cols-2 gap-px bg-border sm:grid-cols-4 lg:grid-cols-7">{[['总耗时', result.telemetry.elapsed_ms == null ? '—' : `${(result.telemetry.elapsed_ms / 1000).toFixed(1)}s`], ['峰值 RSS', formatBytes(result.telemetry.peak_rss_bytes)], ['面板扫描', result.telemetry.panel_scans ?? '—'], ['矩阵字节', formatBytes(result.telemetry.matrix_bytes)], ['缓存命中', result.telemetry.cache_hits ?? '—'], ['Fold 复用', result.telemetry.fold_reuses ?? '—'], ['IPC 结果', formatBytes(result.telemetry.serialized_result_bytes)]].map(([label, value]) => <div key={label} className="bg-surface px-3 py-2"><div className="text-micro text-muted">{label}</div><div className="mt-1 font-mono text-sm font-semibold tabular-nums text-foreground">{String(value)}</div></div>)}</div>{result.telemetry.phase_ms && <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border px-3 py-2">{Object.entries(result.telemetry.phase_ms).map(([phase, ms]) => <span key={phase} className="text-micro text-muted"><span>{phase}</span> <span className="font-mono text-secondary">{ms.toFixed(1)}ms</span></span>)}</div>}</section>
           </div>
@@ -857,22 +872,25 @@ export function MiningWorkbench() {
           失败 (data generation changed), 建议先关实时再开始。 */}
       {pendingMining && (
         <div {...confirmBackdrop} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div onClick={e => e.stopPropagation()} className="w-full max-w-sm rounded-card border border-border bg-surface p-5 shadow-2xl">
-            <div className={cn('flex items-center gap-2', TYPE.section)}>
-              <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
-              实时行情已开启
+          <div onClick={e => e.stopPropagation()} className={dialogPanel('sm', 'p-s2')}>
+            <div className="flex items-start justify-between gap-s2">
+              <div className={cn('flex items-center gap-2', TYPE.section)}>
+                <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
+                实时行情已开启
+              </div>
+              <DialogClose onClose={() => setPendingMining(null)} />
             </div>
             <p className="mt-2 text-xs leading-5 text-secondary">
               实时行情开启期间，盘中数据会持续落盘，挖掘任务可能在启动时因数据更新校验而失败（提示 mining data generation changed）。
               建议先暂时关闭实时行情，任务启动后再重新开启。
             </p>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" disabled={realtimeToggle.isPending} onClick={() => setPendingMining(null)} className="h-8 rounded-btn border border-border px-3 text-xs text-secondary hover:bg-elevated disabled:opacity-50">取消</button>
-              <button type="button" disabled={realtimeToggle.isPending} onClick={() => { const p = pendingMining; setPendingMining(null); if (p) submitMining(p) }} className="h-8 rounded-btn border border-border px-3 text-xs text-foreground hover:bg-elevated disabled:opacity-50">仍要开始</button>
-              <button type="button" disabled={realtimeToggle.isPending} onClick={() => { const p = pendingMining; if (!p) return; void realtimeToggle.mutateAsync(false).then(() => { setPendingMining(null); submitMining(p) }) }} className={buttonClass({ variant: 'primary' }, 'gap-1.5')}>
+              <Button size="sm" disabled={realtimeToggle.isPending} onClick={() => setPendingMining(null)}>取消</Button>
+              <Button size="sm" disabled={realtimeToggle.isPending} onClick={() => { const p = pendingMining; setPendingMining(null); if (p) submitMining(p) }}>仍要开始</Button>
+              <Button variant="primary" size="md" disabled={realtimeToggle.isPending} onClick={() => { const p = pendingMining; if (!p) return; void realtimeToggle.mutateAsync(false).then(() => { setPendingMining(null); submitMining(p) }) }} className="gap-1.5">
                 {realtimeToggle.isPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
                 关闭实时并开始
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -881,10 +899,13 @@ export function MiningWorkbench() {
       {/* 市场环境覆盖不足的补救确认: 补算缺失区间后自动重跑, 取消则不做任何操作。 */}
       {regimeBackfill && (
         <div {...regimeBackdrop} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div onClick={e => e.stopPropagation()} className="w-full max-w-sm rounded-card border border-border bg-surface p-5 shadow-2xl">
-            <div className={cn('flex items-center gap-2', TYPE.section)}>
-              <Database className="h-4 w-4 shrink-0 text-warning" />
-              市场环境数据不完整
+          <div onClick={e => e.stopPropagation()} className={dialogPanel('sm', 'p-s2')}>
+            <div className="flex items-start justify-between gap-s2">
+              <div className={cn('flex items-center gap-2', TYPE.section)}>
+                <Database className="h-4 w-4 shrink-0 text-warning" />
+                市场环境数据不完整
+              </div>
+              <DialogClose onClose={() => setRegimeBackfill(null)} />
             </div>
             <p className="mt-2 text-xs leading-5 text-secondary">
               {regimeBackfill.start
@@ -892,16 +913,16 @@ export function MiningWorkbench() {
                 : '尚未计算市场环境数据。点击确定将执行全量计算（历史较长时耗时较久），完成后重新开始挖掘。'}
             </p>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" disabled={regimeRecomputeAndRun.isPending} onClick={() => setRegimeBackfill(null)} className="h-8 rounded-btn border border-border px-3 text-xs text-secondary hover:bg-elevated disabled:opacity-50">取消</button>
-              <button type="button" disabled={regimeRecomputeAndRun.isPending} onClick={() => regimeRecomputeAndRun.mutate(regimeBackfill)} className={buttonClass({ variant: 'primary' }, 'gap-1.5')}>
+              <Button size="sm" disabled={regimeRecomputeAndRun.isPending} onClick={() => setRegimeBackfill(null)}>取消</Button>
+              <Button variant="primary" size="md" disabled={regimeRecomputeAndRun.isPending} onClick={() => regimeRecomputeAndRun.mutate(regimeBackfill)} className="gap-1.5">
                 {regimeRecomputeAndRun.isPending ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Database className="h-3.5 w-3.5" />}
                 补算并重新挖掘
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </Card>
     </>
   )
 }

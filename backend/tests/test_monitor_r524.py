@@ -66,7 +66,9 @@ def test_R524_只有新到的那条有动效():
 
 def test_R524_规则一条一行_新建是主按钮():
     code = code_of(MONITOR)
-    assert "buttonClass({ variant: 'primary' }, 'h-7 gap-1 px-2.5')" in code
+    # [R823] 迁移到基础件后不再手写 buttonClass 串 —— 断言改成"这颗按钮仍是唯一的主操作"。
+    assert re.search(r'<Button[^>]*variant="primary"[^>]*>\s*<Plus[^>]*/>\s*新建规则', code), (
+        "「新建规则」不是主按钮了")
     assert "新建规则" in code
     # 规则行是 li, 不是 motion.div 卡片
     m = re.search(r"function RulesList\(.*?\n\}\n", code, re.S)

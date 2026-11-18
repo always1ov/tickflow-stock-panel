@@ -427,6 +427,7 @@ export function StockPreviewDialog({ symbol, name, onClose, navList: navListSour
                 onAiAnalyze={onAiAnalyze} aiBusy={aiBusy}
                 onRefresh={handleRefresh}
                 onAddMonitor={() => setShowMonitorEditor(true)}
+                onClose={onClose}
                 viewControls={viewControls}
                 // [R671] 指标行并进头部第二行 —— 与中栏那张图同一份取数(同查询键, 不多发请求)
                 stats={(

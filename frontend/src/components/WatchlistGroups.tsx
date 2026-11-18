@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronDown, ChevronUp, FolderCog, FolderInput, Pencil, Plus, Trash2, X, Eraser } from 'lucide-react'
 import { WatchlistGroupTransfer } from '@/components/WatchlistGroupTransfer'
 import { Modal } from '@/components/Modal'
-import { SELECTED, TYPE, buttonClass } from '@/components/ui'
+import { Button, SELECTED, TYPE, buttonClass, Switch } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -245,26 +245,32 @@ export function WatchlistGroupBar({
           </button>
         )}
         <WatchlistGroupTransfer key={selected} source={selected} groups={groups} entries={entries} />
-        <button
+        <Button
           type="button"
           onClick={() => setManagerOpen(true)}
-          className="order-1 ml-2 inline-flex h-10 w-8 shrink-0 items-center justify-center text-secondary hover:text-accent sm:order-2"
+          variant="ghost"
+          size="md"
+          icon
+          className="order-1 ml-2 shrink-0 hover:text-accent sm:order-2"
           title="管理自选分组"
           aria-label="管理自选分组"
         >
           <FolderCog className="h-4 w-4" />
-        </button>
+        </Button>
         {/* 清空当前分组 — 仅选中具体分组时显示 */}
         {onClearGroup && selected !== 'all' && selected !== 'ungrouped' && (
-          <button
+          <Button
             type="button"
             onClick={() => setConfirmClear(true)}
-            className="order-1 inline-flex h-10 w-8 shrink-0 items-center justify-center text-secondary hover:text-warning sm:order-2"
+            variant="ghost"
+            size="md"
+            icon
+            className="order-1 shrink-0 hover:text-warning sm:order-2"
             title="清空当前分组"
             aria-label="清空当前分组"
           >
             <Eraser className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -449,9 +455,9 @@ function GroupManagerDialog({
           <h2 id="watchlist-groups-title" className={TYPE.section}>管理自选分组</h2>
           <p className="mt-0.5 text-xs text-muted">删除分组不会删除其中的股票</p>
         </div>
-        <button type="button" onClick={onClose} className="h-8 w-8 inline-flex items-center justify-center text-secondary hover:text-foreground" aria-label="关闭">
+        <Button type="button" variant="ghost" icon onClick={onClose} aria-label="关闭">
           <X className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       {/* 显示在侧边栏 开关 */}
@@ -460,19 +466,12 @@ function GroupManagerDialog({
           <div className="text-xs font-medium text-foreground">显示在侧边栏</div>
           <div className="mt-0.5 text-micro text-muted">开启后可在左侧菜单展开分组子菜单</div>
         </div>
-        <button
-          type="button"
-          onClick={() => void toggleGroupsInNav(!groupsInNav)}
+        <Switch
+          checked={groupsInNav}
+          onChange={next => void toggleGroupsInNav(next)}
           disabled={navTogglePending}
-          className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-expand disabled:opacity-50 ${
-            groupsInNav ? 'bg-accent' : 'bg-surface border border-border'
-          }`}
           title={groupsInNav ? '已开启 — 点击关闭' : '已关闭 — 点击开启'}
-        >
-          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-expand ${
-            groupsInNav ? 'translate-x-[18px]' : 'translate-x-0.5'
-          }`} />
-        </button>
+        />
       </div>
 
       <div className="px-4 py-3">
@@ -486,15 +485,15 @@ function GroupManagerDialog({
             placeholder="新分组名称"
             className="h-8 min-w-0 flex-1 rounded-btn border border-border bg-elevated px-3 text-xs text-foreground outline-none focus:border-accent/50"
           />
-          <button
+          <Button
             type="button"
             onClick={() => void create()}
             disabled={pending}
-            className="inline-flex h-8 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs text-on-accent disabled:opacity-50"
+            variant="primary"
           >
             <Plus className="h-3.5 w-3.5" />
             新建
-          </button>
+          </Button>
         </div>
         <div className="mt-2 flex items-start gap-2">
           <span className="mt-1 shrink-0 text-xs text-muted">分组颜色</span>
@@ -525,9 +524,9 @@ function GroupManagerDialog({
                   <button type="button" disabled={pending} onClick={() => void rename(group.id)} className={`p-1 ${resolveWatchlistGroupColor(editingColor).text}`} title="保存分组">
                     <Check className="h-3.5 w-3.5" />
                   </button>
-                  <button type="button" onClick={() => setEditingId(null)} className="p-1 text-secondary hover:text-foreground" title="取消">
+                  <Button type="button" variant="ghost" size="xs" icon onClick={() => setEditingId(null)} title="取消">
                     <X className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                 </div>
                 <div className="mt-1.5">
                   <GroupColorPicker value={editingColor} onChange={setEditingColor} />
@@ -538,17 +537,18 @@ function GroupManagerDialog({
                 <span className="min-w-0 flex-1 text-xs text-secondary">
                   删除“{group.name}”？{(counts[group.id] ?? 0) > 0 ? ` ${counts[group.id]} 只股票将回到未分组。` : ''}
                 </span>
-                <button
+                <Button
                   type="button"
                   disabled={pending}
                   onClick={() => void run(async () => { await onDelete(group.id); setDeletingId(null) })}
-                  className="rounded-btn px-2 py-1 text-xs text-danger bg-danger/10 hover:bg-danger/20 disabled:opacity-50"
+                  variant="danger"
+                  size="xs"
                 >
                   确认
-                </button>
-                <button type="button" onClick={() => setDeletingId(null)} className="p-1 text-secondary hover:text-foreground" aria-label="取消删除">
+                </Button>
+                <Button type="button" variant="ghost" size="xs" icon onClick={() => setDeletingId(null)} aria-label="取消删除">
                   <X className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </>
             ) : (
               <>
@@ -556,30 +556,39 @@ function GroupManagerDialog({
                 <span className="font-mono text-micro text-muted tabular-nums">{counts[group.id] ?? 0} 只</span>
                 {onReorder && groups.length > 1 && (
                   <>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
+                      icon
                       disabled={pending || index === 0}
                       onClick={() => void move(group.id, -1)}
-                      className="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:hover:text-muted"
+                      className="hover:text-accent disabled:hover:text-secondary"
                       title="上移"
                       aria-label={`上移分组 ${group.name}`}
                     >
                       <ChevronUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="ghost"
+                      size="xs"
+                      icon
                       disabled={pending || index === groups.length - 1}
                       onClick={() => void move(group.id, 1)}
-                      className="p-1 text-secondary hover:text-accent disabled:opacity-30 disabled:hover:text-muted"
+                      className="hover:text-accent disabled:hover:text-secondary"
                       title="下移"
                       aria-label={`下移分组 ${group.name}`}
                     >
                       <ChevronDown className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   </>
                 )}
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
+                  icon
                   onClick={() => {
                     setEditingId(group.id)
                     setEditingName(group.name)
@@ -587,19 +596,22 @@ function GroupManagerDialog({
                     setDeletingId(null)
                     setError('')
                   }}
-                  className="p-1 text-secondary hover:text-accent"
+                  className="hover:text-accent"
                   title="编辑分组"
                 >
                   <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="xs"
+                  icon
                   onClick={() => { setDeletingId(group.id); setEditingId(null); setError('') }}
-                  className="p-1 text-secondary hover:text-danger"
+                  className="hover:text-danger"
                   title="删除分组"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </>
             )}
           </div>

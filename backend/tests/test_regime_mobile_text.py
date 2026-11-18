@@ -25,61 +25,57 @@ import re
 
 from tests.frontend_source import code_of
 
-REGIME = "pages/Regime.tsx"
+REGIME_CSS = "pages/Regime.css"
 HEADER = "components/PageHeader.tsx"
 SHELL = "components/PageShell.tsx"
 
 
-def _pill_groups(src: str) -> list[str]:
-    """定高药丸 —— [R457] 换成了全站的分段切换(`components/ui/segmented.ts`),
-    每一个药丸是 `cn(SEG_ITEM, …)`; 这里抓出每一处的参数串。"""
-    return [m.group(0) for m in re.finditer(r"cn\(SEG_ITEM,[^)]*\)", src)]
+def _has(selector: str, declaration: str) -> bool:
+    """`Regime.css` 里有没有一条规则(选择器列表含该项)带这条声明。
 
-
-def _seg() -> dict[str, str]:
-    return dict(re.findall(r"export const (SEG\w*) = '([^']*)'", code_of("components/ui/segmented.ts")))
+    选择器可能和其他规则共用一行(`.regime-toolbar, .regime-range { … }`),
+    所以按逗号拆开比; 媒体查询里的同名规则也算(只要有一处成立即可)。
+    """
+    css = code_of(REGIME_CSS)
+    for raw_selector, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css):
+        parts = [part.strip() for part in raw_selector.split(",")]
+        if selector in parts and declaration in body:
+            return True
+    return False
 
 
 def test_R401_定高药丸里的字不许断():
-    """定高盒子里的字一旦换行就会画到盒子外面 —— 所以定高就必须配不换行。"""
-    src = code_of(REGIME)
-    groups = _pill_groups(src)
-    # [R503/R506] 视图页签与主线排行的「概念/行业」两组撤了, 只剩时间范围那一组(预设 + 自定义两处)
-    assert len(groups) >= 2, f"没找到时间范围那两处定高药丸(找到 {len(groups)} 个), 选择器该更新了"
-    assert re.search(r"\bh-7\b", _seg()["SEG_ITEM"]), "分段切换的药丸不再定高了 —— 这条守卫的前提变了"
-    for cls in groups:
-        assert "whitespace-nowrap" in cls, (
-            f"定高药丸没写 whitespace-nowrap, 窄屏上字会换行并溢出盒子:\n  {cls}")
+    """定高盒子里的字一旦换行就会画到盒子外面 —— 所以定高就必须配不换行。
+
+    [R811] 这一页换成了作者版的 `regime-range` / `regime-tabs` 分段切换,
+    不再是 fork 的 SEG; 守卫跟着换锚点, 钉的还是同一件事。
+    """
+    for selector in (".regime-range button", ".regime-tabs button"):
+        assert _has(selector, "white-space: nowrap"), (
+            f"{selector} 没写 white-space: nowrap, 窄屏上字会换行并溢出盒子")
 
 
 def test_R401_药丸组不许被旁边的说明挤扁():
     """药丸自己不换行还不够: 外面那层若允许被压缩, 压到比内容还窄时字照样换行。
 
-    钉的是"这两层一起成立" —— 药丸组 `shrink-0`, 且它所在的行允许换行
-    (放不下就整组换到下一行去, 而不是把自己压扁)。[R457] 药丸组是全站的 `SEG`。
+    钉的是"这两层一起成立" —— 药丸组 `flex-shrink: 0`, 且它所在的行允许换行
+    (放不下就整组换到下一行去, 而不是把自己压扁)。
     """
-    src = code_of(REGIME)
-    assert "shrink-0" in _seg()["SEG"], "分段切换的外框会被旁边的说明挤扁"
-    spots = [m.start() for m in re.finditer(r"<div className=\{SEG\}>", src)]
-    assert len(spots) >= 1, f"没找到药丸组容器(找到 {len(spots)} 个)"   # [R506] 只剩时间范围那一组
-    for i in spots:
-        head = src[max(0, i - 400):i]
-        assert "flex-wrap" in head, (
-            f"药丸组所在的行不许换行, 放不下时只能把药丸压扁:\n  …{head[-160:]}")
+    for selector in (".regime-toolbar", ".regime-tabbar"):
+        assert _has(selector, "flex-wrap: wrap"), (
+            f"{selector} 不许换行, 放不下时只能把药丸压扁")
+    for selector in (".regime-range", ".regime-tabs"):
+        assert _has(selector, "flex-shrink: 0"), f"{selector} 会被旁边的说明挤扁"
 
 
 def test_R401_区块标题不许被右边的说明腰斩():
     """`SectionTitle` 的 `hint` 最长的一条有三小句, 窄屏上会把标题压成两行。"""
-    src = code_of(REGIME)
-    i = src.index("function SectionTitle")
-    body = src[i:i + 1200]
-    # [R457] 标题字号走 TYPE.card, 不换行 / 不被压窄那两个类写在 cn() 的前一个参数里
-    h2 = re.search(r"<h2 className=\{cn\('([^']*)', TYPE\.card\)\}", body)
-    assert h2, "SectionTitle 里找不到标题元素"
-    assert "whitespace-nowrap" in h2.group(1), f"区块标题会被腰斩: {h2.group(1)}"
-    assert "shrink-0" in h2.group(1), f"区块标题会被右边的说明压窄: {h2.group(1)}"
-    assert "flex-wrap" in body[:body.index("<h2")], (
+    assert _has(".regime-section-heading", "flex-wrap: wrap"), (
         "标题行不许换行 —— 说明放不下时就只能去挤标题")
+    assert _has(".regime-section-title", "flex-shrink: 0"), (
+        "区块标题会被右边的说明压窄")
+    assert _has(".regime-section-title h2", "white-space: nowrap"), (
+        "区块标题会被腰斩")
 
 
 def test_R401_页头粘住_否则R394的让位是假的():

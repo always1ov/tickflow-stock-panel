@@ -11,7 +11,7 @@ import { FlaskConical, Loader2, Sparkles, TrendingUp, X } from 'lucide-react'
 import { api, type LivermoreState, type TrendBacktestResult, type TrendDetail } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
-import { TYPE, buttonClass } from '@/components/ui'
+import { TYPE, Button, buttonClass } from '@/components/ui'
 
 // 状态 → 徽章样式。多头(上涨趋势/自然回升/次级回升)红系,空头绿系;
 // 趋势确认态(UT/DT)实心,其余中间态描边。
@@ -358,14 +358,15 @@ function TrendBacktestDialog({ symbol, onClose }: { symbol: string; onClose: () 
             恢复默认阈值
           </button>
           {result && (
-            <button
+            <Button
+              size="xs"
               onClick={() => run.mutate()}
               disabled={run.isPending}
-              className="inline-flex items-center gap-1 rounded-btn border border-border px-3 py-1 text-micro text-secondary hover:text-foreground disabled:opacity-40"
+              className="gap-1 text-micro"
             >
               {run.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <FlaskConical className="h-3 w-3" />}
               重新回测
-            </button>
+            </Button>
           )}
         </div>
       </div>

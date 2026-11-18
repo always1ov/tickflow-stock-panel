@@ -36,7 +36,7 @@ import { useReviewState } from '@/lib/useReviewStore'
 import {
   startReviewGeneration, resetReview, isReviewGenerating,
 } from '@/lib/reviewStore'
-import { TYPE } from '@/components/ui'
+import { Button, TYPE } from '@/components/ui'
 import { Switch } from '@/components/ui/Switch'
 import { ReviewStatusBar } from './ReviewStatusBar'
 import { FactsBar } from './FactsBar'
@@ -402,12 +402,14 @@ export function ReviewPage() {
                   <Clock className="h-4 w-4 text-accent" />
                   <h3 className={TYPE.section}>定时复盘</h3>
                 </div>
-                <button
+                <Button
+                  icon
+                  variant="ghost"
+                  size="xs"
                   onClick={() => setShowSchedule(false)}
-                  className="rounded-btn p-1 text-secondary transition-colors hover:bg-elevated hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
 
               <p className="mb-4 text-xs leading-relaxed text-muted">
@@ -637,30 +639,34 @@ export function ReviewPage() {
                         {promptCustomized && ' · 自定义后不再跟随版本默认模板更新'}
                       </span>
                       <div className="flex items-center gap-1.5">
-                        <button
+                        <Button
                           type="button"
+                          size="xs"
                           disabled={promptQuery.isLoading || !promptQuery.data}
                           onClick={() => setPromptDraft(promptQuery.data?.default ?? '')}
-                          className="rounded-btn border border-border/60 bg-base px-2 py-1 text-micro text-secondary transition-colors hover:text-foreground disabled:opacity-50"
+                          className="text-micro"
                         >
                           填入默认模板
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          size="xs"
                           disabled={promptMut.isPending || !promptCustomized}
                           onClick={() => promptMut.mutate('')}
-                          className="rounded-btn border border-border/60 bg-base px-2 py-1 text-micro text-secondary transition-colors hover:text-foreground disabled:opacity-50"
+                          className="text-micro"
                         >
                           恢复默认
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          size="xs"
+                          variant="primary"
                           disabled={promptMut.isPending || promptQuery.isLoading}
                           onClick={() => promptMut.mutate(promptText)}
-                          className="rounded-btn bg-accent px-2.5 py-1 text-micro font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:opacity-50"
+                          className="text-micro"
                         >
                           {promptMut.isPending ? '保存中…' : '保存'}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -675,19 +681,18 @@ export function ReviewPage() {
 
               {/* 操作区: 取消 + 保存(统一提交开关+时间) */}
               <div className="mt-5 flex justify-end gap-2">
-                <button
+                <Button
                   onClick={() => setShowSchedule(false)}
-                  className="rounded-btn border border-border bg-surface px-4 py-1.5 text-xs text-foreground transition-colors hover:text-foreground"
                 >
                   取消
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="primary"
                   onClick={() => reviewMut.mutate({ enabled: draft.enabled, hour: draft.hour, minute: draft.minute })}
                   disabled={reviewMut.isPending}
-                  className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-1.5 text-xs font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:opacity-50"
                 >
                   {reviewMut.isPending ? '保存中…' : '保存'}
-                </button>
+                </Button>
               </div>
             </motion.div>
           </motion.div>

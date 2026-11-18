@@ -36,34 +36,38 @@ export function ReviewStatusBar({
   const channels = pushChannels.map(c => CHANNEL_LABEL[c] ?? c).join(' / ')
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border border-border bg-surface/80 px-3.5 py-2">
-      <span
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-btn border px-2 py-0.5 text-micro font-medium',
-          intraday
-            ? 'border-warning/35 bg-warning/10 text-warning'
-            : 'border-border bg-elevated/50 text-secondary',
-        )}
-        title={intraday ? '盘中数据仍在变, 复盘以收盘为准' : '已收盘, 当日数据定稿'}
-      >
-        <span className={cn('h-1.5 w-1.5 rounded-full', intraday ? 'bg-warning' : 'bg-bull')} />
-        {intraday ? '盘中快照 · 复盘以收盘为准' : '收盘定稿'}
-      </span>
+    // [R808] 按钮恒在右侧: 左侧信息区可换行、可收缩, 右侧动作组不参与换行,
+    // 窄屏时压缩的是左侧文案而不是把按钮挤到下一行左对齐。
+    <div className="flex items-center gap-3 rounded-card border border-border bg-surface/80 px-3.5 py-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-btn border px-2 py-0.5 text-micro font-medium',
+            intraday
+              ? 'border-warning/35 bg-warning/10 text-warning'
+              : 'border-border bg-elevated/50 text-secondary',
+          )}
+          title={intraday ? '盘中数据仍在变, 复盘以收盘为准' : '已收盘, 当日数据定稿'}
+        >
+          <span className={cn('h-1.5 w-1.5 rounded-full', intraday ? 'bg-warning' : 'bg-bull')} />
+          {intraday ? '盘中快照 · 复盘以收盘为准' : '收盘定稿'}
+        </span>
 
-      <span className="font-mono text-xs text-foreground">{asOf ?? '最新交易日'}</span>
+        <span className="font-mono text-xs text-foreground">{asOf ?? '最新交易日'}</span>
 
-      <span className="text-micro text-muted">
-        上次归档 <span className="font-mono text-secondary">{fmtArchivedAt(lastArchivedAt)}</span>
-      </span>
+        <span className="text-micro text-muted">
+          上次归档 <span className="font-mono text-secondary">{fmtArchivedAt(lastArchivedAt)}</span>
+        </span>
 
-      <span className="text-micro text-muted">
-        {schedule.enabled
-          ? <>定时 <span className="font-mono text-secondary">{time}</span></>
-          : '定时未开启'}
-        {channels && <> · 推送 {channels}</>}
-      </span>
+        <span className="text-micro text-muted">
+          {schedule.enabled
+            ? <>定时 <span className="font-mono text-secondary">{time}</span></>
+            : '定时未开启'}
+          {channels && <> · 推送 {channels}</>}
+        </span>
+      </div>
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <button
           onClick={onRefresh}
           disabled={refreshing}

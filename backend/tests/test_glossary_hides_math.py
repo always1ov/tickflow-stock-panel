@@ -50,7 +50,10 @@ FORBIDDEN = {
 
 # 文件 → 从哪个标记之后才算"显示区"
 SURFACES = {
-    _FRONT / "decision-board" / "cells.tsx": "function geoLines",
+    # [R814] 原锚点是 `function geoLines` —— R812 精简走势/位置悬停时把这个 helper
+    # 整段删了, 锚点随之落空。挪到文件里**第一个顶层声明** `TD_BASE`, 也就是把
+    # 扫描面扩到全文: 只许扩不许缩(R258 的跟头是拿靠后的锚点把前半截漏掉)。
+    _FRONT / "decision-board" / "cells.tsx": "export const TD_BASE",
     # [R269] 三个区块合并重排后锚点跟着挪。挪到 VerdictHeader 是**扩大**了扫描面:
     # 老锚点 ChannelPanel 排在阶段卡与位置结论卡之后, 那两块的文案一直没被扫到。
     # [R293] `VerdictHeader` 整块并进了头部卡, 锚点再挪一次 —— **挪到 `LimitTag`**,
@@ -201,7 +204,10 @@ def test_R292_说明抽屉的词条真的来自后端():
 # R279 为同一件事补过一次自校验)。
 _REACH = {
     _FRONT / "StockReviewDialog.tsx": "盘中最高触及涨停但收盘没封住",
-    _FRONT / "decision-board" / "cells.tsx": "三条线还有",
+    # [R814] 原探针是「三条线还有」—— 它只活在 R812 删掉的 `geoLines` 里。
+    # 换成本文件第一个渲染组件里的「六态：」: 锚点在 TD_BASE, 这句必须被扫到,
+    # 才能证明扫描面没有从文件开头断掉。
+    _FRONT / "decision-board" / "cells.tsx": "六态：",
     _FRONT / "ReviewHelpView.tsx": "这些词各是什么意思",
 }
 

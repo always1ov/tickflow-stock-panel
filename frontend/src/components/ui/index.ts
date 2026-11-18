@@ -12,4 +12,15 @@ export { SectionTitle } from './SectionTitle'
 export { TYPE } from './type'
 export { TABLE, THEAD, TH_ROW, TH, TR, TD } from './table'
 export { SEG, SEG_ITEM, SEG_ON, SEG_OFF } from './segmented'
-export { Switch } from './Switch'
+export { Switch, SwitchTrack } from './Switch'
+// [R814] 补齐三处手写最多的缺口: 徽标 / 工具条 / 弹窗固定件 / 复选框。
+export { Badge, type BadgeTone } from './Badge'
+export { Toolbar, ToolbarGroup, ToolbarDivider, TOOLBAR, TOOLBAR_GROUP } from './Toolbar'
+export {
+  DialogClose, dialogPanel,
+  DIALOG_HEADER, DIALOG_TITLE, DIALOG_BODY, DIALOG_FOOTER,
+  type DialogSize,
+} from './Dialog'
+export { Checkbox } from './Checkbox'
+// [R824] 补齐 R823 报上来的两处缺口: 弱强调徽标档 + 单选。
+export { Radio } from './Radio'

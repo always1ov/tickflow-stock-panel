@@ -13,11 +13,14 @@ from tests.frontend_source import code_of
 
 def test_R523_看板顶部两排网格手机两列():
     """四格指数、六格 KPI 在 390px 下硬塞: 标签竖排、数值截断。手机两列, 宽屏照旧四 / 六列。"""
-    # [R561 同步上游] 上游 v0.3.2 把看板拆成网格组件, 这两排搬进了 components/dashboard/registry.tsx
-    code = code_of("components/dashboard/registry.tsx")
-    assert 'className="grid h-full grid-cols-2 gap-1 md:grid-cols-4"' in code, "指数条手机不是两列"
-    assert 'className="grid h-full grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-6"' in code, "KPI 排手机不是两列"
-    assert not re.search(r'className="grid h-full grid-cols-[346] gap-1(?: [a-z]+:grid-cols-\d)*"', code), "顶部网格又写死成固定列数了"
+    # [R561 同步上游] 看板拆成网格组件, 两排搬进 components/dashboard/registry.tsx;
+    # [R814] R806 之后 registry 已经不在, 网格并回 `DashboardBoard.tsx`, 外层高度由
+    # `Section` 统一给, `h-full` 不再写在网格上 —— 判据只看**列数**(手机两列/宽屏四六列),
+    # 不钉那一串 class。
+    code = code_of("components/dashboard/DashboardBoard.tsx")
+    assert 'className="grid grid-cols-2 gap-1 md:grid-cols-4"' in code, "指数条手机不是两列"
+    assert 'className="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:grid-cols-6"' in code, "KPI 排手机不是两列"
+    assert not re.search(r'className="grid grid-cols-[346] gap-1(?: [a-z]+:grid-cols-\d+)*"', code), "顶部网格又写死成固定列数了"
 
 
 def test_R523_KPI读数手机降一号():

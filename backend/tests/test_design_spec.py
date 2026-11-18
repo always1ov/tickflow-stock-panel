@@ -47,7 +47,7 @@ RATCHET = {
     # 暖色族(amber/yellow/orange)统一收进 warning。棘轮随之压到 0/0, 另两类按迁移后的真实值重设。
     "裸圆角": 0,          # rounded / -sm/-md/-lg/-xl/-2xl/-3xl 已全部换成 rounded-btn/card/dialog
     "任意字号": 0,        # text-[Npx] 已全部换成 text-micro/body/title/page/hero
-    "硬编码色": 397,      # [R763] 删掉 Top10 两列(PulseList 里 3 处 bg-blue-400 等)后 400 → 397
+    "硬编码色": 277,      # [R823] P4(回测/因子/信号/监控)把调色板硬编码色清掉 112 处: 389 → 277
     "任意容器宽": 22,      # 剩余都是 <1000px 的工具条/列宽, 1000px 以上已换 max-w-read/wide
 }
 

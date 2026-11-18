@@ -19,8 +19,23 @@ export function cnClock(now: Date = new Date()): { day: number; mins: number } {
   return { day: bj.getDay(), mins: bj.getHours() * 60 + bj.getMinutes() }
 }
 
-/** 展示用时段: 与 `MarketStatusCard` 的提示语同一套边界(09:30 / 15:00)。 */
-export function cnMarketPhase(now: Date = new Date()): CnMarketPhase {
+/**
+ * 北京时间的日期字符串 `YYYY-MM-DD`。
+ *
+ * [R814] 从 `lib/marketSession.ts` 收进来的: 那个文件自己又写了一份
+ * `Intl.DateTimeFormat(timeZone: 'Asia/Shanghai')`, 于是全仓有了第二个换时区的
+ * 产地(R319 要拦的就是这个)。日期与分钟数现在同出 `marketClock` 一处。
+ */
+export function cnDate(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now)
+  const get = (type: string) => parts.find(p => p.type === type)?.value ?? ''
+  return `${get('year')}-${get('month')}-${get('day')}`
+}
+
+/** 展示用时段: 与 `MarketStatusCard` 的提示语同一套边界(09:30 / 15:00)。 */export function cnMarketPhase(now: Date = new Date()): CnMarketPhase {
   const { day, mins } = cnClock(now)
   if (day === 0 || day === 6) return 'weekend'
   if (mins < 9 * 60 + 30) return 'pre'

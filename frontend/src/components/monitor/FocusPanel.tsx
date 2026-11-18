@@ -6,6 +6,7 @@ import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import { toast } from '@/components/Toast'
 import { Skeleton } from '@/components/data/Skeleton'
+import { Switch, Badge } from '@/components/ui'
 
 /** [R159] 焦点名单 —— 自选太多时, 谁值得推送。
  *
@@ -24,11 +25,11 @@ import { Skeleton } from '@/components/data/Skeleton'
  *
  * [R524] 原来是监控中心顶上一条可折叠的「推送焦点」条(FocusBar), 现在是监控中心的一栏, 四档摊开成四列。
  * 名字统一叫「焦点名单」—— CONTEXT.md 与后端一直是这个名字, 界面上叫「推送焦点」是同一个东西两个名字。 */
-const TIER_STYLE: Record<FocusTier, string> = {
-  held: 'border-bull/40 bg-bull/10 text-bull',
-  plan: 'border-accent/40 bg-accent/10 text-accent',
-  band: 'border-warning/40 bg-warning/10 text-warning',   // [R161] 贴轨: 高抛低吸候选
-  watch: 'border-border bg-elevated/60 text-muted',
+const TIER_TONE: Record<FocusTier, 'bull' | 'accent' | 'warning' | 'neutral'> = {
+  held: 'bull',
+  plan: 'accent',
+  band: 'warning',   // [R161] 贴轨: 高抛低吸候选
+  watch: 'neutral',
 }
 const TIERS: FocusTier[] = ['held', 'plan', 'band', 'watch']
 
@@ -70,12 +71,12 @@ export function FocusPanel() {
         <button
           onClick={() => overrideMut.mutate({ symbol: it.symbol, mode: pinned ? null : 'pin' })}
           title={pinned ? '取消钉住' : '钉住: 无论分档, 永远推送'}
-          className={cn('rounded-btn p-1 transition-colors cursor-pointer', pinned ? 'text-accent' : 'text-muted/50 hover:text-accent')}
+          className={cn('rounded-btn p-1 transition-colors cursor-pointer', pinned ? 'text-accent' : 'text-secondary/60 hover:text-accent')}
         ><Pin className="h-3 w-3" /></button>
         <button
           onClick={() => overrideMut.mutate({ symbol: it.symbol, mode: muted ? null : 'mute' })}
           title={muted ? '取消静音' : '静音: 无论分档, 广域规则不推(单独设的点位提醒仍推)'}
-          className={cn('rounded-btn p-1 transition-colors cursor-pointer', muted ? 'text-warning' : 'text-muted/50 hover:text-warning')}
+          className={cn('rounded-btn p-1 transition-colors cursor-pointer', muted ? 'text-warning' : 'text-secondary/60 hover:text-warning')}
         ><BellOff className="h-3 w-3" /></button>
       </li>
     )
@@ -96,14 +97,12 @@ export function FocusPanel() {
         <label className="ml-auto inline-flex cursor-pointer items-center gap-2 text-xs text-secondary"
                title={'开(默认): 全市场/自选分组/板块这类广域规则, 只对「持有 + 计划中 + 钉住」弹窗、响铃、推外部渠道、计徽标; 焦点外的只写进触发记录(灰显)。\n单独给某只票设的规则(点位提醒等)不受影响, 永远推。\n关: 所有告警照常打扰。'}>
           <span>只认焦点名单</span>
-          <button
-            role="switch" aria-checked={v.focus_only}
+          <Switch
+            size="sm"
+            checked={v.focus_only}
             disabled={prefsMut.isPending}
-            onClick={() => prefsMut.mutate(!v.focus_only)}
-            className={cn('relative h-4 w-7 rounded-full transition-colors', v.focus_only ? 'bg-accent' : 'bg-border')}
-          >
-            <span className={cn('absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform', v.focus_only ? 'translate-x-3.5' : 'translate-x-0.5')} />
-          </button>
+            onChange={next => prefsMut.mutate(next)}
+          />
         </label>
       </div>
       {gated === 0 && (
@@ -116,7 +115,7 @@ export function FocusPanel() {
           return (
             <section key={t} className="min-w-0">
               <div className="flex items-center gap-2 border-b border-border pb-1">
-                <span className={cn('rounded-btn border px-1.5 py-px text-micro', TIER_STYLE[t])}>{labels[t]}</span>
+                <Badge tone={TIER_TONE[t]}>{labels[t]}</Badge>
                 <span className="font-mono text-micro tabular-nums text-muted">{v.counts[t]}</span>
                 {t === 'watch' && (
                   <button onClick={() => setShowWatch(s => !s)} className="ml-auto text-micro text-secondary transition-colors hover:text-foreground cursor-pointer">

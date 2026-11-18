@@ -480,7 +480,7 @@ export function AnalysisKChart({
             type="button"
             title={ANALYSIS_PANE_HELP}
             aria-label="副图图例说明"
-            className="ml-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-base/40 text-micro text-secondary transition-ui hover:border-border hover:text-foreground"
+            className="ml-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-surface text-micro text-secondary transition-ui hover:border-border hover:text-foreground"
           >
             ?
           </button>

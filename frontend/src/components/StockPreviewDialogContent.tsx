@@ -26,6 +26,7 @@ import { useQuoteClock } from '@/lib/useQuoteClock'
 import { ExtensionSlot } from '@/extensions/ExtensionSlot'
 import { ExtensionBoundary } from '@/extensions/ExtensionBoundary'
 import { getFrontendSlotRegistrations } from '@/extensions/registry'
+import { Button } from '@/components/ui'
 
 export interface Props {
   symbol: string | null
@@ -400,16 +401,19 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
               <div className="flex shrink-0 items-center gap-1">
                 {/* 自选 */}
                 {inWatchlist ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
+                    icon
                     onClick={() => toggleWatchlist.mutate({ action: 'remove' })}
                     disabled={toggleWatchlist.isPending}
-                    className="rounded-btn p-1.5 text-[#FACC15] transition-colors cursor-pointer hover:bg-elevated disabled:opacity-50"
+                    className="text-[#FACC15]"
                     title="移出自选"
                     aria-label={`将 ${symbol} 移出自选`}
                   >
                     <Star className="h-4 w-4" />
-                  </button>
+                  </Button>
                 ) : (
                   <WatchlistAddMenu
                     onSelect={groupId => toggleWatchlist.mutate({ action: 'add', groupId })}
@@ -421,42 +425,52 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                   </WatchlistAddMenu>
                 )}
                 {/* 加监控 */}
-                <button
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  icon
                   onClick={() => setShowMonitorEditor(true)}
-                  className="p-1.5 rounded-btn text-warning hover:bg-warning/10 transition-colors cursor-pointer"
+                  className="text-warning hover:bg-warning/10 hover:text-warning"
                   title="加监控"
                 >
                   <RadioTower className="h-4 w-4" />
-                </button>
+                </Button>
 
                 {/* 刷新 */}
                 {isChartView && (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    icon
                     onClick={handleRefresh}
-                    className="p-1.5 rounded-btn text-secondary hover:text-foreground hover:bg-elevated transition-colors"
                     title="刷新"
                   >
                     <RefreshCw className="h-4 w-4" />
-                  </button>
+                  </Button>
                 )}
 
                 {/* 放大 / 缩小 */}
-                <button
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  icon
                   onClick={() => setMaximized(v => !v)}
-                  className="p-1.5 rounded-btn text-secondary hover:text-foreground hover:bg-elevated transition-colors"
                   title={maximized ? '缩小' : '放大'}
                 >
                   {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                </button>
+                </Button>
 
-                <button
+                <Button
+                  variant="danger"
+                  size="xs"
+                  icon
                   onClick={onClose}
-                  className="shrink-0 rounded-btn p-1.5 text-secondary transition-colors hover:bg-danger/15 hover:text-danger"
+                  className="shrink-0"
                   aria-label="关闭个股详情"
                   title="关闭"
                 >
                   <X className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
               </div>
             </div>

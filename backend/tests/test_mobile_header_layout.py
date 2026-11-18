@@ -68,7 +68,10 @@ def test_R394_标题让出的位置盖得住那个悬浮汉堡():
     """
     header, layout = _code(HEADER), _code(LAYOUT)
 
-    burger = re.search(r"isDesktop \?[^:]+:\s*'left-(\d+) top-(\d+) p-(\d+)'", layout)
+    # [R814] R806 删掉侧栏「收起菜单」按钮后, 桌面那一支从 `'…'` 长成了 `cn(…)`
+    # 多行调用, 老正则(要求 `isDesktop ? … : '…'` 紧挨着)落空。这里直接抓**移动端
+    # 那一支** —— 它在整份布局里只此一处, 形状仍是 `left-N top-N p-N`。
+    burger = re.search(r":\s*'left-(\d+) top-(\d+) p-(\d+)'", layout)
     assert burger, "定位不到移动端汉堡的那行样式 —— 这条守卫的锚要跟着改"
     right_edge = _u(burger.group(1)) + _u(burger.group(3)) * 2 + 16 + 2
 

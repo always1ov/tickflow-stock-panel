@@ -7,6 +7,7 @@
  *     <button className={cn(SEG_ITEM, on ? SEG_ON : SEG_OFF)}>…</button>
  */
 export const SEG = 'inline-flex shrink-0 items-center gap-0.5 rounded-btn border border-border bg-elevated/60 p-0.5'
-export const SEG_ITEM = 'inline-flex h-7 items-center gap-1 rounded-btn px-2.5 text-xs transition-colors duration-hover cursor-pointer'
+// [R817] 定高 + 不换行: 28px 的格子一旦允许换行, 字会画到盒子外面(R401 市场环境手机截图)。
+export const SEG_ITEM = 'inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-btn px-2.5 text-xs transition-colors duration-hover cursor-pointer'
 export const SEG_ON = 'bg-foreground font-medium text-surface'
 export const SEG_OFF = 'text-secondary hover:text-foreground'

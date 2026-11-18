@@ -14,7 +14,7 @@ import {
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
-import { TYPE, buttonClass } from '@/components/ui'
+import { TYPE, Button, buttonClass, Switch } from '@/components/ui'
 import { fmtAssetPrice, pricePrecision, roundPriceToTick } from '@/lib/format'
 
 interface Props {
@@ -508,15 +508,18 @@ export function PriceAlertDialog({
                         <span className="block truncate text-xs text-foreground">{rule.name}</span>
                         <span className="mt-0.5 block font-mono text-micro text-muted">{isUp ? '涨至' : '跌至'} {fmtAssetPrice(alert.target, assetType)} · {COOLDOWNS.find(item => item.value === rule.cooldown_seconds)?.label ?? `${rule.cooldown_seconds} 秒`}</span>
                       </span>
-                      <button role="switch" aria-checked={rule.enabled} onClick={() => toggle.mutate(rule)} disabled={toggle.isPending} className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${rule.enabled ? 'bg-sky-500' : 'bg-surface border border-border'}`} title={rule.enabled ? '停用' : '启用'}>
-                        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${rule.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
-                      </button>
+                      <Switch
+                        checked={rule.enabled}
+                        onChange={() => toggle.mutate(rule)}
+                        disabled={toggle.isPending}
+                        title={rule.enabled ? '停用' : '启用'}
+                      />
                       {confirmDelete === rule.id ? (
-                        <button onClick={() => remove.mutate(rule.id)} disabled={remove.isPending} className="h-7 rounded-btn border border-danger/30 bg-danger/10 px-2 text-micro text-danger">确认</button>
+                        <Button variant="danger" size="xs" onClick={() => remove.mutate(rule.id)} disabled={remove.isPending} className="px-2 text-micro">确认</Button>
                       ) : (
-                        <button onClick={() => setConfirmDelete(rule.id)} className="rounded-btn p-1.5 text-secondary hover:bg-danger/10 hover:text-danger" title="删除">
+                        <Button variant="danger" size="xs" icon onClick={() => setConfirmDelete(rule.id)} title="删除">
                           <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )
@@ -531,12 +534,12 @@ export function PriceAlertDialog({
             监控中心<ExternalLink className="h-3 w-3" />
           </Link>
           <div className="flex items-center gap-2">
-            <button onClick={onClose} className="h-8 rounded-btn border border-border px-3 text-xs text-secondary hover:text-foreground">取消</button>
+            <Button variant="outline" onClick={onClose}>取消</Button>
             {tab === 'create' && (
-              <button onClick={() => save.mutate()} disabled={!targetValid || alreadyReached || duplicate || save.isPending} className="inline-flex h-8 items-center gap-1.5 rounded-btn bg-sky-500 px-4 text-xs font-medium text-white transition-colors hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-40">
+              <Button variant="primary" onClick={() => save.mutate()} disabled={!targetValid || alreadyReached || duplicate || save.isPending} className="px-4 gap-1.5">
                 {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bell className="h-3.5 w-3.5" />}
                 创建提醒
-              </button>
+              </Button>
             )}
           </div>
         </footer>

@@ -12,12 +12,13 @@ import { Skeleton } from '@/components/data/Skeleton'
 import { PageHeader } from '@/components/PageHeader'
 import { AnchorWrap } from '@/lib/useCardFlash'
 import { ResourceTransferButton } from '@/components/ResourceTransferDialog'
+import { Badge, Button, Card, buttonClass, type BadgeTone } from '@/components/ui'
 
 const KIND_LABEL: Record<SignalKind, string> = { entry: '入场', exit: '出场', both: '出入通用' }
-const KIND_CLASS: Record<SignalKind, string> = {
-  entry: 'bg-accent/10 text-accent',
-  exit: 'bg-warning/10 text-warning',
-  both: 'bg-muted/10 text-muted',
+const KIND_TONE: Record<SignalKind, BadgeTone> = {
+  entry: 'accent',
+  exit: 'warning',
+  both: 'neutral',
 }
 
 /** 信号库独立页: 全部信号均为用户定义 (csg_* / 迁移的 signal_*), 策略/回测/监控统一取用。 */
@@ -122,7 +123,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
             <span className="rounded-btn bg-elevated px-1 py-px font-mono text-micro text-muted">{signals.length}</span>
             <span className="text-muted">· {enabledCustomSignals} 个已启用</span>
           </div>
-          <div className="inline-flex h-7 items-center rounded-btn border border-border p-0.5" role="tablist" aria-label="信号库视图">
+          <div className="inline-flex items-center rounded-btn border border-border p-0.5" role="tablist" aria-label="信号库视图">
             {([['library', '信号库'], ['archive', `档案库 ${archivedSignals.length}`]] as const).map(([id, label]) => (
               <button
                 key={id}
@@ -130,7 +131,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                 role="tab"
                 aria-selected={view === id}
                 onClick={() => setView(id)}
-                className={`rounded-btn px-2 py-0.5 text-micro transition-colors ${view === id ? 'bg-foreground font-medium text-surface' : 'text-secondary hover:text-foreground'}`}
+                className={buttonClass({ size: 'xs', selected: view === id })}
               >
                 {label}
               </button>
@@ -139,13 +140,10 @@ function SignalsBody({ highlight }: { highlight: string }) {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-micro text-muted">信号保存为 <span className="font-mono text-secondary">csg_*</span> 列，条件字段可用行情指标、涨跌停判定价与全部注册因子</span>
-          <button
-            onClick={openNew}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-btn border border-warning/30 bg-warning/5 px-3 text-xs font-medium text-warning transition-colors hover:bg-warning/10"
-          >
+          <Button onClick={openNew} variant="primary" className="shrink-0 gap-1.5">
             <Plus className="h-3.5 w-3.5" />
             新建信号
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -153,16 +151,16 @@ function SignalsBody({ highlight }: { highlight: string }) {
         <section>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {signals.map(sig => (
-              <div key={sig.id} className="rounded-card border border-border bg-base p-4">
+              <Card key={sig.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <h3 className="truncate text-sm font-medium text-foreground">{sig.name}</h3>
-                      <span className={`rounded-btn px-1.5 py-0.5 text-micro ${KIND_CLASS[sig.kind]}`}>
+                      <Badge className="shrink-0" tone={KIND_TONE[sig.kind]}>
                         {KIND_LABEL[sig.kind]}
-                      </span>
-                      {!sig.enabled && <span className="rounded-btn bg-muted/10 px-1.5 py-0.5 text-micro text-muted">已停用</span>}
-                      {sig.archived && <span className="rounded-btn bg-muted/15 px-1.5 py-0.5 text-micro text-muted">已归档</span>}
+                      </Badge>
+                      {!sig.enabled && <Badge className="shrink-0">已停用</Badge>}
+                      {sig.archived && <Badge className="shrink-0">已归档</Badge>}
                     </div>
                     <p className="mt-1 truncate font-mono text-micro text-muted">{sig.column ?? `csg_${sig.id}`}</p>
                     {sig.archived && sig.archived_at && (
@@ -230,15 +228,15 @@ function SignalsBody({ highlight }: { highlight: string }) {
                     </span>
                   ))}
                 </div>
-              </div>
+              </Card>
             ))}
             {list.isLoading &&
               Array.from({ length: 2 }).map((_, i) => (
-                <div key={`sk-${i}`} className="space-y-3 rounded-card border border-border bg-base p-4">
+                <Card key={`sk-${i}`} className="space-y-3">
                   <Skeleton w="w-1/2" h="h-4" />
                   <Skeleton w="w-1/3" h="h-3" />
                   <Skeleton h="h-4" />
-                </div>
+                </Card>
               ))}
             {!list.isLoading && signals.length === 0 && (
               <div className="rounded-card border border-dashed border-border px-5 py-10 text-center text-sm text-muted md:col-span-2">

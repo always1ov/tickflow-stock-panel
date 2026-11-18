@@ -6,7 +6,7 @@ import { ResearchCandidatesDialog } from './backtest/ResearchCandidatesDialog'
 import { RobustnessValidation } from './backtest/RobustnessValidation'
 import { StrategyBacktest } from './backtest/StrategyBacktest'
 import { type ResearchCandidate } from '@/lib/api'
-import { buttonClass } from '@/components/ui'
+import { Button, ToolbarDivider } from '@/components/ui'
 import { PageTabs, type PageTabDef } from '@/components/PageTabs'
 
 type Tab = 'strategy' | 'robustness'
@@ -74,17 +74,16 @@ export function Backtest() {
         className="shrink-0 flex-wrap gap-x-4 gap-y-2 bg-base/95 px-3 lg:flex-nowrap lg:px-5"
         right={(
           <div className="flex w-full min-w-0 items-center gap-1.5 sm:gap-2 lg:w-auto">
-            <button
-              type="button"
+            <Button
               onClick={() => setCandidatesOpen(true)}
               aria-label="打开候选方案"
               title="候选方案"
-              className={buttonClass({}, 'shrink-0 gap-1.5')}
+              className="shrink-0 gap-1.5"
             >
               <BookmarkCheck className="h-3.5 w-3.5" />
               <span>候选方案</span>
-            </button>
-            <span className="h-5 w-px shrink-0 bg-border" aria-hidden="true" />
+            </Button>
+            <ToolbarDivider className="h-5" />
             {/* [R538] 分栏条原来是手抄的一份(与 PageTabs 逐字相同), 换成共用件 —— 长相不变, 产地一个 */}
             <div className="min-w-0 flex-1 lg:flex-none">
               <PageTabs tabs={MODES} active={activeTab} onChange={changeTab} label="回测视图" />

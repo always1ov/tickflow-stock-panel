@@ -21,6 +21,7 @@ import { FlaskConical, Loader2, Sparkles, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import type { Fib2Grain, Fib2GrainBacktestResult } from '@/lib/api'
 import { useLevelColors } from '@/lib/theme'
+import { Button } from '@/components/ui'
 
 const CN: Record<Fib2Grain, string> = { coarse: '粗', mid: '中', fine: '细' }
 
@@ -64,9 +65,9 @@ export function Fib2GrainDialog({
               <span className="text-micro text-muted">{r.window_days} 根日线</span>
             )}
           </div>
-          <button onClick={onClose} className="text-secondary hover:text-foreground">
+          <Button variant="ghost" size="xs" icon onClick={onClose}>
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="flex-1 space-y-4 overflow-auto p-4">
@@ -81,16 +82,18 @@ export function Fib2GrainDialog({
                 </span>
                 —— 这一组不出买卖信号, 没有收益可算。
               </p>
-              <button
+              <Button
+                variant="primary"
+                size="md"
                 onClick={() => run.mutate()}
                 disabled={run.isPending}
-                className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-2 text-body font-medium text-on-accent hover:bg-accent/90 disabled:opacity-50"
+                className="gap-1.5"
               >
                 {run.isPending
                   ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   : <FlaskConical className="h-3.5 w-3.5" />}
                 {run.isPending ? '回测中…' : '一键回测'}
-              </button>
+              </Button>
               {run.isError && (
                 <p className="text-micro text-danger">{(run.error as Error).message}</p>
               )}

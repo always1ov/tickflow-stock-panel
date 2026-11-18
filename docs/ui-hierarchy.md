@@ -5,7 +5,11 @@
 
 取值就是个股弹窗重做(R429~R448)那一套, 折到 R399 的字号刻度上。代码里的唯一产地是
 `frontend/src/components/ui/`(`type.ts` / `SectionTitle.tsx` / `table.ts` / `Button.tsx` /
-`Card.tsx`), 调用处不要再手写这些 class 串。
+`Card.tsx` / `Field.tsx` / `segmented.ts` / `Badge.tsx` / `Toolbar.tsx` / `Dialog.tsx` /
+`Checkbox.tsx`), 调用处不要再手写这些 class 串。
+
+迁移进度由 `backend/tests/test_component_recipes.py` 的棘轮钉住: 手写配方只许降,
+`buttonClass()` 的覆盖文件数只许升。
 
 ## 层级
 
@@ -25,10 +29,25 @@
 
 - **按钮**: `<Button>` / `buttonClass()`。默认 32px 高、13px 字、描边实底(小号 28px 高, 字仍是 13px —— 按钮一律正文级); 选中是黑白反相
   (亮色黑底白字、暗色白底黑字), 全站只有这一种选中态。
+  **高度实际只有 28 / 32 两档**(`spacing.9` 被改写成 `2rem`, 所以 `h-9 === h-8 === 32px`):
+  `md` 不是更高的按钮, 而是同高、字更大(15px)、横向更宽的那一档, 只给弹窗里的主操作。
+  禁用态全站只有一个值 `disabled:opacity-50`。
 - **分段切换**(「股票 / ETF」「全部 / 日线 / 分钟」这一类): `segmented.ts` 的 `SEG` / `SEG_ITEM` / `SEG_ON` / `SEG_OFF`。
   外面一圈描边, 选中那一格反相, 总高 32px, 与旁边按钮齐平。
+- **实底上的字只有两档**: `text-on-accent`(= `--base`) 或 `text-surface`(SEG_ON 用的就是它)。
+  `--accent-text` 是「深底上的 accent 文字」, **和 `--accent` 同值**, 拿它给实底当字色就是隐形;
+  `bg-accent text-white` 同理(暗色 accent 是 #E4E4E4)。`tests/test_contrast_tokens.py` 全站拦这两类。
 - **卡片**: `<Card>`。实边框、实底、6px 圆角、无投影。
-- **表格**: `table.ts`。表头 11px 灰字浅灰底条, 内容 13px, 行间一道细线。
+- **输入 / 下拉**: `fieldInput` / `fieldSelect`。高度对齐按钮的 32px, 13px 字, 实底实边框。
+- **徽标**: `<Badge tone=…>`。20px 高、11px 字、6px 内边距; 除 `accent` 外都是"10% 底 + 同色字",
+  不是实心色块。`bull` / `bear` 只给行情语义, 不做普通状态色。
+- **工具条**: `<Toolbar>` / `<ToolbarGroup>` / `<ToolbarDivider>`。同一行按钮统一 `size="sm"`,
+  组内 `gap-g2`、组间 `gap-g3` —— 按钮不再各自写高度。
+- **弹窗**: `<Modal panelClassName={dialogPanel('md')}>` + `DIALOG_HEADER` / `DIALOG_TITLE` /
+  `DIALOG_BODY` / `DIALOG_FOOTER`。宽度只有 sm(24rem) / md(32rem) / lg(42rem) / xl(56rem) 四档,
+  **右上角必须有 `<DialogClose>`**。
+- **复选框**: `<Checkbox>`。原生 `input[type=checkbox]`, 16px、`accent-accent`, 点击区 28px。
+- **表格**: `table.ts`。表头 11px 灰字、**坐在卡片底上**(R532 起没有浅灰底条), 内容 13px, 行间一道细线。
   **整页主列表**(自选、选股那张 `StockDataTable`)内容保持 15px —— 那是整页的主体, 本来就够大;
   表头照样落到 11px 灰字(R452 之前是 15px 中粗, 比内容还显眼)。
 
@@ -44,6 +63,11 @@
 | 与正文同字号的卡片标题 | 放大正文之后标题和正文一样大, 层级就塌了 | `TYPE.card`(15) |
 | 手写按钮 class 串 | | `buttonClass()` |
 | 各写各的选中色 | | `selected` |
+| 手写卡片串 `rounded-card border border-border bg-surface` | | `<Card>` |
+| 手写输入框/下拉 | | `fieldInput` / `fieldSelect` |
+| 手写徽标 `bg-elevated px-…` | | `<Badge>` |
+| 弹窗自己传宽度/底色/圆角 | | `dialogPanel(尺寸)` + `DIALOG_*` |
+| 弹窗没有关闭按钮 | 只靠 ESC 和点遮罩, 鼠标用户找不到出口 | `<DialogClose>` |
 | `text-micro`(R400 那一轮已经落到 11px 的) | 正文、控件、表格内容、说明段落 | `text-xs`(13) —— **不能只看写死的字号**, R400 迁过的页面(模拟盘等)正文挤在 11px, 要按角色逐处看 |
 
 每迁完一个文件, 把它加进 `backend/tests/test_ui_hierarchy.py` 的 `MIGRATED`: 那里面的文件

@@ -15,6 +15,20 @@ import { MiningWorkbench } from './MiningWorkbench'
 import { AutoMiningDialog } from './AutoMiningDialog'
 import { AddFactorSignalDialog } from './AddFactorSignalDialog'
 import { factorBatchCandidate } from './researchCandidates'
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  SEG,
+  SEG_ITEM,
+  SEG_ON,
+  SEG_OFF,
+  fieldInput,
+  fieldSelect,
+  buttonClass,
+  type BadgeTone,
+} from '@/components/ui'
 
 const formatDate = (value: Date) => value.toISOString().slice(0, 10)
 const monthsAgo = (months: number) => {
@@ -23,18 +37,17 @@ const monthsAgo = (months: number) => {
   return formatDate(value)
 }
 const TODAY = formatDate(new Date())
-const INPUT_CLS = 'w-full rounded-input border border-border bg-surface px-2.5 py-1.5 text-xs focus:border-accent focus:outline-none'
 
 type View = 'batch' | 'single' | 'mining'
 type SortKey = 'ic' | 'ir' | 'return' | 't_nw' | 'win_rate' | 'drawdown'
 type Verdict = 'valid' | 'edge' | 'invalid' | 'error'
 
 // P0 判读为客户端经验规则, metrics_v2 (服务端显著性) 落地后切换为服务端 verdict
-const VERDICT_META: Record<Verdict, { label: string; cls: string }> = {
-  valid: { label: '有效', cls: 'bg-bull/10 text-bull' },
-  edge: { label: '边缘', cls: 'bg-warning/10 text-warning' },
-  invalid: { label: '无效', cls: 'bg-base text-muted' },
-  error: { label: '失败', cls: 'bg-danger/10 text-danger' },
+const VERDICT_META: Record<Verdict, { label: string; tone: BadgeTone }> = {
+  valid: { label: '有效', tone: 'accent' },
+  edge: { label: '边缘', tone: 'warning' },
+  invalid: { label: '无效', tone: 'neutral' },
+  error: { label: '失败', tone: 'danger' },
 }
 
 // 服务端判读优先 (metrics_v2: NW t ≥ 2 显著 且 BH q ≤ 0.1), 缺失时降级 P0 经验规则
@@ -389,7 +402,7 @@ function BatchDiscovery({
   }
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 overflow-hidden rounded-card border border-border bg-surface/80 xl:grid-cols-[19rem_minmax(0,1fr)]">
+    <Card padding="none" className="grid h-full min-h-0 grid-cols-1 overflow-hidden xl:grid-cols-[19rem_minmax(0,1fr)]">
       <section className="flex min-h-0 flex-col border-b border-border bg-base/25 xl:border-b-0 xl:border-r">
         {/* 顶部固定区: 计数 + 预设 + 搜索 */}
         <div className="shrink-0 space-y-2 border-b border-border/60 px-3 py-2.5">
@@ -411,21 +424,18 @@ function BatchDiscovery({
               const ids = presetIds(preset)
               const active = activePreset === preset.id
               return (
-                <button
+                <Button
                   key={preset.id}
-                  type="button"
+                  size="xs"
+                  selected={active}
                   onClick={() => applyPreset(preset)}
                   disabled={ids.length === 0}
                   title={preset.hint}
-                  className={`inline-flex items-center gap-1 rounded-btn border px-2 py-1 text-micro font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${active
-                    ? 'border-foreground bg-foreground text-surface'
-                    : 'border-border bg-surface text-secondary hover:border-accent/40 hover:text-accent'
-                  }`}
+                  className="gap-1"
                 >
                   {preset.label}
                   <span className="font-mono opacity-70">{ids.length}</span>
-                  {active && <span aria-hidden>✓</span>}
-                </button>
+                </Button>
               )
             })}
           </div>
@@ -436,7 +446,7 @@ function BatchDiscovery({
               value={factorQuery}
               onChange={event => setFactorQuery(event.target.value)}
               placeholder="搜索因子 (名称/公式)"
-              className={`${INPUT_CLS} pl-7`}
+              className={`${fieldInput} w-full pl-7 text-xs`}
             />
           </div>
         </div>
@@ -469,11 +479,9 @@ function BatchDiscovery({
                           : 'text-secondary hover:bg-elevated/50 hover:text-foreground'
                         }`}
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={checked}
                           onChange={() => toggleFactor(item.id)}
-                          className="h-3.5 w-3.5 shrink-0 accent-accent"
                         />
                         <span className="min-w-0 truncate" title={`${item.label} (${item.id}) · ${item.desc}`}>{definitionOptionLabel(item)}</span>
                       </label>
@@ -495,16 +503,13 @@ function BatchDiscovery({
           <div>
             <div className="mb-1 flex items-center justify-between">
               <span className="text-micro font-medium text-muted">资产与范围</span>
-              <div className="inline-flex overflow-hidden rounded-btn border border-border bg-surface">
+              <div className={SEG}>
                 {(['stock', 'etf'] as const).map(value => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => { setAssetType(value); setSymbols('') }}
-                    className={`px-2.5 py-1 text-micro font-medium transition-colors ${assetType === value
-                      ? 'bg-foreground text-surface'
-                      : 'text-secondary hover:text-foreground'
-                    }`}
+                    className={cn(SEG_ITEM, assetType === value ? SEG_ON : SEG_OFF)}
                   >
                     {value === 'stock' ? '股票' : 'ETF'}
                   </button>
@@ -517,7 +522,7 @@ function BatchDiscovery({
                 value={symbols}
                 onChange={event => setSymbols(event.target.value)}
                 placeholder="留空使用全市场"
-                className={`${INPUT_CLS} min-w-0 flex-1 font-mono`}
+                className={`${fieldInput} min-w-0 flex-1 text-xs`}
               />
               <WatchlistGroupMenu
                 onSelect={importFromWatchlist}
@@ -528,7 +533,7 @@ function BatchDiscovery({
                 disableEmpty
                 menuLabel="选择自选分组"
                 align="right"
-                triggerClassName="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-input border border-border bg-surface px-2 text-micro text-secondary transition-colors hover:border-accent/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                triggerClassName={buttonClass({}, 'shrink-0 gap-1')}
                 title="从自选分组加入筛选范围"
                 ariaLabel="从自选加入筛选范围"
               >
@@ -551,17 +556,15 @@ function BatchDiscovery({
             </div>
             <div className="mt-1.5 flex gap-1">
               {[3, 6, 12].map(months => (
-                <button
+                <Button
                   key={months}
-                  type="button"
+                  size="xs"
+                  selected={start === monthsAgo(months) && end === TODAY}
                   onClick={() => { setStart(monthsAgo(months)); setEnd(TODAY) }}
-                  className={`flex-1 rounded-btn px-2 py-1 text-micro transition-colors ${start === monthsAgo(months) && end === TODAY
-                    ? 'bg-foreground font-medium text-surface'
-                    : 'text-secondary hover:bg-elevated hover:text-secondary'
-                  }`}
+                  className="flex-1"
                 >
                   {months === 12 ? '1年' : `${months}个月`}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -573,7 +576,7 @@ function BatchDiscovery({
             <div className="grid grid-cols-3 gap-1.5 border-t border-border/60 px-2.5 py-2">
               <label className="block">
                 <span className="mb-1 block text-micro text-muted">调仓</span>
-                <select value={rebalance} onChange={event => setRebalance(event.target.value as typeof rebalance)} className={INPUT_CLS}>
+                <select value={rebalance} onChange={event => setRebalance(event.target.value as typeof rebalance)} className={`${fieldSelect} w-full text-xs`}>
                   <option value="daily">日度</option>
                   <option value="weekly">周度</option>
                   <option value="monthly">月度</option>
@@ -581,7 +584,7 @@ function BatchDiscovery({
               </label>
               <label className="block">
                 <span className="mb-1 block text-micro text-muted">分组</span>
-                <select value={nGroups} onChange={event => setNGroups(Number(event.target.value))} className={INPUT_CLS}>
+                <select value={nGroups} onChange={event => setNGroups(Number(event.target.value))} className={`${fieldSelect} w-full text-xs`}>
                   <option value={3}>3组</option>
                   <option value={5}>5组</option>
                   <option value={10}>10组</option>
@@ -589,7 +592,7 @@ function BatchDiscovery({
               </label>
               <label className="block">
                 <span className="mb-1 block text-micro text-muted">佣金/万</span>
-                <input type="number" value={fees} onChange={event => setFees(event.target.value)} className={INPUT_CLS} />
+                <input type="number" value={fees} onChange={event => setFees(event.target.value)} className={`${fieldInput} w-full text-xs`} />
               </label>
             </div>
           </details>
@@ -597,24 +600,26 @@ function BatchDiscovery({
 
         {/* 运行条: 常驻底部, 不随列表滚动消失 */}
         <div className="shrink-0 space-y-1.5 border-t border-border bg-surface/70 px-3 py-2.5">
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="md"
             onClick={() => startRun()}
             disabled={run.isPending || selected.length === 0}
             title={selected.length >= 16 ? '因子较多, 全市场运行可能需要较长时间; 可先用「快速体检」' : undefined}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full gap-1.5"
           >
             <Play className="h-3.5 w-3.5" />
             {run.isPending ? '筛选中…' : `筛选 ${selected.length} 个因子`}
-          </button>
+          </Button>
           {run.isPending && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={cancelRun}
-              className="w-full rounded-btn border border-border px-3 py-1.5 text-micro text-secondary transition-colors hover:border-danger/40 hover:text-danger"
+              className="w-full"
             >
               取消本次筛选
-            </button>
+            </Button>
           )}
         </div>
       </section>
@@ -624,13 +629,14 @@ function BatchDiscovery({
           <div className="m-3 flex items-center gap-3 rounded-btn border border-accent/30 bg-accent/5 px-3 py-2.5 text-xs text-secondary">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-accent/25 border-t-accent" />
             正在加载共享数据面板并评估 {selected.length} 个因子
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={cancelRun}
-              className="ml-auto shrink-0 rounded-btn border border-border px-2 py-1 text-micro text-secondary transition-colors hover:border-danger/40 hover:text-danger"
+              className="ml-auto shrink-0"
             >
               取消
-            </button>
+            </Button>
           </div>
         )}
         {runCancelled && (
@@ -647,7 +653,7 @@ function BatchDiscovery({
           <div className="m-3 rounded-btn border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{run.data.error}</div>
         )}
         {!results && !run.isPending && (
-          <div className="m-3 rounded-card border border-border bg-surface/60 p-6 text-center">
+          <Card padding="none" className="m-3 p-6 text-center">
             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-accent">
               <Search className="h-5 w-5" />
             </div>
@@ -656,8 +662,9 @@ function BatchDiscovery({
               左侧选因子（或用预设）→ 点「筛选」批量检验 → 点击结果行看单因子详情。
               IC 衡量历史上因子值与后续涨跌的关联强度（绝对值越大关联越强），IR 是稳定度。
             </div>
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="sm"
               onClick={() => {
                 const ids = presetIds(QUICK_PRESET)
                 setSelected(ids)
@@ -665,13 +672,13 @@ function BatchDiscovery({
                 startRun(ids)
               }}
               disabled={allColumns.length === 0}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-xs font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-3 gap-1.5"
             >
               <Play className="h-3.5 w-3.5" />
               立即跑「快速体检」
-            </button>
+            </Button>
             <div className="mt-1.5 text-micro text-muted">每组取 1 个代表因子, 通常十几秒出结果</div>
-          </div>
+          </Card>
         )}
         {results && !results.error && (
           <div>
@@ -683,13 +690,12 @@ function BatchDiscovery({
                     {results.results.length} 因子 · {results.n_symbols} 标的 · {results.n_dates} 交易日 · <Clock className="inline h-3 w-3" />{results.elapsed_ms.toFixed(0)}ms
                   </span>
                   {!run.data && restored && (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-btn border border-border bg-elevated/40 px-1.5 py-0.5 text-micro text-muted"
+                    <Badge
                       title="会话内记忆的上次运行结果; 修改左侧配置后点「筛选」重新计算"
                     >
                       <Clock className="h-3 w-3" />
                       上次运行 {new Date(restored.ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    </Badge>
                   )}
                 </div>
                 {computableResults.length > 0 && (
@@ -796,42 +802,46 @@ function BatchDiscovery({
                       <td className={`px-3 py-3 text-right font-mono ${priceColorClass(item.long_short_return)}`}>{item.long_short_return == null ? '—' : fmtPct(item.long_short_return)}</td>
                       <td className="px-3 py-3 text-right font-mono text-bear">{item.long_short_max_drawdown == null ? '—' : fmtPct(item.long_short_max_drawdown)}</td>
                       <td className="px-3 py-3 text-center">
-                        <span className={`inline-flex rounded-btn px-1.5 py-0.5 text-micro font-medium ${VERDICT_META[verdict].cls}`}>
+                        <Badge tone={VERDICT_META[verdict].tone}>
                           {VERDICT_META[verdict].label}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex justify-end gap-1">
-                          <button
-                            type="button"
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            icon
                             onClick={() => save.mutate(item)}
                             disabled={!!item.error || save.isPending}
-                            className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-40"
                             title="保存候选"
                             aria-label={`保存 ${item.label} 为候选`}
                           >
                             <BookmarkPlus className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            icon
                             onClick={() => setSignalFrom(item)}
                             disabled={!!item.error}
-                            className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-warning/10 hover:text-warning disabled:opacity-40"
+                            className="hover:bg-warning/10 hover:text-warning"
                             title="加入信号条件（方向按 IC 预填，阈值给建议值）"
                             aria-label={`把 ${item.label} 加入信号条件`}
                           >
                             <Zap className="h-3.5 w-3.5" />
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            icon
                             onClick={event => { event.stopPropagation(); onFullscreen(item.factor_name, item.label) }}
                             disabled={!!item.error}
-                            className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-elevated hover:text-foreground disabled:opacity-40"
                             title="全屏单因子检验（完整配置与图表）"
                             aria-label={`全屏检验 ${item.label}`}
                           >
                             <Expand className="h-3.5 w-3.5" />
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -844,7 +854,7 @@ function BatchDiscovery({
       </section>
 
       {signalFrom && <AddFactorSignalDialog item={signalFrom} onClose={() => setSignalFrom(null)} />}
-    </div>
+    </Card>
   )
 }
 
@@ -898,24 +908,26 @@ function FactorDetailPanel({ name, label, onClose, onFullscreen }: {
           ↑↓ 切换 · Esc 关闭
         </span>
         <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="xs"
+            icon
             onClick={onFullscreen}
             title="全屏单因子检验（完整配置与图表）"
             aria-label="全屏单因子检验"
-            className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-elevated hover:text-foreground"
           >
             <Expand className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            icon
             onClick={onClose}
             title="关闭详情 (Esc)"
             aria-label="关闭详情"
-            className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-elevated hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -993,7 +1005,7 @@ export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusF
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       {!introCollapsed && (
-        <div className="flex shrink-0 items-start gap-2 rounded-card border border-border bg-surface/60 px-3 py-2 text-micro leading-relaxed text-secondary">
+        <Card padding="tight" className="flex shrink-0 items-start gap-2 text-micro leading-relaxed text-secondary">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
           <div className="min-w-0 flex-1">
             <span className="font-medium text-foreground">三步看懂本页：</span>
@@ -1006,20 +1018,21 @@ export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusF
           >
             知道了
           </button>
-        </div>
+        </Card>
       )}
       <div className="flex shrink-0 items-center border-b border-border/70 px-1 pb-2">
         {view === 'single' && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={() => setView('batch')}
-            className="mr-2 inline-flex items-center gap-1 rounded-btn px-2 py-1 text-micro text-secondary transition-colors hover:bg-elevated hover:text-foreground"
+            className="mr-2 gap-1"
             title="返回批量结果（筛选配置与结果保留）"
           >
             ← 返回批量
-          </button>
+          </Button>
         )}
-        <div className="inline-flex rounded-btn border border-border bg-surface/80 p-0.5">
+        <div className={SEG}>
           {([
             ['batch', '批量筛选', ListFilter],
             ['mining', '挖掘工作台', Pickaxe],
@@ -1028,10 +1041,7 @@ export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusF
               key={value}
               type="button"
               onClick={() => setView(value)}
-              className={`inline-flex items-center gap-1.5 rounded-[5px] px-3 py-1.5 text-xs font-medium transition-colors ${view === value || (value === 'batch' && view === 'single')
-                ? 'bg-accent text-on-accent shadow-sm'
-                : 'text-secondary hover:bg-elevated hover:text-foreground'
-              }`}
+              className={cn(SEG_ITEM, 'gap-1.5 px-3', view === value || (value === 'batch' && view === 'single') ? SEG_ON : SEG_OFF)}
             >
               <Icon className="h-3.5 w-3.5" />
               {label}
@@ -1039,15 +1049,14 @@ export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusF
           ))}
         </div>
         {view !== 'mining' && (
-          <button
-            type="button"
+          <Button
             onClick={() => setAutoOpen(true)}
-            className="ml-auto mr-1 inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-elevated"
+            className="ml-auto mr-1 gap-1.5"
             title="不知道选什么因子？让系统全量筛选达标因子并自动搜索组合（嵌套样本外验证）"
           >
             <Sparkles className="h-3.5 w-3.5" />
             自动挖掘
-          </button>
+          </Button>
         )}
       </div>
       <div className="min-h-0 flex-1">

@@ -25,16 +25,16 @@ import {
   SweepParamList,
   CombosHint,
 } from './components/paramSweep'
-import { THEAD, buttonClass } from '@/components/ui'
+import { THEAD, Badge, Button, Card, fieldSelect } from '@/components/ui'
 
 const TODAY = new Date().toISOString().slice(0, 10)
 const THREE_YEARS_AGO = new Date(Date.now() - 3 * 365 * 864e5).toISOString().slice(0, 10)
 
-function Stat({ label, value, hint, color }: { label: string; value: string; hint?: string; color?: string }) {
+function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: 'bull' | 'bear' }) {
   return (
     <div className="rounded-input border border-border bg-elevated/40 p-2.5">
       <div className="text-xs text-secondary">{label}</div>
-      <div className="mt-0.5 text-xl font-semibold tabular-nums" style={color ? { color } : undefined}>{value}</div>
+      <div className={`mt-0.5 text-xl font-semibold tabular-nums${tone === 'bull' ? ' text-bull' : tone === 'bear' ? ' text-bear' : ''}`}>{value}</div>
       {hint && <div className="mt-0.5 text-micro text-secondary">{hint}</div>}
     </div>
   )
@@ -158,7 +158,7 @@ export function StrategyWalkForward() {
   return (
     <div className="grid grid-cols-1 gap-3 lg:grid-cols-[320px_1fr]">
       {/* ── 配置面板 ── */}
-      <div className="space-y-3 rounded-card border border-border bg-surface p-4">
+      <Card className="space-y-3">
         <div>
           <label className="mb-1.5 block text-xs font-medium text-secondary">策略</label>
           <StrategySelect strategies={strategies} value={sweep.strategyId} onChange={sweep.selectStrategy} />
@@ -166,7 +166,7 @@ export function StrategyWalkForward() {
 
         <div>
           <label className="mb-1.5 block text-xs font-medium text-secondary">优化目标</label>
-          <select value={objective} onChange={e => setObjective(e.target.value)} className={INPUT_CLS}>
+          <select value={objective} onChange={e => setObjective(e.target.value)} className={`${fieldSelect} w-full`}>
             {PRIMARY_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
         </div>
@@ -215,12 +215,12 @@ export function StrategyWalkForward() {
           </div>
         )}
         {foldPreview.error && (
-          <div className="text-micro text-red-400">折切分无效: {(foldPreview.error as Error)?.message ?? '请检查区间与窗口参数'}</div>
+          <div className="text-micro text-danger">折切分无效: {(foldPreview.error as Error)?.message ?? '请检查区间与窗口参数'}</div>
         )}
 
         <div>
           <label className="mb-1.5 block text-xs font-medium text-secondary">模式</label>
-          <select value={mode} onChange={e => setMode(e.target.value as any)} className={INPUT_CLS}>
+          <select value={mode} onChange={e => setMode(e.target.value as any)} className={`${fieldSelect} w-full`}>
             <option value="position">组合仓位</option>
             <option value="full">全量独立</option>
           </select>
@@ -231,20 +231,20 @@ export function StrategyWalkForward() {
         <div className="text-xs text-secondary">每折跑 {sweep.combos || 0} 组优化 × N 折，耗时较长</div>
 
         {task?.isPending ? (
-          <button onClick={stopWalkForward} className={buttonClass({}, 'w-full justify-center gap-1.5 border-danger bg-danger font-medium text-on-accent hover:bg-danger/90')}>
+          <Button variant="danger" onClick={stopWalkForward} className="w-full justify-center gap-1.5">
             <Square className="h-3.5 w-3.5" /> 停止
-          </button>
+          </Button>
         ) : (
-          <button onClick={onRun} disabled={!canRun} className={buttonClass({ variant: 'primary' }, 'w-full justify-center gap-1.5')}>
+          <Button variant="primary" onClick={onRun} disabled={!canRun} className="w-full justify-center gap-1.5">
             <Play className="h-3.5 w-3.5" /> 开始滚动样本外检验
-          </button>
+          </Button>
         )}
-      </div>
+      </Card>
 
       {/* ── 结果面板 ── */}
-      <div className="min-h-[300px] rounded-card border border-border bg-surface p-4">
+      <Card className="min-h-[300px]">
         {task?.error && (
-          <div className="mb-3 rounded-input border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">{task.error}</div>
+          <div className="mb-3 rounded-input border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">{task.error}</div>
         )}
 
         {task?.isPending && progress && (
@@ -253,7 +253,7 @@ export function StrategyWalkForward() {
               <span>第 {progress.done}/{progress.total} 折</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
-              <div className="h-full bg-accent transition-all" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
+              <div className="h-full bg-accent transition-[width]" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
             </div>
           </div>
         )}
@@ -276,11 +276,11 @@ export function StrategyWalkForward() {
             {/* 汇总卡 — 可空数值已在上游用 fin() 归一, NaN/Infinity 走 '—' 而非渲染 "NaN" */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Stat label="OOS 复利收益" value={fmtPct(compounded)}
-                color={compounded != null && compounded >= 0 ? '#34d399' : '#f87171'} />
+                tone={compounded != null && compounded >= 0 ? 'bull' : 'bear'} />
               <Stat label="IS→OOS 退化"
                 value={degradation != null ? degradation.toFixed(3) : '—'}
                 hint={degradation != null && degradation > 0 ? '样本外退化=过拟合' : '样本外未退化'}
-                color={degradation != null && degradation > 0 ? '#f87171' : '#34d399'} />
+                tone={degradation != null && degradation > 0 ? 'bear' : 'bull'} />
               <Stat label="一致性" value={fmtPct(summary.consistency)} hint="OOS 盈利折占比" />
               <Stat label="有效折" value={result.n_skipped > 0 ? `${result.n_folds} (跳过${result.n_skipped})` : String(result.n_folds)} />
             </div>
@@ -297,7 +297,7 @@ export function StrategyWalkForward() {
 
             {/* 采用最新折参数: 滚动检验的标准实践 — 最后一折训练参数上实盘 */}
             {result.folds.length > 0 && result.folds[result.folds.length - 1].best_params && (
-              <div className="flex items-center justify-between gap-3 rounded-card border border-border/60 bg-elevated/30 p-3">
+              <Card padding="tight" className="flex items-center justify-between gap-3">
                 <div className="min-w-0 text-micro text-secondary">
                   <div className="font-medium text-foreground">采用最新折参数</div>
                   <div className="mt-0.5 truncate">
@@ -305,19 +305,21 @@ export function StrategyWalkForward() {
                     {' '}{Object.entries(result.folds[result.folds.length - 1].best_params!).map(([k, v]) => `${k}=${String(v)}`).join(', ')}
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="primary"
+                  size="xs"
                   onClick={() => onApplyLatestFold()}
                   disabled={applying}
-                  className="shrink-0 inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-micro font-medium text-on-accent hover:opacity-90 disabled:opacity-40"
+                  className="shrink-0 gap-1.5"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" /> {applying ? '应用中…' : '应用到策略'}
-                </button>
-              </div>
+                </Button>
+              </Card>
             )}
 
             {/* 跳过折透明展示: 无效折不进聚合但不静默消失 */}
             {result.skipped?.length > 0 && (
-              <div className="rounded-card border border-border/60 p-3">
+              <Card padding="tight">
                 <div className="mb-1.5 text-xs font-medium text-secondary">跳过的折 ({result.skipped.length})</div>
                 <div className="max-h-32 space-y-0.5 overflow-y-auto">
                   {result.skipped.map((s, i) => (
@@ -327,7 +329,7 @@ export function StrategyWalkForward() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </Card>
             )}
 
             {/* 每折表 */}
@@ -357,7 +359,7 @@ export function StrategyWalkForward() {
                           {f.best_params ? Object.entries(f.best_params).map(([k, v]) => `${k}=${v}`).join(', ') : '—'}
                         </td>
                         <td className="px-2 py-1.5 text-right">{is != null ? is.toFixed(3) : '—'}</td>
-                        <td className="px-2 py-1.5 text-right" style={degraded ? { color: '#f87171' } : undefined}>
+                        <td className={`px-2 py-1.5 text-right${degraded ? ' text-bear' : ''}`}>
                           {oos != null ? oos.toFixed(3) : '—'}
                         </td>
                         <td className="px-2 py-1.5 text-right">
@@ -371,14 +373,14 @@ export function StrategyWalkForward() {
             </div>
 
             {degradation != null && degradation > 0 && (
-              <div className="flex items-center gap-1.5 rounded-input border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-400">
+              <div className="flex items-center gap-1.5 rounded-input border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
                 <TrendingDown className="h-3.5 w-3.5" />
                 样本外目标较样本内退化 {degradation.toFixed(3)}，提示参数可能过拟合训练区间。
               </div>
             )}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   )
 }
@@ -393,7 +395,7 @@ function ParamDrift({ folds }: { folds: { index: number; best_params: Record<str
   const keys = Object.keys(withParams[0].best_params!)
   if (!keys.length) return null
   return (
-    <div className="rounded-card border border-border/60 p-3">
+    <Card padding="tight">
       <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-secondary">
         <GitBranch className="h-3.5 w-3.5" /> 参数漂移轨迹 (逐折最优值)
       </div>
@@ -405,13 +407,13 @@ function ParamDrift({ folds }: { folds: { index: number; best_params: Record<str
             <div key={k} className="flex items-center gap-2 text-micro">
               <span className="w-32 shrink-0 truncate text-muted" title={k}>{k}</span>
               <span className="min-w-0 flex-1 truncate text-foreground">{seq.join(' → ')}</span>
-              <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-micro ${stable ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400' : 'border-warning/40 bg-warning/10 text-warning'}`}>
+              <Badge tone={stable ? 'accent' : 'warning'}>
                 {stable ? '稳定' : '漂移'}
-              </span>
+              </Badge>
             </div>
           )
         })}
       </div>
-    </div>
+    </Card>
   )
 }

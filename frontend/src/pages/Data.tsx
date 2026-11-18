@@ -64,7 +64,7 @@ import { ExtDataStatCard } from '@/components/ext-data/ExtDataStatCard'
 import { CreateExtDialog } from '@/components/ext-data/CreateExtDialog'
 import { EditExtDialog } from '@/components/ext-data/EditExtDialog'
 import { ExtConfigImportDialog } from '@/components/ext-data/ExtConfigTransfer'
-import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
+import { Button, SEG, SEG_ITEM, SEG_OFF, SEG_ON, TYPE, buttonClass } from '@/components/ui'
 
 export function Data() {
   const qc = useQueryClient()
@@ -630,10 +630,11 @@ export function Data() {
         subtitle="本地数据画像 · 同步状态 · 历史记录"
         right={
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <Button
+              variant="primary"
               onClick={() => adjGate.guard(() => startSync.mutate())}
               disabled={isStarting}
-              className={buttonClass({ variant: 'primary' }, 'gap-1.5')}
+              className="gap-1.5"
             >
               {(isStarting || isRunning) ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -641,57 +642,58 @@ export function Data() {
                 <Play className="h-3.5 w-3.5" />
               )}
               {isStarting ? '启动中…' : isRunning ? '同步中…' : '立即同步'}
-            </button>
+            </Button>
             {isRunning && !!activeJobId && (
-              <button
+              <Button
+                variant="danger"
                 onClick={() => setShowStopConfirm(true)}
                 title="停止当前同步任务"
-                className={buttonClass({}, 'gap-1.5 border-danger/40 font-medium text-danger hover:bg-danger/10')}
+                className="gap-1.5 border-danger/40 font-medium text-danger hover:bg-danger/10"
               >
                 <Square className="h-3 w-3 fill-current" />
                 停止
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               onClick={() => setOpenSettings('pipeline-scope')}
-              className={buttonClass({}, 'gap-1.5')}
+              className="gap-1.5"
             >
               <CheckSquare className="h-3.5 w-3.5" />
               数据范围
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setShowRepair(true)}
               disabled={isRunning}
-              className={buttonClass({}, 'gap-1.5')}
+              className="gap-1.5"
             >
               <WandSparkles className="h-3.5 w-3.5" />
               自检/修补
-            </button>
+            </Button>
             <div className="h-5 w-px bg-border" />
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 onClick={() => setShowCreateExt(true)}
-                className={buttonClass({}, 'gap-1.5')}
+                className="gap-1.5"
               >
                 <Plus className="h-3.5 w-3.5" />
                 扩展数据
-              </button>
+              </Button>
               {hasTickflowKey && (
-              <button
+              <Button
                 onClick={() => setShowEndpointTest(true)}
-                className={buttonClass({}, 'gap-1.5')}
+                className="gap-1.5"
               >
                 <Wifi className="h-3.5 w-3.5" />
                 测试端点
-              </button>
+              </Button>
               )}
-              <button
+              <Button
                 onClick={() => setOpenSettings('page-settings')}
-                className={buttonClass({}, 'gap-1.5')}
+                className="gap-1.5"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
                 页面设置
-              </button>
+              </Button>
               <div className="h-5 w-px bg-border" />
               <Link
                 to="/settings?tab=data-sources&highlight=data-sources"
@@ -701,14 +703,15 @@ export function Data() {
                 <Database className="h-3.5 w-3.5" />
                 <span className="max-w-[120px] truncate">{activeDataSourceName}</span>
               </Link>
-              <button
+              <Button
+                variant="danger"
                 onClick={() => setShowClearConfirm(true)}
                 disabled={isRunning}
-                className={buttonClass({ variant: 'danger' }, 'gap-1.5')}
+                className="gap-1.5"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 清除数据
-              </button>
+              </Button>
             </div>
           </div>
         }
@@ -990,10 +993,9 @@ export function Data() {
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <SectionTitle icon={Database}>数据画像</SectionTitle>
-            <button type="button" onClick={() => setShowImportExt(true)}
-              className="inline-flex min-h-8 items-center gap-1.5 rounded-btn border border-border px-3 text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+            <Button onClick={() => setShowImportExt(true)} className="gap-1.5">
               <Upload className="h-3.5 w-3.5" />导入扩展配置
-            </button>
+            </Button>
           </div>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-stretch">
             {getCardOrder().filter(k => cardVisible[k]).map((k: CardKey) => (
@@ -1226,27 +1228,28 @@ export function Data() {
                         disabled={updateIndexBatchSize.isPending || !!activeJobId || syncIndexDaily.isPending}
                         className="w-20 px-2 py-1 rounded-btn bg-elevated border border-border text-xs font-mono text-foreground outline-none focus:border-accent disabled:opacity-40"
                       />
-                      <button
+                      <Button
+                        size="xs"
                         onClick={() => {
                           const size = Math.max(1, Math.min(10000, Number(indexBatchInput) || 100))
                           setIndexBatchInput(String(size))
                           updateIndexBatchSize.mutate(size)
                         }}
                         disabled={updateIndexBatchSize.isPending || !!activeJobId || syncIndexDaily.isPending}
-                        className={buttonClass({ size: 'xs' })}
                       >
                         {updateIndexBatchSize.isPending ? '保存中…' : '保存'}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                   <div className="text-xs text-muted">
                     当前生效: <span className="font-mono text-secondary">{indexDailyBatchSize}</span>
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="primary"
                   onClick={() => syncIndexDaily.mutate()}
                   disabled={!hasDailyBatchCap || !!activeJobId || syncIndexDaily.isPending}
-                  className={buttonClass({ variant: 'primary' }, 'w-full gap-1.5')}
+                  className="w-full gap-1.5"
                 >
                   {syncIndexDaily.isPending ? (
                     <>
@@ -1256,7 +1259,7 @@ export function Data() {
                   ) : (
                     <>获取数据</>
                   )}
-                </button>
+                </Button>
                 {!hasDailyBatchCap && (
                   <MissingCapChip capKey="kline.daily.batch" />
                 )}
@@ -1324,20 +1327,19 @@ export function Data() {
                 </div>
               </div>
               <div className="flex items-center justify-end gap-2 mt-5">
-                <button
+                <Button
                   onClick={() => setShowStopConfirm(false)}
                   disabled={stopSync.isPending}
-                  className={buttonClass()}
                 >
                   取消
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => stopSync.mutate()}
                   disabled={stopSync.isPending}
-                  className={buttonClass({}, 'border-danger bg-danger font-medium text-on-accent hover:bg-danger/90')}
+                  className="border-danger bg-danger font-medium text-on-accent hover:bg-danger/90"
                 >
                   {stopSync.isPending ? '停止中…' : '确认停止'}
-                </button>
+                </Button>
               </div>
             </motion.div>
           </div>
@@ -1388,20 +1390,19 @@ export function Data() {
                 </div>
               </div>
               <div className="flex items-center justify-end gap-2 mt-5">
-                <button
+                <Button
                   onClick={() => setShowClearConfirm(false)}
                   disabled={clearData.isPending}
-                  className={buttonClass()}
                 >
                   取消
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => clearData.mutate()}
                   disabled={clearData.isPending}
-                  className={buttonClass({}, 'border-danger bg-danger font-medium text-on-accent hover:bg-danger/90')}
+                  className="border-danger bg-danger font-medium text-on-accent hover:bg-danger/90"
                 >
                   {clearData.isPending ? '清除中…' : '清除数据'}
-                </button>
+                </Button>
               </div>
             </motion.div>
           </div>

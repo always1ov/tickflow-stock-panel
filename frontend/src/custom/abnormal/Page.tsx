@@ -19,7 +19,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { PageTabs, usePageTab, type PageTabDef } from '@/components/PageTabs'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { cn } from '@/lib/cn'
-import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, buttonClass } from '@/components/ui'
+import { SEG, SEG_ITEM, SEG_OFF, SEG_ON, Button, buttonClass } from '@/components/ui'
 
 /**
  * 异动监控 — 全时段异动中心, 按交易时间线分三个 tab:
@@ -671,14 +671,16 @@ function DeviationView({ onPreview }: {
               新建「异动监控」规则 —— 后台持续评估, 触发时统一走触发记录 / 站内通知 / 外部渠道推送,
               与本页开关互不影响。
             </p>
-            <button
+            <Button
               type="button"
+              variant="primary"
+              size="md"
               onClick={() => toggleEnabled(true)}
-              className="mt-5 inline-flex h-9 items-center gap-2 rounded-btn bg-accent px-4 text-xs font-medium text-on-accent"
+              className="mt-5 gap-2"
             >
               <Power className="h-4 w-4" />
               开启监控
-            </button>
+            </Button>
           </div>
         </div>
       ) : (

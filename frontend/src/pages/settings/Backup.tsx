@@ -12,6 +12,7 @@ import { api } from '@/lib/api'
 import type { ConfigBackupApplyResult, ConfigBackupInspect } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { Modal } from '@/components/Modal'
+import { Switch } from '@/components/ui'
 import { QK } from '@/lib/queryKeys'
 import { notifyStrategyLibraryChanged, STRATEGY_LIBRARY_QUERY_KEYS } from '@/lib/strategyLibrary'
 
@@ -418,19 +419,11 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
                     {inspect.conflict_files} 个同名文件默认跳过; 开启后用备份内容覆盖本机同名文件
                   </div>
                 </div>
-                <button
-                  onClick={() => setAllowOverwrite((v) => !v)}
-                  aria-pressed={allowOverwrite}
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 ${
-                    allowOverwrite ? 'bg-warning' : 'bg-surface border border-border'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-                      allowOverwrite ? 'translate-x-[18px]' : 'translate-x-[3px]'
-                    }`}
-                  />
-                </button>
+                <Switch
+                  checked={allowOverwrite}
+                  onChange={next => setAllowOverwrite(next)}
+                  tone="warning"
+                />
               </div>
             )}
 

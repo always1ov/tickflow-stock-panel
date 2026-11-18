@@ -14,6 +14,7 @@ import { History, RefreshCw, Scale, Trash2, X } from 'lucide-react'
 import { api, type AiReviewReport, type AiReviewReportMeta } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
+import { Button } from '@/components/ui'
 import { fmtArchivedAt, parseIndexPcts, pctClass, scoreColor, shortenIndexNames } from './shared'
 
 /** 对照三段: 只按标题关键词摘原文, 缺哪段就写「原文未包含」 */
@@ -98,14 +99,15 @@ export function ArchiveStrip({
         <span className="text-xs font-medium text-foreground">复盘档案</span>
         <span className="font-mono text-micro text-muted">({reports.length})</span>
         <div className="ml-auto flex items-center gap-1">
-          <button
+          <Button
+            size="xs"
             onClick={() => setCompareOpen(true)}
             disabled={reports.length < 2}
-            className="inline-flex items-center gap-1 rounded-btn border border-border bg-surface px-2 py-1 text-micro text-foreground transition-colors hover:bg-elevated/70 disabled:opacity-40"
+            className="text-micro"
             title={reports.length < 2 ? '至少两篇才能对照' : '选两篇对照 定调 / 明日计划 / 风险'}
           >
             <Scale className="h-3 w-3" />对照
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -173,18 +175,22 @@ export function ArchiveStrip({
                 </button>
                 {confirmId === r.id ? (
                   <span className="mt-1 flex items-center gap-1">
-                    <button
+                    <Button
+                      variant="danger"
+                      size="xs"
                       onClick={() => { onDelete(r.id); setConfirmId(null) }}
-                      className="rounded-btn bg-bear/10 px-1.5 py-0.5 text-micro text-bear transition-colors hover:bg-bear/20"
+                      className="text-micro"
                     >
                       确认删除
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="xs"
                       onClick={() => setConfirmId(null)}
-                      className="rounded-btn px-1.5 py-0.5 text-micro text-muted transition-colors hover:text-foreground"
+                      className="text-micro"
                     >
                       取消
-                    </button>
+                    </Button>
                   </span>
                 ) : (
                   <button
@@ -224,9 +230,9 @@ export function ArchiveStrip({
                 <Scale className="h-4 w-4 text-accent" />
                 <h3 className="text-sm font-medium text-foreground">复盘对照</h3>
                 <span className="text-micro text-muted">三段原文摘录 · 不做语义判定</span>
-                <button onClick={() => setCompareOpen(false)} className="ml-auto rounded-btn p-1 text-secondary hover:bg-elevated hover:text-foreground">
+                <Button icon variant="ghost" size="xs" onClick={() => setCompareOpen(false)} className="ml-auto">
                   <X className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 {[{ id: leftId, q: leftQ, report: left }, { id: rightId, q: rightQ, report: right }].map((side, i) => (

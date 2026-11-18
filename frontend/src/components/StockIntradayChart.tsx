@@ -6,6 +6,7 @@ import { QK } from '@/lib/queryKeys'
 import { klineMinuteQueryOptions, minuteRefetchInterval } from '@/lib/kline'
 import { minuteEmptyText, minuteFetchErrorText, type DailySummary } from '@/lib/intraday-chart'
 import type { ChartRenderer } from '@/lib/chart-types'
+import { Button } from '@/components/ui'
 
 const EChartsIntraday = lazy(() => import('./EChartsIntraday').then(m => ({ default: m.EChartsIntraday })))
 const LightweightIntraday = lazy(() => import('./charts/LightweightIntraday').then(m => ({ default: m.LightweightIntraday })))
@@ -114,39 +115,41 @@ export function StockIntradayChart({
             // 数据源确认无此日分钟数据 (停牌/复牌延迟等): 静态提示 + 保留重试
             <>
               <div className="text-xs text-muted">{minuteEmptyText('该日', true)}</div>
-              <button
+              <Button
                 onClick={() => { setAttemptDate(date); fetchMinute.mutate() }}
-                className="px-4 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs font-medium hover:bg-elevated/80 transition-colors duration-hover"
+                className="px-4"
               >
                 重新获取
-              </button>
+              </Button>
             </>
           ) : minuteDismissed ? (
             <>
               <div className="text-xs text-muted">{minuteEmptyText('该日')}</div>
-              <button
+              <Button
+                variant="primary"
                 onClick={() => setMinuteDismissed(false)}
-                className="px-4 py-1.5 rounded-btn bg-accent/90 text-on-accent text-xs font-medium hover:bg-accent transition-colors duration-hover"
+                className="px-4"
               >
                 获取分钟K
-              </button>
+              </Button>
             </>
           ) : (
             <>
               <div className="text-sm text-foreground">是否立即获取最近5日分钟K？</div>
               <div className="flex items-center gap-3">
-                <button
+                <Button
+                  variant="primary"
                   onClick={() => { setAttemptDate(date); fetchMinute.mutate() }}
-                  className="px-4 py-1.5 rounded-btn bg-accent/90 text-on-accent text-xs font-medium hover:bg-accent transition-colors duration-hover"
+                  className="px-4"
                 >
                   确定
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => setMinuteDismissed(true)}
-                  className="px-4 py-1.5 rounded-btn bg-surface border border-border text-foreground text-xs hover:bg-elevated/80 transition-colors duration-hover"
+                  className="px-4"
                 >
                   取消
-                </button>
+                </Button>
               </div>
             </>
           )}

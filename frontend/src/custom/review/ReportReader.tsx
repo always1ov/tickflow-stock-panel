@@ -17,6 +17,7 @@ import type { AiReviewReport } from '@/lib/api'
 import type { ReviewPhase } from '@/lib/reviewStore'
 import { cn } from '@/lib/cn'
 import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
+import { Button } from '@/components/ui'
 import { scoreColor } from './shared'
 
 const REPORT_SECTIONS = '报告包含: 一句话定调 · 盘面总览 · 板块主线 · 资金情绪 · 消息催化 · 明日计划 · 风险提示'
@@ -83,12 +84,12 @@ export function ReportReader({
         </div>
         <div className="text-sm font-medium text-foreground">复盘失败</div>
         <div className="max-w-md text-center text-xs text-secondary">{error || '请检查 AI 配置后重试'}</div>
-        <button
+        <Button
           onClick={onRegenerate}
-          className="mt-1 inline-flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-elevated"
+          className="mt-1"
         >
           <RefreshCw className="h-3.5 w-3.5" />重新生成
-        </button>
+        </Button>
       </section>
     )
   }
@@ -171,31 +172,33 @@ export function ReportReader({
         </div>
         <div className="ml-auto flex items-center gap-1">
           {headings.length > 0 && (
-            <button
+            <Button
+              size="xs"
               onClick={() => setTocOpen(v => !v)}
-              className="inline-flex items-center gap-1 rounded-btn border border-border bg-surface px-2 py-1 text-xs text-foreground transition-colors hover:bg-elevated/70 lg:hidden"
+              className="lg:hidden"
             >
               <List className="h-3 w-3" />目录
-            </button>
+            </Button>
           )}
           {showActions && (
             <>
-              <button onClick={onCopy} className="inline-flex items-center gap-1 rounded-btn border border-border bg-surface px-2 py-1 text-xs text-foreground transition-colors hover:bg-elevated/70" title="复制全文">
+              <Button size="xs" onClick={onCopy} title="复制全文">
                 <Copy className="h-3 w-3" />复制
-              </button>
-              <button onClick={onDownload} className="inline-flex items-center gap-1 rounded-btn border border-border bg-surface px-2 py-1 text-xs text-foreground transition-colors hover:bg-elevated/70" title="下载为 Markdown">
+              </Button>
+              <Button size="xs" onClick={onDownload} title="下载为 Markdown">
                 <Download className="h-3 w-3" />下载
-              </button>
+              </Button>
             </>
           )}
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={() => setCollapsed(v => !v)}
-            className="inline-flex items-center gap-1 rounded-btn px-1.5 py-1 text-micro text-muted transition-colors hover:text-foreground"
             title={collapsed ? '展开正文' : '收起正文'}
           >
             {collapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
             {collapsed ? '展开' : '收起'}
-          </button>
+          </Button>
         </div>
       </div>
 

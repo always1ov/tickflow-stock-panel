@@ -9,7 +9,7 @@ import { api, type SettingsState } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { AiProfiles } from '@/pages/settings/AiProfiles'
 import { SettingsCard, SettingsHighlight } from './SettingsCard'
-import { buttonClass, TYPE } from '@/components/ui'
+import { Button, TYPE } from '@/components/ui'
 import { Switch } from '@/components/ui/Switch'
 import { cn } from '@/lib/cn'
 
@@ -373,9 +373,9 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
       {customUa && (
         <div className="flex gap-2">
           <input type="text" value={userAgent} onChange={e => setUserAgent(e.target.value)} placeholder="粘贴浏览器 User-Agent" className={`${INPUT_CLS} flex-1`} />
-          <button type="button" onClick={genRandomUa} title="随机生成浏览器 User-Agent" className="h-9 px-2.5 rounded-btn border border-border/50 text-xs text-secondary hover:text-accent hover:border-accent/30 transition-ui flex items-center gap-1.5 shrink-0">
+          <Button type="button" onClick={genRandomUa} title="随机生成浏览器 User-Agent" className="h-9 px-2.5 text-secondary hover:border-accent/30 hover:text-accent">
             <Shuffle className="h-3 w-3" /> 随机
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -385,20 +385,20 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
   const saveButtons = (
     <>
       {/* [R598 同步上游 v0.3.36] 保存位旁边补一个「测试连接」，与卡内「测试」同一个探测逻辑 */}
-      <button onClick={handleTest} disabled={testing} className={buttonClass({ size: 'sm' }, 'gap-1.5')} title="测试当前表单的连接, 不保存配置">
+      <Button onClick={handleTest} disabled={testing} className="gap-1.5" title="测试当前表单的连接, 不保存配置">
         {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wifi className="h-3.5 w-3.5" />}
         {testing ? '测试中' : '测试连接'}
-      </button>
+      </Button>
       {configured && !profilesManaged && (
-        <button onClick={() => setConfirmClear(true)} disabled={clear.isPending} className={buttonClass({ size: 'sm', variant: 'danger' }, 'gap-1.5')} title="Clear AI provider configuration">
+        <Button variant="danger" onClick={() => setConfirmClear(true)} disabled={clear.isPending} className="gap-1.5" title="Clear AI provider configuration">
           <Trash2 className="h-3.5 w-3.5" />
           清空
-        </button>
+        </Button>
       )}
-      <button onClick={() => save.mutate()} disabled={save.isPending || !canSave} className={buttonClass({ size: 'sm', variant: 'primary' }, 'gap-1.5')}>
+      <Button variant="primary" onClick={() => save.mutate()} disabled={save.isPending || !canSave} className="gap-1.5">
         {save.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : saved ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
         {save.isPending ? '保存中...' : saved ? '已保存' : '保存配置'}
-      </button>
+      </Button>
     </>
   )
 
@@ -447,10 +447,10 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
             </div>
           </div>
           {connected && (
-            <button onClick={handleTest} disabled={testing} className={buttonClass({ size: 'xs' }, 'gap-1.5')}>
+            <Button size="xs" onClick={handleTest} disabled={testing} className="gap-1.5">
               {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}
               {testing ? '测试中' : '测试'}
-            </button>
+            </Button>
           )}
         </div>
         {testResult && (
@@ -513,7 +513,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
                     <input type="text" value={model} onChange={e => handleModelChange(e.target.value)} placeholder="gpt-5.6-sol" className={`${INPUT_CLS} ${selectedPreset?.sponsor ? 'pr-9' : ''}`} />
                     {selectedPreset?.sponsor && (
                       <button type="button" onClick={fetchModelOptions} aria-label="获取模型列表"
-                        className="absolute right-1.5 top-1/2 flex h-6 w-7 -translate-y-1/2 items-center justify-center rounded-btn border border-border/40 bg-base text-secondary transition-colors hover:border-accent/40 hover:text-accent">
+                        className="absolute right-1.5 top-1/2 flex h-6 w-7 -translate-y-1/2 items-center justify-center rounded-btn border border-border/40 bg-surface text-secondary transition-colors hover:border-accent/40 hover:text-accent">
                         {modelsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
                       </button>
                     )}
@@ -567,10 +567,10 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
                       {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                     </button>
                   </div>
-                  <button onClick={handleTest} disabled={testing || !apiKey} className="h-9 px-3 rounded-btn border border-border/50 text-xs text-secondary hover:text-accent hover:border-accent/30 disabled:opacity-40 transition-ui flex items-center gap-1.5 shrink-0">
+                  <Button onClick={handleTest} disabled={testing || !apiKey} className="h-9 text-secondary hover:border-accent/30 hover:text-accent">
                     {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}
                     测试
-                  </button>
+                  </Button>
                 </div>
               </Field>
 
@@ -611,12 +611,12 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
               这会清空已保存的 provider、API Key、API 地址、模型和 Codex CLI 命令。之后可以重新配置。
             </p>
             <div className="flex items-center justify-end gap-2">
-              <button onClick={() => setConfirmClear(false)} className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground hover:bg-elevated/80 text-sm transition-colors">
+              <Button size="md" onClick={() => setConfirmClear(false)}>
                 取消
-              </button>
-              <button onClick={() => clear.mutate()} disabled={clear.isPending} className="px-3 py-1.5 rounded-btn bg-danger/15 text-danger hover:bg-danger/25 text-sm font-medium transition-colors disabled:opacity-50">
+              </Button>
+              <Button variant="danger" size="md" onClick={() => clear.mutate()} disabled={clear.isPending} className="bg-danger/15 text-danger hover:bg-danger/25">
                 {clear.isPending ? '清空中...' : '确认'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

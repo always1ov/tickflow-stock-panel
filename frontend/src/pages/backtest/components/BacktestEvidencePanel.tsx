@@ -1,5 +1,6 @@
 import { Download, ScanSearch } from 'lucide-react'
 import type { BacktestEvidence } from '@/lib/api'
+import { Button, Card } from '@/components/ui'
 
 const STATUS_LABELS: Record<BacktestEvidence['lookahead']['status'], string> = {
   passed: '抽样未发现差异', failed: '检测到历史输出变化', partial: '部分检查未完成',
@@ -39,16 +40,16 @@ export function BacktestEvidencePanel({ evidence }: { evidence?: BacktestEvidenc
   const color = failed ? 'text-danger' : lookahead.status === 'passed' ? 'text-foreground' : 'text-warning'
 
   return (
-    <section aria-label="回测检查与版本记录" className="min-w-0 rounded-card border border-border bg-surface px-4 py-3">
+    <Card padding="tight" aria-label="回测检查与版本记录" className="min-w-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs">
           <ScanSearch className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
           <span className="font-medium text-foreground">未来数据检查</span>
           <span className={color}>{STATUS_LABELS[lookahead.status]}</span>
         </div>
-        <button type="button" onClick={() => exportEvidence(evidence)} className="inline-flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-xs text-secondary hover:text-accent">
+        <Button size="xs" onClick={() => exportEvidence(evidence)} className="gap-1">
           <Download className="h-3 w-3" aria-hidden="true" />导出核查报告
-        </button>
+        </Button>
       </div>
       {failed && <p className="mt-2 text-xs leading-5 text-danger">改变未来数据后，部分历史输出发生变化。请结合下方差异排查策略或指标。</p>}
       {evidence.execution_timing?.status === 'failed' && (
@@ -94,6 +95,6 @@ export function BacktestEvidencePanel({ evidence }: { evidence?: BacktestEvidenc
           <p className="leading-5 text-muted">版本记录保存内容指纹与有效参数。它不备份全量行情，也不验证供应商历史修订、历史股票池和静态维表是否符合当时可用的信息。</p>
         </div>
       </details>
-    </section>
+    </Card>
   )
 }

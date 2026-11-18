@@ -15,9 +15,10 @@ import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
 import { PackageActions } from '@/custom/source-packages/extension'
 import { PluginKeyConfig } from './DataSources'
 import { INVALIDATE_KEYS, SettingsBackupPanel } from './Backup'
+import { Button, buttonClass } from '@/components/ui'
 
-const BUTTON = 'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs font-medium text-secondary transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-9'
-const PRIMARY = cn(BUTTON, 'border-blue-600 bg-blue-600 text-on-accent hover:bg-blue-700 hover:text-on-accent')
+// 本页在手机上保留 44px 触达高度, 桌面回到全站 32px 档
+const TAP = 'min-h-11 py-2 font-medium sm:min-h-9'
 // 16px 用 text-[16px]: 主题色有 base, text-base 会生成 color 规则让文字变成背景色 (见 tailwind.config.ts)
 const INPUT = 'min-h-11 w-full min-w-0 rounded-input border border-border bg-base px-3 py-2 text-title leading-6 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent sm:min-h-9 sm:text-sm'
 const KIND = { strategy: '策略', factor: '因子', signal: '信号', settings: '调参', code: '辅助模块' }
@@ -203,14 +204,14 @@ export function SettingsImportCenterPanel() {
   return <div className="max-w-5xl space-y-6">
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0 flex-1"><h2 className="text-xl font-semibold tracking-tight text-foreground">导入与备份</h2><p className="mt-2 text-sm leading-6 text-secondary">一个入口，导入资源、安装扩展、迁移配置。</p></div>
-      <button type="button" className={cn(BUTTON, 'shrink-0')} disabled={busy} onClick={() => changeView('backup')}><Download className="h-4 w-4" aria-hidden="true" />创建配置备份</button>
+      <Button type="button" className={cn(TAP, 'shrink-0')} disabled={busy} onClick={() => changeView('backup')}><Download className="h-4 w-4" aria-hidden="true" />创建配置备份</Button>
     </header>
     <nav className="flex gap-6 border-b border-border" aria-label="导入与扩展">
       {[['import', '导入文件'], ['installed', '已安装扩展']].map(([key, label]) => <button key={key} type="button" aria-pressed={key === 'import' ? view !== 'installed' : view === key} disabled={busy} onClick={() => changeView(key)}
         className={cn('min-h-11 border-b-2 pb-3 text-sm font-medium disabled:opacity-50', (key === 'import' ? view !== 'installed' : view === key) ? 'border-accent text-accent' : 'border-transparent text-secondary hover:text-foreground')}>{label}</button>)}
     </nav>
 
-    {view === 'backup' ? <><SettingsBackupPanel mode="export" /><button type="button" className={BUTTON} onClick={() => changeView('import')}><ArrowLeft className="h-3.5 w-3.5" />返回导入</button></>
+    {view === 'backup' ? <><SettingsBackupPanel mode="export" /><Button type="button" className={TAP} onClick={() => changeView('import')}><ArrowLeft className="h-3.5 w-3.5" />返回导入</Button></>
       : view === 'installed' ? <InstalledView packages={packages.data ?? []} sources={(sources.data?.plugins ?? []).filter(p => p.origin === 'external')} pages={(pages.data ?? []).filter(p => !p.managed_by)}
         loading={packages.isLoading || sources.isLoading || pages.isLoading} error={packages.error || sources.error || pages.error}
         selected={selectedItem} select={target => changeView('installed', target)} install={reset} refresh={refreshInstalled} bootErrors={liveErrors} />
@@ -220,9 +221,9 @@ export function SettingsImportCenterPanel() {
             <CheckCircle2 className="mb-4 h-9 w-9 text-success" aria-hidden="true" />
             <h3 className="text-lg font-semibold text-foreground">{result.title}</h3><p className="mt-3 text-sm leading-7 text-secondary">{result.message}</p>
             <ul className="my-6 space-y-3 border-y border-border py-5 text-sm leading-6 text-secondary">{result.details.map((detail, i) => <li key={i} className="break-words">{detail}</li>)}</ul>
-            <div className="flex flex-wrap gap-3">{result.target && <button type="button" className={PRIMARY} onClick={() => changeView('installed', result.target)}>查看已安装扩展<ArrowRight className="h-3.5 w-3.5" /></button>}
-              {result.path && <Link to={result.path} className={PRIMARY}>查看导入资源<ArrowRight className="h-3.5 w-3.5" /></Link>}
-              <button type="button" className={BUTTON} onClick={reset}>继续导入</button></div>
+            <div className="flex flex-wrap gap-3">{result.target && <Button type="button" variant="primary" className={TAP} onClick={() => changeView('installed', result.target)}>查看已安装扩展<ArrowRight className="h-3.5 w-3.5" /></Button>}
+              {result.path && <Link to={result.path} className={buttonClass({ variant: 'primary' }, TAP)}>查看导入资源<ArrowRight className="h-3.5 w-3.5" /></Link>}
+              <Button type="button" className={TAP} onClick={reset}>继续导入</Button></div>
           </section> : review ? <>
             <header className="space-y-2">
               <div className="flex flex-wrap items-center gap-3 text-xs text-secondary"><Package className="h-4 w-4" aria-hidden="true" /><span>{review.kind === 'extension' && review.preview.manifest.frontend ? '完整功能包' : TYPE[review.kind]}</span><span className="break-all">{review.kind === 'project' ? '项目源码 · ' + review.preview.namespace : files.map(f => f.name).join('、')}</span>{!!files.length && <span>{formatSize(files.reduce((sum, f) => sum + f.size, 0))}</span>}</div>
@@ -286,23 +287,23 @@ export function SettingsImportCenterPanel() {
                   {packageDoc && <div className="flex justify-between gap-3"><dt className="text-secondary">目标版本</dt><dd>{packageDoc.version}</dd></div>}
                 </dl>
                 {(codeTrust || review.kind === 'backup') && <label className="flex items-start gap-2 text-xs leading-6 text-secondary"><input type="checkbox" className="mt-1 accent-accent" disabled={busy} aria-label={review.kind === 'backup' ? '信任备份来源' : '信任代码来源'} checked={trusted} onChange={e => setTrusted(e.target.checked)} /><span>{review.kind === 'backup' ? '我确认这是可信的备份，允许恢复所选配置及其中的代码。' : '我信任此代码来源，允许它在本机运行。代码可访问主程序的数据和凭据。'}</span></label>}
-                <button type="button" className={cn(PRIMARY, 'mt-4 w-full whitespace-normal')} disabled={disabled} onClick={() => void apply()}>{busy && <Loader2 className="h-4 w-4 animate-spin" />}{busy ? '正在处理…' : review.kind === 'backup' ? '恢复所选配置' : review.kind === 'resources' ? '确认导入' : 'installed_version' in review.preview && review.preview.installed_version ? '确认更新' : '确认安装'}</button>
+                <Button type="button" variant="primary" className={cn(TAP, 'mt-4 w-full whitespace-normal')} disabled={disabled} onClick={() => void apply()}>{busy && <Loader2 className="h-4 w-4 animate-spin" />}{busy ? '正在处理…' : review.kind === 'backup' ? '恢复所选配置' : review.kind === 'resources' ? '确认导入' : 'installed_version' in review.preview && review.preview.installed_version ? '确认更新' : '确认安装'}</Button>
                 <p className="mt-3 text-xs leading-6 text-secondary">确认前不会应用任何变更。{unresolved ? '请先处理同名冲突。' : ''}</p>
               </aside>
             </div>
-            <button type="button" className={BUTTON} disabled={busy} onClick={reset}><ArrowLeft className="h-3.5 w-3.5" />重新选择文件</button>
+            <Button type="button" className={TAP} disabled={busy} onClick={reset}><ArrowLeft className="h-3.5 w-3.5" />重新选择文件</Button>
           </> : <>
             <div className={cn('rounded-card border border-dashed bg-surface px-4 py-10 text-center transition-colors sm:py-12', dragging ? 'border-accent bg-accent/5' : 'border-border')}
               onDragOver={e => { e.preventDefault(); if (!busy) setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={e => { e.preventDefault(); setDragging(false); void inspect(Array.from(e.dataTransfer.files)) }}>
               <Upload className="mx-auto mb-4 h-7 w-7 text-secondary" aria-hidden="true" /><h3 className="text-lg font-semibold text-foreground">把文件放到这里</h3>
               <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-secondary">自动识别策略与定义、配置备份、数据源插件、页面插件，以及后端或前后端完整扩展包。</p>
-              <button type="button" className={cn(PRIMARY, 'mt-5')} disabled={busy} onClick={() => fileInput.current?.click()}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}{busy ? '正在识别文件…' : '选择文件'}</button>
+              <Button type="button" variant="primary" className={cn(TAP, 'mt-5')} disabled={busy} onClick={() => fileInput.current?.click()}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}{busy ? '正在识别文件…' : '选择文件'}</Button>
               <p className="mt-3 text-xs leading-6 text-secondary">支持 ZIP、PY、JSON、JS、MJS、TSX。资源文件可多选；扩展和备份逐包处理。</p>
             </div>
-            {!!namespaces.data?.length && <details className="border-b border-border pb-5 text-xs text-secondary"><summary className="cursor-pointer">从本项目的源码页面导入</summary><p className="mt-3 leading-6">把现有源码页面编译为独立页面插件；不会把它的后端代码一起打包。</p><div className="mt-3 flex flex-wrap items-center gap-2"><select aria-label="项目源码页面" className={cn(INPUT, 'sm:w-64')} value={namespace} onChange={e => setNamespace(e.target.value)} disabled={busy}><option value="">选择源码页面</option>{namespaces.data.map(ns => <option key={ns} value={ns}>{ns}</option>)}</select><button type="button" className={BUTTON} disabled={busy || !namespace} onClick={() => { setReview({ kind: 'project', preview: { namespace } }); setPageId(namespace.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 64)); setTrusted(false); setAllowOverwrite(false) }}>预览项目页面</button></div></details>}
+            {!!namespaces.data?.length && <details className="border-b border-border pb-5 text-xs text-secondary"><summary className="cursor-pointer">从本项目的源码页面导入</summary><p className="mt-3 leading-6">把现有源码页面编译为独立页面插件；不会把它的后端代码一起打包。</p><div className="mt-3 flex flex-wrap items-center gap-2"><select aria-label="项目源码页面" className={cn(INPUT, 'sm:w-64')} value={namespace} onChange={e => setNamespace(e.target.value)} disabled={busy}><option value="">选择源码页面</option>{namespaces.data.map(ns => <option key={ns} value={ns}>{ns}</option>)}</select><Button type="button" className={TAP} disabled={busy || !namespace} onClick={() => { setReview({ kind: 'project', preview: { namespace } }); setPageId(namespace.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 64)); setTrusted(false); setAllowOverwrite(false) }}>预览项目页面</Button></div></details>}
             <section className="flex flex-wrap items-end justify-between gap-4 border-b border-border pb-5">
               <div><h3 className="text-sm font-medium text-foreground">分享策略、信号与因子</h3><p className="mt-2 text-xs leading-6 text-secondary">批量导出定义和关联依赖；换机迁移请使用“创建配置备份”。</p></div>
-              <div className="flex flex-wrap gap-2"><select aria-label="导出资源类型" className={cn(INPUT, 'w-auto')} value={exportKind} onChange={e => setExportKind(e.target.value as ResourceKind)}>{(['strategy', 'signal', 'factor'] as const).map(kind => <option key={kind} value={kind}>{KIND[kind]}</option>)}</select><button type="button" className={BUTTON} onClick={() => setExporting(true)}><Download className="h-3.5 w-3.5" />批量导出资源</button></div>
+              <div className="flex flex-wrap gap-2"><select aria-label="导出资源类型" className={cn(INPUT, 'w-auto')} value={exportKind} onChange={e => setExportKind(e.target.value as ResourceKind)}>{(['strategy', 'signal', 'factor'] as const).map(kind => <option key={kind} value={kind}>{KIND[kind]}</option>)}</select><Button type="button" className={TAP} onClick={() => setExporting(true)}><Download className="h-3.5 w-3.5" />批量导出资源</Button></div>
             </section>
             <Notice>导入前会展示变更范围、依赖和冲突。后端扩展安装到用户数据目录，升级主程序不会覆盖安装文件。</Notice>
           </>}
@@ -354,8 +355,8 @@ function InstalledView({ packages, sources, pages, selected, select, install, re
     <header className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-secondary">{items.length} 个已安装扩展</p>
       <div className="flex gap-2">
-        <button type="button" className={BUTTON} disabled={busy || loading} onClick={() => void refresh()} aria-label="刷新扩展清单"><RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /></button>
-        <button type="button" className={BUTTON} disabled={busy} onClick={install}><Plus className="h-3.5 w-3.5" aria-hidden="true" />安装扩展</button>
+        <Button type="button" icon className="min-h-11 w-11 sm:min-h-9 sm:w-9" disabled={busy || loading} onClick={() => void refresh()} aria-label="刷新扩展清单"><RefreshCw className="h-3.5 w-3.5" aria-hidden="true" /></Button>
+        <Button type="button" className={TAP} disabled={busy} onClick={install}><Plus className="h-3.5 w-3.5" aria-hidden="true" />安装扩展</Button>
       </div>
     </header>
     {!!error && <div role="alert" className="text-sm text-danger">扩展清单读取失败，已保留可用列表。请点击刷新重试。</div>}
@@ -371,7 +372,7 @@ function InstalledView({ packages, sources, pages, selected, select, install, re
       <Package className="mx-auto h-7 w-7 text-muted" aria-hidden="true" />
       <p className="mt-4 text-sm font-medium text-foreground">尚未安装外部扩展</p>
       <p className="mt-2 text-xs leading-6 text-secondary">从“导入文件”安装数据源或页面插件。源码内置页面可在“页面管理”中维护。</p>
-      <button type="button" className={cn(BUTTON, 'mt-4')} onClick={install}>安装扩展</button>
+      <Button type="button" className={cn(TAP, 'mt-4')} onClick={install}>安装扩展</Button>
     </div>}
     {/* 设置页已有两级侧栏，按面板的可用宽度决定何时折叠。 */}
     {!!items.length && <div className="overflow-hidden rounded-card border border-border bg-surface [container-type:inline-size]">
@@ -400,16 +401,16 @@ function InstalledView({ packages, sources, pages, selected, select, install, re
         {source && (source.description || source.usage_notes?.length || source.homepage || source.key_manage_url) && <div className="mb-5 max-w-2xl"><PluginMetadata plugin={source} /></div>}
         {pack && <><dl className="my-4 space-y-3 text-xs leading-6"><div className="flex justify-between gap-3"><dt className="text-secondary">当前版本</dt><dd>{pack.version || '尚未生效'}</dd></div>{pack.pending_version && <div className="flex justify-between gap-3"><dt className="text-secondary">待生效版本</dt><dd>{pack.pending_version}</dd></div>}<div className="flex justify-between gap-3"><dt className="text-secondary">当前进程</dt><dd>{pack.runtime_version ? '已加载 ' + pack.runtime_version : '未加载'}</dd></div></dl>
           <p className="text-xs leading-6 text-secondary">{pack.frontend ? '前端页面与后台服务一起更新、启停和卸载。' : '后端接口、初始化任务和通知格式化器在重启后生效。'}</p>
-          {!pack.pending_remove && <div className="mt-4 flex flex-wrap gap-2"><button className={BUTTON} disabled={busy} onClick={() => void run(pack.enabled ? 'disable' : 'enable')}>{pack.enabled ? '停用扩展' : '启用扩展'}</button>{pack.previous_version && <button className={BUTTON} disabled={busy} onClick={() => setConfirm('rollback')}>{'回退到 ' + pack.previous_version}</button>}{pack.pending_version && pack.version && <button className={BUTTON} disabled={busy} onClick={() => void run('cancel-update')}>取消待生效更新</button>}<button className={cn(BUTTON, 'text-danger')} disabled={busy} onClick={() => setConfirm('remove')}>卸载扩展</button></div>}
+          {!pack.pending_remove && <div className="mt-4 flex flex-wrap gap-2"><Button className={TAP} disabled={busy} onClick={() => void run(pack.enabled ? 'disable' : 'enable')}>{pack.enabled ? '停用扩展' : '启用扩展'}</Button>{pack.previous_version && <Button className={TAP} disabled={busy} onClick={() => setConfirm('rollback')}>{'回退到 ' + pack.previous_version}</Button>}{pack.pending_version && pack.version && <Button className={TAP} disabled={busy} onClick={() => void run('cancel-update')}>取消待生效更新</Button>}<Button variant="danger" className={TAP} disabled={busy} onClick={() => setConfirm('remove')}>卸载扩展</Button></div>}
           <p className="mt-4 flex items-start gap-2 text-xs leading-6 text-secondary"><Clock3 className="mt-1 h-3.5 w-3.5 shrink-0" />变更后请重启主程序；刷新浏览器不能替代后台重启。</p>
         </>}
         {source && <>
           <PackageActions key={source.name} plugin={source} refresh={refresh} />
           {source.api_key_env && source.enabled !== false && !source.pending_remove && <div className="mt-6 max-w-xl border-t border-border pt-5"><PluginKeyConfig key={source.name} plugin={source} /></div>}
         </>}
-        {page && <><p className="break-all text-xs leading-6 text-secondary">页面标识：{page.id}</p><p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">启停和卸载在刷新浏览器后生效。更新时从“导入文件”上传新产物，并确认替换相同标识。</p><div className="mt-4 flex flex-wrap gap-2"><button className={BUTTON} disabled={busy || (!page.enabled && !!activeError)} onClick={() => void run(page.enabled ? 'disable' : 'enable')}>{page.enabled ? '停用页面' : '启用页面'}</button><button className={cn(BUTTON, 'text-danger')} disabled={busy} onClick={() => setConfirm('remove')}>卸载页面</button></div></>}
+        {page && <><p className="break-all text-xs leading-6 text-secondary">页面标识：{page.id}</p><p className="mt-2 max-w-2xl text-sm leading-6 text-secondary">启停和卸载在刷新浏览器后生效。更新时从“导入文件”上传新产物，并确认替换相同标识。</p><div className="mt-4 flex flex-wrap gap-2"><Button className={TAP} disabled={busy || (!page.enabled && !!activeError)} onClick={() => void run(page.enabled ? 'disable' : 'enable')}>{page.enabled ? '停用页面' : '启用页面'}</Button><Button variant="danger" className={TAP} disabled={busy} onClick={() => setConfirm('remove')}>卸载页面</Button></div></>}
         {activeError && <div role="alert" className="mt-5 space-y-2 rounded-btn bg-danger/5 p-3 text-xs leading-6 text-danger"><p className="font-medium">加载失败</p><p className="break-words">{pack?.failed_version ? '版本 ' + pack.failed_version + ' 启动失败；' + (pack.runtime_version ? '当前仍运行 ' + pack.runtime_version + '。' : '扩展未启用。') : activeError}</p>{page && <p>请停用此页面，或修正冲突后重新导入。</p>}</div>}
-        {confirm && <div className="mt-5 space-y-3 border-t border-border pt-4"><p className="text-xs leading-6 text-secondary">{confirm === 'remove' ? '确认卸载此扩展？扩展包及关联页面将移除，包目录外的数据保留。' : '确认回退：' + pack?.version + ' → ' + pack?.previous_version + '。重启后切换，原有启停状态保留。' + (pack?.pending_version ? '已暂存的 ' + pack.pending_version + ' 将被替换。' : '')}</p><div className="flex flex-wrap gap-2"><button className={BUTTON} disabled={busy} onClick={() => setConfirm('')}>取消</button><button className={cn(BUTTON, confirm === 'remove' && 'text-danger')} disabled={busy} onClick={() => void run(confirm)}>{busy ? '处理中…' : '确认'}</button></div></div>}
+        {confirm && <div className="mt-5 space-y-3 border-t border-border pt-4"><p className="text-xs leading-6 text-secondary">{confirm === 'remove' ? '确认卸载此扩展？扩展包及关联页面将移除，包目录外的数据保留。' : '确认回退：' + pack?.version + ' → ' + pack?.previous_version + '。重启后切换，原有启停状态保留。' + (pack?.pending_version ? '已暂存的 ' + pack.pending_version + ' 将被替换。' : '')}</p><div className="flex flex-wrap gap-2"><Button className={TAP} disabled={busy} onClick={() => setConfirm('')}>取消</Button><Button variant={confirm === 'remove' ? 'danger' : 'outline'} className={TAP} disabled={busy} onClick={() => void run(confirm)}>{busy ? '处理中…' : '确认'}</Button></div></div>}
       </section>}
       </div>
     </div>}

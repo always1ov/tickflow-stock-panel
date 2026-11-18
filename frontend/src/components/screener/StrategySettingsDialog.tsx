@@ -8,6 +8,7 @@ import { selectableStrategies, strategyOptionLabel } from '@/lib/strategyLibrary
 import { toPercentages, normalizeWeights } from '@/lib/weights'
 import { groupParams, visibleParams } from '@/lib/strategyParams'
 import { toast } from '@/components/Toast'
+import { Switch } from '@/components/ui'
 import { BUILTIN_COLUMNS } from '@/lib/watchlist-columns'
 import { color } from '@/lib/colors'
 import { SignalPicker } from './SignalPicker'
@@ -183,18 +184,11 @@ const ParamField = memo(function ParamField({ def, value, onChange, onApplyValue
     return (
       <div className="flex items-center gap-2">
         <span className={PARAM_LABEL_CLS} title={def.label}>{def.label}</span>
-        <button
-          type="button"
-          onClick={() => onChange(def.id, !checked)}
-          className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${
-            checked ? 'bg-accent' : 'bg-surface border border-border'
-          }`}
-          aria-pressed={checked}
-        >
-          <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-            checked ? 'translate-x-[14px]' : 'translate-x-0.5'
-          }`} />
-        </button>
+        <Switch
+          size="sm"
+          checked={checked}
+          onChange={next => onChange(def.id, next)}
+        />
         <span className="text-micro text-muted/60">{checked ? '开' : '关'}</span>
       </div>
     )
@@ -659,15 +653,12 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                           dim={!basicFilterEnabled}
                           extra={<>
                             <span className="text-micro text-muted/60">{basicFilterEnabled ? '已启用' : '已关闭'}</span>
-                            <button
-                              type="button"
-                              onClick={() => setBasicFilterEnabled(v => !v)}
-                              aria-pressed={basicFilterEnabled}
-                              aria-label="启用基础参数过滤"
-                              className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors duration-200 cursor-pointer ${basicFilterEnabled ? 'bg-sky-500' : 'bg-surface border border-border'}`}
-                            >
-                              <span className={`inline-block h-3 w-3 rounded-full bg-white shadow-sm transition-transform duration-200 ${basicFilterEnabled ? 'translate-x-[14px]' : 'translate-x-0.5'}`} />
-                            </button>
+                            <Switch
+                              size="sm"
+                              checked={basicFilterEnabled}
+                              onChange={next => setBasicFilterEnabled(next)}
+                              label="启用基础参数过滤"
+                            />
                           </>}
                         >
                           <div className="space-y-2">

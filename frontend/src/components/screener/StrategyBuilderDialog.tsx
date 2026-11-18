@@ -7,7 +7,7 @@ import { storage, type DefaultStrategyBasicFilter } from '@/lib/storage'
 import { cn } from '@/lib/cn'
 import { ALL_BOARDS } from './StrategySettingsDialog'
 import { loadDefaultBasicFilter } from './DefaultStrategyParamsDialog'
-import { TYPE } from '@/components/ui'
+import { TYPE, SwitchTrack } from '@/components/ui'
 
 // ===== 工具函数 =====
 
@@ -620,9 +620,9 @@ export function StrategyBuilderDialog({ open, onClose, onSavedId, mode = 'create
                     <Terminal className="h-3.5 w-3.5 text-emerald-400" />
                     AI 迭代（自动回测诊断优化）
                   </span>
-                  <span className={cn('relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors', iterateEnabled ? 'bg-emerald-400/40' : 'bg-border')}>
-                    <span className={cn('inline-block h-4 w-4 rounded-full bg-white transform transition-transform', iterateEnabled ? 'translate-x-[18px]' : 'translate-x-[2px]')} />
-                  </span>
+                  {/* [R821] 整行本身就是按钮, 这里只借开关的外观表达 aria-pressed;
+                      真开关塞进来会变成按钮套按钮。 */}
+                  <SwitchTrack checked={iterateEnabled} />
                 </button>
                 {aiStatus?.configured && !supportsIteration && (
                   <div role="status" className="text-micro text-muted">当前 AI 接入暂不支持自动迭代，仍可使用普通生成。</div>

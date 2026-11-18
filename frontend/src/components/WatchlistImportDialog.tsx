@@ -11,7 +11,7 @@ import {
   WATCHLIST_GROUP_COLORS,
   resolveWatchlistGroupColor,
 } from '@/lib/watchlist-group-colors'
-import { TYPE } from '@/components/ui'
+import { Button, TYPE } from '@/components/ui'
 
 interface Props {
   open: boolean
@@ -676,14 +676,15 @@ export function WatchlistImportDialog({
             一律按证券主数据匹配，已在自选的只并入分组不重复添加
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={onClose}
-          className="h-8 w-8 inline-flex items-center justify-center rounded-btn text-secondary hover:bg-elevated"
+          variant="ghost"
+          icon
           aria-label="关闭"
         >
           <X className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       <div className="px-4 py-3 overflow-y-auto flex-1 space-y-3">
@@ -694,14 +695,14 @@ export function WatchlistImportDialog({
         <div className="space-y-2">
           <Dropzone busy={busy} label={progressLabel ?? '解析中…'} onPick={(l) => void onSourcePick(l)} />
           {!pasteOpen ? (
-            <button
+            <Button
               type="button"
               onClick={() => setPasteOpen(true)}
-              className="w-full inline-flex items-center justify-center gap-1.5 rounded-btn border border-dashed border-border bg-surface px-3 py-2 text-xs text-foreground hover:bg-elevated/70"
+              className="w-full border-dashed"
             >
               <Keyboard className="h-3.5 w-3.5 text-accent" />
               或粘贴证券代码 / 整篇文章
-            </button>
+            </Button>
           ) : (
             <div className="space-y-2 rounded-btn border border-border bg-elevated/40 p-2.5">
               <textarea
@@ -723,33 +724,35 @@ export function WatchlistImportDialog({
                   代码用「解析代码」，整篇文章用「AI 认股票」
                 </span>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="xs"
                     onClick={() => { setPasteOpen(false); setCodesText('') }}
-                    className="h-7 px-2 rounded-btn text-xs text-secondary hover:bg-elevated"
                   >
                     收起
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     disabled={busy || !codesText.trim()}
                     onClick={() => void runCodes()}
                     title="只认六位代码，不调 AI，最快"
-                    className="h-7 px-2.5 rounded-btn text-xs inline-flex items-center gap-1.5 border border-border bg-surface text-foreground hover:text-foreground disabled:opacity-40"
+                    size="xs"
                   >
                     <Keyboard className="h-3.5 w-3.5" />
                     解析代码
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     disabled={busy || !codesText.trim()}
                     onClick={() => void runText()}
                     title="把整篇文章交给 AI：认出提到的个股（只有名字也认），并按文章自己分好的小分队归类"
-                    className="h-7 px-2.5 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-on-accent hover:bg-accent/90 disabled:opacity-40"
+                    variant="primary"
+                    size="xs"
                   >
                     {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                     AI 认股票
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -930,16 +933,17 @@ export function WatchlistImportDialog({
                   className="h-8 min-w-0 flex-1 rounded-btn border border-border bg-surface px-2 text-xs text-foreground placeholder:text-muted focus:border-accent/50 focus:outline-none"
                   aria-label="新分组名称"
                 />
-                <button
+                <Button
                   type="button"
                   onClick={() => void createGroup()}
                   disabled={creatingGroup || !newGroupName.trim()}
                   title="创建分组，并作为本次导入的目标分组"
-                  className="h-8 shrink-0 px-3 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-on-accent hover:bg-accent/90 disabled:opacity-40"
+                  variant="primary"
+                  className="shrink-0"
                 >
                   {creatingGroup ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                   创建
-                </button>
+                </Button>
               </div>
               <div className="flex items-center gap-2 pl-1">
                 <span className="text-xs text-secondary shrink-0">颜色</span>
@@ -966,18 +970,18 @@ export function WatchlistImportDialog({
         )}
 
         <div className="flex items-center justify-end gap-2">
-          <button
+          <Button
             type="button"
             onClick={onClose}
-            className="h-8 px-3 rounded-btn text-xs text-secondary hover:bg-elevated"
+            variant="ghost"
           >
             取消
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             disabled={selected.size === 0 || batchAdd.isPending || busy}
             onClick={() => void confirmAdd()}
-            className="h-8 px-3 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-on-accent hover:bg-accent/90 disabled:opacity-40"
+            variant="primary"
           >
             {batchAdd.isPending ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -985,7 +989,7 @@ export function WatchlistImportDialog({
               <Upload className="h-3.5 w-3.5" />
             )}
             导入所选 ({selected.size})
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

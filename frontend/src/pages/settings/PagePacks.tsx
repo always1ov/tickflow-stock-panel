@@ -13,6 +13,7 @@ import { Package, Trash2, Upload, AlertTriangle, CheckCircle2, FileCode, FolderD
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
+import { Switch } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { packToExtension, runtimeBundleUrl } from '@/extensions/runtime'
 import { getFrontendExtensionLoadErrors } from '@/extensions/registry'
@@ -252,22 +253,12 @@ export function SettingsPagePacksPanel() {
               <div>{fmtTime(p.uploaded_at)}</div>
             </div>
             <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={() => enabledMut.mutate({ id: p.id, enabled: !p.enabled })}
+              <Switch
+                checked={p.enabled}
+                onChange={next => enabledMut.mutate({ id: p.id, enabled: next })}
                 disabled={!!p.error}
-                className={cn(
-                  'relative h-5 w-9 rounded-full transition-colors',
-                  p.enabled ? 'bg-accent' : 'bg-surface border border-border',
-                  p.error && 'cursor-not-allowed opacity-40',
-                )}
                 title={p.error ? '校验失败的包不可启用' : p.enabled ? '停用 (刷新后生效)' : '启用 (刷新后生效)'}
-              >
-                <span className={cn(
-                  'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
-                  p.enabled ? 'left-[1.125rem]' : 'left-0.5',
-                )} />
-              </button>
+              />
             </div>
             <div className="flex justify-center">
               <button

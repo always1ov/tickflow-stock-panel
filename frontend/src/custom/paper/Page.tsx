@@ -27,6 +27,7 @@ import { fmtPct, priceColorClass } from '@/lib/format'
 import { boardTag } from '@/components/stock-table/primitives'
 import { PageHeader } from '@/components/PageHeader'
 import { Modal } from '@/components/Modal'
+import { Switch } from '@/components/ui'
 // [fork R562] 跟六态转折(转折模拟盘并入虚拟账户) —— 逻辑都在这几个 fork 文件里, 本页只留挂载点
 import { FlipFollowCard, FlipRulesCard } from '@/components/paper/FlipFollowCard'
 import { FLIP_RULE_NAME, FlipRuleRow, FlipSetupToggle, validMaxPos } from '@/components/paper/FlipSetup'
@@ -2562,20 +2563,13 @@ function AccountPanel({ acc, name, onDeleted }: { acc: string; name?: string; on
                 <span title="开启后, 触及涨停的买入/触及跌停的卖出不再直接过期, 转次日开盘重试 (最多顺延 3 日)">
                   涨跌停排队次日重试
                 </span>
-                <button
-                  onClick={() => queueM.mutate(!ov.queue_limit_orders)}
+                <Switch
+                  size="sm"
+                  checked={!!ov.queue_limit_orders}
                   disabled={queueM.isPending}
-                  className={cn(
-                    'relative h-4 w-8 shrink-0 rounded-full transition-colors',
-                    ov.queue_limit_orders ? 'bg-accent' : 'bg-border',
-                  )}
-                  aria-label="涨跌停排队次日重试开关"
-                >
-                  <span className={cn(
-                    'absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
-                    ov.queue_limit_orders ? 'left-[18px]' : 'left-0.5',
-                  )} />
-                </button>
+                  onChange={next => queueM.mutate(next)}
+                  label="涨跌停排队次日重试开关"
+                />
               </div>
             </div>
           </div>

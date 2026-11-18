@@ -18,7 +18,7 @@ import { fmtPrice, fmtPct, fmtBigNum, priceColorClass, formatExtNumber, fmtAsset
 import { cn } from '@/lib/cn'
 import { computeGroupPcts, loadGroupStatsConfig, type GroupStatsConfigPatch } from '@/lib/watchlistGroupStats'
 import { PageHeader } from '@/components/PageHeader'
-import { SEG, SEG_ITEM, SEG_OFF, SEG_ON } from '@/components/ui'
+import { Button, SEG, SEG_ITEM, SEG_OFF, SEG_ON } from '@/components/ui'
 import { EmptyState } from '@/components/EmptyState'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { QuoteFreshnessBadge } from '@/components/QuoteFreshnessBadge'
@@ -1210,41 +1210,42 @@ export function Watchlist() {
               addPending={addMutation.isPending}
               memberPending={addGroupMember.isPending || removeGroupMember.isPending}
             />
-            <button
+            <Button
               onClick={() => setImportOpen(true)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-surface border border-border hover:bg-elevated/80 text-foreground hover:text-foreground transition-colors duration-150 ease-smooth"
               title="批量导入自选（截图 / CSV / 粘贴代码）"
               aria-label="批量导入自选"
+              icon
             >
               <FileUp className="h-4 w-4" />
-            </button>
+            </Button>
             <div className="w-px h-5 bg-border" />
             {/* 自定义列 / 刷新 */}
-            <button
+            <Button
               onClick={() => setCustomizerOpen(true)}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-surface border border-border hover:bg-elevated/80 text-foreground hover:text-foreground transition-colors duration-150 ease-smooth"
               title="自定义列"
+              icon
             >
               <Settings2 className="h-4 w-4" />
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => enriched.refetch()}
               disabled={enriched.isFetching}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-surface border border-border hover:bg-elevated/80 text-foreground hover:text-foreground transition-colors duration-150 ease-smooth disabled:opacity-50"
               title="刷新"
+              icon
             >
               <RefreshCw className={`h-4 w-4 ${enriched.isFetching ? 'animate-spin' : ''}`} />
-            </button>
+            </Button>
             {allSymbols.length > 0 && (
               <>
                 <div className="w-px h-5 bg-border" />
-                <button
+                <Button
                   onClick={() => setConfirmClear(true)}
-                  className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-danger/10 text-danger hover:bg-danger/20 transition-colors duration-150 ease-smooth"
                   title="清空自选"
+                  variant="danger"
+                  icon
                 >
                   <Trash2 className="h-4 w-4" />
-                </button>
+                </Button>
               </>
             )}
             {/* 扩展插槽: 自选页工具栏二开区 (无注册时不渲染) */}
@@ -1304,14 +1305,15 @@ export function Watchlist() {
           {activeFilterCount > 0 && <span className="font-mono">{activeFilterCount}</span>}
         </button>
         {hasActiveFilters && (
-          <button
+          <Button
             onClick={resetAllFilters}
-            className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-surface border border-border text-foreground hover:bg-danger/10 hover:text-danger transition-colors duration-150 ease-smooth"
             title="重置全部筛选"
             aria-label="重置全部筛选"
+            variant="danger"
+            icon
           >
             <RotateCcw className="h-4 w-4" />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -1769,19 +1771,20 @@ export function Watchlist() {
                 将移除全部 {allSymbols.length} 只自选，此操作不可恢复。
               </p>
               <div className="flex items-center justify-end gap-2">
-                <button
+                <Button
                   onClick={() => setConfirmClear(false)}
-                  className="px-3 py-1.5 rounded-btn bg-surface border border-border text-foreground hover:bg-elevated/80 text-sm transition-colors"
+                  size="md"
                 >
                   取消
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => clearAll.mutate()}
                   disabled={clearAll.isPending}
-                  className="px-3 py-1.5 rounded-btn bg-danger/15 text-danger hover:bg-danger/25 text-sm font-medium transition-colors disabled:opacity-50"
+                  variant="danger"
+                  size="md"
                 >
                   {clearAll.isPending ? '清除中...' : '确认清空'}
-                </button>
+                </Button>
               </div>
             </motion.div>
           </div>

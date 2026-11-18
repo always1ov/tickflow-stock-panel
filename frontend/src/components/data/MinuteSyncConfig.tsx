@@ -4,7 +4,7 @@ import { Loader2, Trash2, Download, Calendar, SlidersHorizontal, Activity } from
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { MissingCapChip } from '@/lib/capability-labels'
-import { TYPE, buttonClass } from '@/components/ui'
+import { TYPE, buttonClass, Switch } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { MinuteGapPanel } from '@/components/data/MinuteGapPanel'
 
@@ -126,22 +126,12 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
       <div className="space-y-4 rounded-card border border-border bg-base/30 p-3 sm:p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <button
-            role="switch"
-            aria-label="自动同步"
-            aria-checked={enabled}
-            onClick={handleToggle}
+          <Switch
+            checked={enabled}
+            onChange={() => handleToggle()}
             disabled={!hasMinuteCap}
-            className={`tap-target relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-expand shrink-0 ${
-              enabled ? 'bg-accent' : 'bg-surface border border-border'
-            } ${!hasMinuteCap ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
-          >
-            <span
-              className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-expand ${
-                enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
-              }`}
-            />
-          </button>
+            label="自动同步"
+          />
           <span className="text-xs text-foreground font-medium">
             自动同步{enabled ? '已开启' : '已关闭'}
           </span>
