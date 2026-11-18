@@ -96,7 +96,9 @@ def test_R759_每天两行摆齐八样信息():
     sec = code_of(SEC)
     for piece in ("{r.date.slice(5)}", "{r.close.toFixed(2)}", "chgCls(r.change_pct)",
                   "trendBadgeCls(r.trend.state)", "VERDICT_CLS[r.verdict.tone]",
-                  "<LegAct leg={l} />", "<LegFill leg={l} />", "<LegResult leg={l} />"):
+                  # [R846] 成交那格多一个 `openAsDot`: 逐日复盘里「未完」收成灰色省略号,
+                  # 免得琥珀色把一行灰字拦腰截断(说法仍在悬停里)。
+                  "<LegAct leg={l} />", "<LegFill leg={l} openAsDot />", "<LegResult leg={l} />"):
         assert piece in sec, f"逐日少了一样: {piece}"
 
 
@@ -107,7 +109,9 @@ def test_R759_两套口径都在_六态与通道():
     sec = code_of(SEC)
     assert "legsByFlipDate(d.verdict_trades)" in sec, "逐日里通道那笔动作没接上"
     assert "legsByFlipDate(d.flip_trades)" in sec, "逐日里六态那笔动作没接上"
-    for word in ("只看有事的日子", "只看换档的日子"):
+    # [R854] 用户: 「这两个按钮重命名, 我喜欢放在右边」—— 砍掉「的日子」, 排版回到右对齐
+    # [R855] 标记改名后按钮跟着走: 「只看换档」→「只看档位切换」
+    for word in ("只看有事", "只看档位切换"):
         assert word in sec, f"筛选少了「{word}」"
 
 

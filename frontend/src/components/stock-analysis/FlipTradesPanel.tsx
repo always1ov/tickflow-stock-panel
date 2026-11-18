@@ -223,16 +223,20 @@ export function LegAct({ leg }: { leg: Leg }) {
   )
 }
 
-export function LegFill({ leg }: { leg: Leg }) {
+export function LegFill({ leg, openAsDot = false }: { leg: Leg; openAsDot?: boolean }) {
   return (
     <>
       <span className="text-secondary">{leg.enter_date.slice(5)} {leg.enter_price.toFixed(2)}</span>
       <span className="mx-1 opacity-50">→</span>
       {leg.exit_date.slice(5)} {leg.exit_price.toFixed(2)}
-      {leg.open_ended && (
+      {leg.open_ended && (openAsDot ? (
+        // [R846] 逐日复盘那一行本来就密, 琥珀色「未完」夹在两个价格中间, 把一行灰字拦腰截断。
+        // 那里收成一枚灰色省略号, 说法仍挂在悬停里; 卡片(default)那处不动。
+        <span className="text-muted/40" title="这一段还没走完 —— 按最新收盘记, 不进胜负统计">…</span>
+      ) : (
         <span className="ml-1 text-warning/80"
               title="这一段还没走完 —— 按最后一天收盘价记, 不进胜负统计">未完</span>
-      )}
+      ))}
     </>
   )
 }

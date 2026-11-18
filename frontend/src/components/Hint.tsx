@@ -13,17 +13,19 @@
  *
  * 触发器**不做**按下缩放之外的动效: 它一天会被点几十次。
  */
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
 const GAP = 8      // 离视口边缘至少留这么多
 const OFFSET = 4   // 浮层与触发器之间
 
-export function Hint({ title, className }: {
+export function Hint({ title, className, icon }: {
   /** 说明文字 —— 与原来写在 `title=` 里的是同一份, `\n` 会换行 */
   title: string
   className?: string
+  /** [R864] 触发器的图标: 默认圆问号; 个别表头要区分「这是什么」, 换成 Info 之类更直白 */
+  icon?: ReactNode
 }) {
   const [open, setOpen] = useState(false)
   const [style, setStyle] = useState<CSSProperties>()
@@ -81,7 +83,7 @@ export function Hint({ title, className }: {
           className,
         )}
       >
-        <HelpCircle className="h-3 w-3" />
+        {icon ?? <HelpCircle className="h-3 w-3" />}
       </button>
       {open && (
         <span

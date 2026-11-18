@@ -49,10 +49,16 @@ type Placement = { left: number; top: number; below: boolean }
 /**
  * `note` 给调用方补一句只在该处成立的话 —— 同一个"到上沿", 持仓侧是止盈时机,
  * 买入候选侧是追高。这个差别不能写死在 verdict 里, 它对两边都得成立。
+ *
+ * [R848] `compact`: 复盘「趋势 · 档位」那一列只要**结论 + 怎么做 + 依据**。
+ * 原来的「为什么」段和尾巴那段口径, 与上面的依据基本在说同一件事, 悬停里读到最后
+ * 反而找不到重点(用户: 「悬浮描述要简洁抓住重点显示不能说那么多没帮助的废话」)。
+ * 默认形态(决策台)不动, 那里一列就是一个结论, 三段是它需要的。
  */
-export function VerdictHover({ v, note, children }: {
+export function VerdictHover({ v, note, compact = false, children }: {
   v: KeltnerVerdict
   note?: string
+  compact?: boolean
   children: ReactNode
 }) {
   const ref = useRef<HTMLSpanElement>(null)
@@ -120,10 +126,12 @@ export function VerdictHover({ v, note, children }: {
                 <div className="mt-0.5 text-xs leading-snug text-foreground">{v.action}</div>
               </div>
 
-              <div className="mt-2">
-                <div className="text-micro text-muted">为什么</div>
-                <div className="mt-0.5 text-micro leading-relaxed text-secondary">{v.detail}</div>
-              </div>
+              {!compact && (
+                <div className="mt-2">
+                  <div className="text-micro text-muted">为什么</div>
+                  <div className="mt-0.5 text-micro leading-relaxed text-secondary">{v.detail}</div>
+                </div>
+              )}
 
               <div className="mt-2 flex items-baseline gap-1.5">
                 <span className="shrink-0 text-micro text-muted">依据</span>
@@ -141,10 +149,12 @@ export function VerdictHover({ v, note, children }: {
                   {note}
                 </div>
               )}
-              <div className="mt-1.5 text-micro leading-relaxed text-muted/80">
-                这是「档位」—— 说的是这个价算高还是算低, 不是会不会继续涨。
-                清仓与否看止盈线/生命线, 优先级在通道之上。收盘口径。
-              </div>
+              {!compact && (
+                <div className="mt-1.5 text-micro leading-relaxed text-muted/80">
+                  这是「档位」—— 说的是这个价算高还是算低, 不是会不会继续涨。
+                  清仓与否看止盈线/生命线, 优先级在通道之上。收盘口径。
+                </div>
+              )}
             </div>
           </div>
         </div>,

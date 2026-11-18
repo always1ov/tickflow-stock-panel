@@ -68,11 +68,14 @@ def test_R612_双栏_左栏只放现状_窄屏单列():
     dlg = code_of(DLG)
     st = code_of(ST)
     grid = dlg[dlg.index("xl:grid xl:grid-cols-[minmax(240px,290px)_minmax(0,1fr)_minmax(250px,300px)]"):]
-    left = grid[grid.index("xl:overflow-y-auto xl:border-b-0 xl:border-r"):]
+    # [R866] R840 起左栏那一格的 class 里没有 `xl:border-b-0` 了(三栏在 xl 就成立, 不再需要
+    # 抹掉单列时留下的下边框), 定位串跟着改; 守的东西不变。
+    left = grid[grid.index("xl:min-h-0 xl:overflow-y-auto xl:border-r"):]
     left = left[:left.index("</div>")]
     assert "<StatusSection" in left and "<ChartLevelsSection" not in left, "左栏不是只放现状"
     assert grid.index("<StatusSection") < grid.index("<ChartLevelsSection"), "现状没排在图前面"
-    assert "grid grid-cols-1 items-start" in st and "sm:grid-cols-2" not in st, "左栏只有 240~290px, 现状该是单列"
+    # [R866] R840 重排: 外面仍是一条纵列(不许摊成 2/4 列), 只把「趋势」与「通道」并进同一行。
+    assert "grid grid-cols-1 gap-y-3" in st and "sm:grid-cols-2" not in st, "左栏只有 240~290px, 现状该是单列"
     assert "max-md:w-screen" in dlg and "max-md:h-[100dvh]" in dlg, "手机上没铺满整屏"
 
 
@@ -110,7 +113,10 @@ def test_R445_现状块删掉打码的部分_没有分隔竖线_四块等分():
     assert '<Cell label="通道阶段">' in st and "通道档位" not in st
     # [R760] R707 把本块收成左栏一条纵列(240~290px), 「四块等分一行」不再成立;
     # 守的原意改成: 单一列、顶端对齐, 不许再摊成多列。
-    assert "grid grid-cols-1 items-start" in st and "lg:grid-cols-4" not in st
+    # [R866] R840 重排后外面仍是 `grid-cols-1`(间距从 `items-start` 换成 `gap-y-3`),
+    # 只有「趋势 / 通道」那一行内部并成两格 —— 位置类不摊开, 读数类并排, 都不算「摊成多列」。
+    assert "grid grid-cols-1 gap-y-3" in st and "lg:grid-cols-4" not in st
+    assert "grid-cols-[minmax(0,1fr)_auto]" in st, "趋势 / 通道那一行没并排"
     # [R760] 「跌破转弱 / 站上转强」两格按 R682 撤掉、R707 未恢复 —— 改为守下架状态。
     assert "FlipCell" not in st and "跌破转弱" not in st and "站上转强" not in st
     # [R448] 用户: 「删掉三档位置这四个字」

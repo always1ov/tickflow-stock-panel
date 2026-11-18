@@ -90,8 +90,9 @@ Keltner 三档、注记·不计分、焦点名单、收盘口径 vs 盘中口径
 
 这些不是偏好，是**已经定案的规矩**，除非用户明确改口，一律照办：
 
-1. **永不开 pull request。** 用户原话「我的修改永不提交 pr」。所有工作直接提交并推送到
-   `claude/upstream-clean`。
+1. **永不开 pull request。** 用户原话「我的修改永不提交 pr」。所有工作直接提交到
+   **`魔改中-R643`**（唯一工作分支）。原 `claude/upstream-clean` 早已删除 ——
+   本地与远端都没有它，别再往那儿推，也别在文档里把它当成当前分支。
 2. **沟通用中文。**
 3. **`backend/app/strategy/builtin/*.py` 只读。** 用户原话「我策略里面的因子不能动，
    那是精心设计验证过的」—— 不改因子、阈值、参数、META。每次提交前用
@@ -224,7 +225,7 @@ Keltner 三档、注记·不计分、焦点名单、收盘口径 vs 盘中口径
 | 镜像仓库 | `ghcr.io/always1ov/tickflow-stock-panel` |
 | Tag 策略 | 发布分支与 `v*` tag 覆盖 **`:latest`**；此外**每次构建都另出** `:<sha>` 与 `:<分支名>`（斜杠转横线），`v*` tag 另出 `:vX.Y.Z`。部署只拉 `:latest`，其余是可追溯用的 |
 | 部署方式 | `docker-compose.yml` 拉取预构建 `:latest`，不本地 build |
-| CI 工作流 | `.github/workflows/docker.yml`（push 到 **`main` 或 `claude/upstream-clean`** 自动刷 `:latest` + `:sha` **并自动触发 Coolify 部署**；其他工作分支只出 `:sha` / `:<分支名>`，不动 `:latest`；`v*` tag 另出版本号镜像；`workflow_dispatch` 手动兜底） |
+| CI 工作流 | `.github/workflows/docker.yml`（push 到 **`main`** 自动刷 `:latest` + `:sha` **并自动触发 Coolify 部署**；其他工作分支（含当前唯一工作分支 `魔改中-R643`）只出 `:sha` / `:<分支名>`，不动 `:latest`；`v*` tag 另出版本号镜像；`workflow_dispatch` 手动兜底。⚠️ 文件里的 `claude/upstream-clean` 那一项是**历史残留**，该分支已删除，永远不会命中） |
 | 多架构 | `linux/amd64` + `linux/arm64` |
 | 环境变量 | 模板 `.env.example`，真实值在 `.env`（`.gitignore` 已排除） |
 | 数据持久化 | `./data:/app/data`（`data/` 由 `.gitignore` 排除） |
@@ -376,3 +377,27 @@ Keltner 三档、注记·不计分、焦点名单、收盘口径 vs 盘中口径
 - **这两行都是从工作流文件抄的，会再次过期。** 改 `docker.yml` 的触发分支、`tags:`
   块或部署步骤时，必须同时改这两行。没有守卫钉着它们 —— 快照表是给人读的散文，
   钉不住；能做的只有在改工作流时顺手回来看一眼。
+
+### 2026-11-18 — 改掉「推到 claude/upstream-clean」这条过期规矩
+
+**改动文件：**
+- `AGENTS.md`（本文件）— 修改 — 「Fork 硬约束」第 1 条与「当前项目快照」CI 工作流那一行
+
+**问题：**
+- 硬约束第 1 条还写着「所有工作直接提交并推送到 `claude/upstream-clean`」，快照表也写着
+  「push 到 `main` 或 `claude/upstream-clean` 自动刷 `:latest`」。但这条分支**本地和远端
+  都已经不存在**（`git branch -a` 只剩 `main` / `deploy` / `魔改中-R643` 等）。
+- 我这一轮就是照着它跟用户汇报「要不要推到 claude/upstream-clean」，被用户当场纠正：
+  「怎么还有 claude/upstream-clean，不是已经删除了吗，我就只改我的魔改分支」。
+
+**关键决策：**
+- 第 1 条改为「直接提交到 `魔改中-R643`（唯一工作分支）」，并写明原分支已删除。
+- 快照表不改工作流文件的描述，只把事实标清楚：`main` 仍是发布分支，其他分支（含
+  `魔改中-R643`）只出 `:sha` / `:<分支名>`；`docker.yml` 里那一项标为**历史残留**。
+- **没有动 `docker.yml`** —— 那条 `on.push.branches` 条目不会命中已删除的分支，
+  删不删都不影响构建；真要清理，另开一轮。
+
+**已知注意事项 / 遗留：**
+- `FORK_NOTES.md`、`docs/hidden-features.md`、`docs/docker-build-convention.md` 里仍有
+  提到 `claude/upstream-clean` 的地方：前两处是历史记录（找回提交号用），保持原样；
+  `docker-build-convention.md` 那份是构建约定，等下次动 Docker 时一并核对。
